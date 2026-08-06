@@ -168,7 +168,41 @@ Faction Parser::factionFromRaw(int raw) {
     return static_cast<Faction>(raw);
 }
 
-void Parser::parsePlayerSlots(const QString& header) {
+void Parser::parseMapReference(const QStringView header) {
+    // The header's GameInfo text begins with "M=" followed by a numeric
+    // (short-range, hex-encoded per the format doc) unknown value of
+    // variable width - it can contain hex letters (e.g. a trailing 'b'),
+    // so its exact width/character class isn't reliable to scan for.
+    // Empirically (107 real replays), the map reference that follows always
+    // begins with "data/", which is a far more reliable anchor.
+    constexpr QLatin1String mapMarker("M=");
+    constexpr QLatin1String pathAnchor("data/");
+
+    if (!header.startsWith(mapMarker)) {
+        throw CorruptDataException(QString("header missing map reference"),
+                                   m_reader->lastOffset());
+    }
+
+    const qsizetype mapStart =
+        header.indexOf(pathAnchor, mapMarker.size(), Qt::CaseInsensitive);
+    if (mapStart < 0) {
+        throw CorruptDataException(
+            QString("header map reference missing data/ prefix"),
+            m_reader->lastOffset());
+    }
+
+    const qsizetype mapEnd = header.indexOf(QLatin1Char(';'), mapStart);
+    if (mapEnd < 0) {
+        throw CorruptDataException(
+            QString("header map reference missing terminator"),
+            m_reader->lastOffset());
+    }
+
+    m_metadata.mapReference =
+        header.sliced(mapStart, mapEnd - mapStart).toString();
+}
+
+void Parser::parsePlayerSlots(const QStringView header) {
     // The header's ";S=" key holds a colon-separated list of player slots,
     // e.g. "S=HMuonic,0,0,TT,4,10,-1,-1,0,1,-1,:CB,-1,11,-1,-1,0,4:X:X:...;"
     // Each slot starts with a type letter: H (human), C (computer), or X
@@ -275,6 +309,7 @@ void Parser::parseHeaderTail() {
 
     // read the header
     const QString header = m_reader->readFixedCharString<uint32_t>();
+    parseMapReference(header);
     parsePlayerSlots(header);
 
     const auto replaySaver = m_reader->readByte<uint8_t>();

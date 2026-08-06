@@ -65,5 +65,19 @@ struct ReplayMetadata {
      * doesn't seem to include the extension
      */
     QString filename;
+    /**
+     * A normalized (lowercased, forward-slash-separated) virtual path into
+     * whichever .big archive contains the map, e.g.
+     * "data/maps/official/abandoned subway 1.02+__25beta". Confirmed against
+     * the game's own archive listings: matches directly for maps shipped in
+     * the base game, and for custom/community maps it points into whatever
+     * separately-installed .big file provides them.
+     *
+     * This may be useful to do things like determine whether or not the file
+     * is from the current community patch version since there are files that
+     * control which .big files are loaded and those contain this literal
+     * string.
+     */
+    QString mapReference;
 };
 }  // namespace LegionParser
