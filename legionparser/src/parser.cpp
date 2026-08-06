@@ -19,15 +19,18 @@ constexpr std::size_t U1_SIZE = 33;
 constexpr std::size_t U2_SIZE = 19;
 constexpr std::size_t DATETIME_STRING_LENGTH = 8;
 constexpr char MAX_PLAYERS = 8;
-
 constexpr const char* const REPL_MAGIC = "CNC3RPL";
 constexpr std::size_t REPL_MAGIC_SIZE = 8;
+
+//  The S= string has the faction field at 6 and the computer has it at 3
+constexpr qsizetype HUMAN_FACTION_SLOT_FIELD = 5;
+constexpr qsizetype COMP_FACTION_SLOT_FIELD = 2;
 
 Parser::Parser(QIODevice& replayFile, ParserEventListener& listener)
     : m_reader(std::make_unique<Reader>(replayFile)),
       m_evListener(listener),
       m_metadata{},
-      m_offset{} {}
+      m_offset{0} {}
 
 Parser::~Parser() = default;
 
@@ -157,9 +160,9 @@ Player Parser::parseOnePlayer() {
 }
 
 Faction Parser::factionFromRaw(int raw) {
-    constexpr auto FACTION_MIN = static_cast<int>(Faction::GDI);
-    constexpr auto FACTION_MAX = static_cast<int>(Faction::Traveler);
-    if (raw < FACTION_MIN || raw > FACTION_MAX) {
+    constexpr auto factionMin = static_cast<int>(Faction::GDI);
+    constexpr auto factionMax = static_cast<int>(Faction::Traveler);
+    if (raw < factionMin || factionMax < raw) {
         return Faction::Unknown;
     }
     return static_cast<Faction>(raw);
@@ -171,75 +174,72 @@ void Parser::parsePlayerSlots(const QString& header) {
     // Each slot starts with a type letter: H (human), C (computer), or X
     // (empty/unused, skipped). Search for ";S=" rather than "S=" alone,
     // since other keys like "MS=0" contain "S=" as a substring.
+    // The human player has their faction marker in the 6th field and the
+    // computer player has its faction marker in the 3rd field
     const QLatin1String slotMarker(";S=");
-    const auto slotsStart = header.indexOf(slotMarker);
-    if (slotsStart < 0) {
+    qsizetype slotStart = header.indexOf(slotMarker);
+    if (slotStart < 0) {
         throw CorruptDataException(QString("header missing player slot list"),
                                    m_reader->lastOffset());
     }
+    // Move past the starting token
+    slotStart += slotMarker.size();
 
-    QString slotsText = header.mid(slotsStart + slotMarker.size());
-    if (slotsText.endsWith(QLatin1Char(';'))) {
-        slotsText.chop(1);
-    }
+    for (auto player = m_metadata.players.begin();
+         // TODO: breaking due to slotStart running off the end before we've
+         // marked all the players should be tracked/warned
+         slotStart < header.size() && player < m_metadata.players.end();
+         player++) {
+        const qsizetype playerIdx{player - m_metadata.players.begin()};
 
-    struct SlotInfo {
-        QString name;
-        Faction faction;
-    };
-    QList<SlotInfo> slotInfos;
-
-    const QStringList slotTokens = slotsText.split(QLatin1Char(':'));
-    for (const QString& slot : slotTokens) {
-        if (slot.isEmpty()) {
-            continue;
+        // find the end of the current slot. This is either the following ':',
+        // the next ';', or the end of the header.
+        qsizetype slotEnd = header.indexOf(QString(":"), slotStart);
+        if (slotEnd == -1) {
+            slotEnd = header.indexOf(QString(";"), slotStart);
         }
-        const QChar slotType = slot.at(0);
-        const QStringList fields = slot.mid(1).split(QLatin1Char(','));
+        if (slotEnd == -1) {
+            slotEnd = header.size();
+        }
+        const QStringView slotView =
+            QStringView(header).sliced(slotStart, slotEnd - slotStart);
 
-        // The faction field's position differs by slot type: field 5 for a
-        // human slot (field 0 is the player name), field 2 for a computer
-        // slot (field 0 is a difficulty code, no name present).
-        std::size_t factionField = 0;
-        QString name;
+        // Decode the player data
+        const QChar slotType = slotView.at(0);
+        qsizetype factionField{};
         if (slotType == QLatin1Char('H')) {
-            factionField = 5;
-            name = fields.value(0);
+            factionField = HUMAN_FACTION_SLOT_FIELD;
+            player->isComputer = false;
         } else if (slotType == QLatin1Char('C')) {
-            factionField = 2;
+            factionField = COMP_FACTION_SLOT_FIELD;
+            player->isComputer = true;
         } else {
-            // X (empty) or any other/unrecognized slot type
-            continue;
+            // TODO: see about continuing with the partial data here
+            throw CorruptDataException(
+                QString("player %1 type is not recognized").arg(playerIdx),
+                m_reader->lastOffset());
         }
 
-        if (static_cast<std::size_t>(fields.size()) <= factionField) {
+        const QList<QStringView> fields = slotView.split(QChar(','));
+
+        if (std::cmp_less_equal(fields.size(), factionField)) {
             throw CorruptDataException(
-                QString("player slot missing expected fields"),
+                QString("player %1 slot missing expected fields")
+                    .arg(playerIdx),
                 m_reader->lastOffset());
         }
 
         bool ok = false;
-        const int raw = fields.at(static_cast<qsizetype>(factionField)).toInt(&ok);
+        const int factionOrdinal = fields.at(factionField).toInt(&ok);
         if (!ok) {
-            throw CorruptDataException(QString("player slot faction not numeric"),
-                                       m_reader->lastOffset());
+            throw CorruptDataException(
+                QString("player type %s non-numeric").arg(playerIdx),
+                m_reader->lastOffset());
         }
+        player->faction = factionFromRaw(factionOrdinal);
 
-        slotInfos.append(SlotInfo{.name = name, .faction = factionFromRaw(raw)});
-    }
-
-    if (slotInfos.size() != m_metadata.players.size()) {
-        throw CorruptDataException(
-            QString("player slot count did not match parsed player count"),
-            m_reader->lastOffset());
-    }
-
-    for (qsizetype i = 0; i < slotInfos.size(); i++) {
-        Player& player = m_metadata.players[i];
-        player.faction = slotInfos.at(i).faction;
-        if (!slotInfos.at(i).name.isEmpty()) {
-            player.playerName = slotInfos.at(i).name;
-        }
+        // At the end, prepare for the next path
+        slotStart = slotEnd + 1;
     }
 }
 

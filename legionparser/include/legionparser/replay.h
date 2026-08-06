@@ -32,11 +32,14 @@ enum class Faction : std::uint8_t {
 };
 
 struct Player {
-    std::uint32_t playerId;
-    QString playerName;
-    std::int8_t teamNumber;  // Only relevant for multiplayer
-    bool isReplaySaver = false;
+    std::uint32_t playerId = std::numeric_limits<std::uint32_t>::max();
+    QString playerName = "";
+    // Only relevant for multiplayer
+    // The default will also be larger than the input
+    std::int32_t teamNumber = std::numeric_limits<std::int32_t>::max();
     Faction faction = Faction::Unknown;
+    bool isComputer = false;
+    bool isReplaySaver = false;
 };
 
 struct ReplayMetadata {
