@@ -84,6 +84,13 @@ class Parser {
 
     void parseHeaderTail();
 
+    // Extracts the ";S=" player-slot list from the header text and assigns
+    // each slot's name (where present) and faction onto the corresponding
+    // entry in m_metadata.players, matched positionally in slot order.
+    void parsePlayerSlots(const QString& header);
+
+    static Faction factionFromRaw(int raw);
+
     void parseBody();
 
     std::unique_ptr<Reader> m_reader;

@@ -3,6 +3,7 @@
 
 #include <QDataStream>
 #include <QString>
+#include <QStringList>
 #include <QTimeZone>
 #include <bit>
 #include <cstdint>
@@ -139,7 +140,7 @@ void Parser::parsePlayers() {
         m_metadata.players.append(parseOnePlayer());
     }
     // Parse the final commentator player that always appears to exist
-    parseOnePlayer();
+    m_metadata.players.append(parseOnePlayer());
 }
 
 Player Parser::parseOnePlayer() {
@@ -153,6 +154,93 @@ Player Parser::parseOnePlayer() {
     return Player{.playerId = playerId,
                   .playerName = playerName,
                   .teamNumber = teamNumber};
+}
+
+Faction Parser::factionFromRaw(int raw) {
+    constexpr auto FACTION_MIN = static_cast<int>(Faction::GDI);
+    constexpr auto FACTION_MAX = static_cast<int>(Faction::Traveler);
+    if (raw < FACTION_MIN || raw > FACTION_MAX) {
+        return Faction::Unknown;
+    }
+    return static_cast<Faction>(raw);
+}
+
+void Parser::parsePlayerSlots(const QString& header) {
+    // The header's ";S=" key holds a colon-separated list of player slots,
+    // e.g. "S=HMuonic,0,0,TT,4,10,-1,-1,0,1,-1,:CB,-1,11,-1,-1,0,4:X:X:...;"
+    // Each slot starts with a type letter: H (human), C (computer), or X
+    // (empty/unused, skipped). Search for ";S=" rather than "S=" alone,
+    // since other keys like "MS=0" contain "S=" as a substring.
+    const QLatin1String slotMarker(";S=");
+    const auto slotsStart = header.indexOf(slotMarker);
+    if (slotsStart < 0) {
+        throw CorruptDataException(QString("header missing player slot list"),
+                                   m_reader->lastOffset());
+    }
+
+    QString slotsText = header.mid(slotsStart + slotMarker.size());
+    if (slotsText.endsWith(QLatin1Char(';'))) {
+        slotsText.chop(1);
+    }
+
+    struct SlotInfo {
+        QString name;
+        Faction faction;
+    };
+    QList<SlotInfo> slotInfos;
+
+    const QStringList slotTokens = slotsText.split(QLatin1Char(':'));
+    for (const QString& slot : slotTokens) {
+        if (slot.isEmpty()) {
+            continue;
+        }
+        const QChar slotType = slot.at(0);
+        const QStringList fields = slot.mid(1).split(QLatin1Char(','));
+
+        // The faction field's position differs by slot type: field 5 for a
+        // human slot (field 0 is the player name), field 2 for a computer
+        // slot (field 0 is a difficulty code, no name present).
+        std::size_t factionField = 0;
+        QString name;
+        if (slotType == QLatin1Char('H')) {
+            factionField = 5;
+            name = fields.value(0);
+        } else if (slotType == QLatin1Char('C')) {
+            factionField = 2;
+        } else {
+            // X (empty) or any other/unrecognized slot type
+            continue;
+        }
+
+        if (static_cast<std::size_t>(fields.size()) <= factionField) {
+            throw CorruptDataException(
+                QString("player slot missing expected fields"),
+                m_reader->lastOffset());
+        }
+
+        bool ok = false;
+        const int raw = fields.at(static_cast<qsizetype>(factionField)).toInt(&ok);
+        if (!ok) {
+            throw CorruptDataException(QString("player slot faction not numeric"),
+                                       m_reader->lastOffset());
+        }
+
+        slotInfos.append(SlotInfo{.name = name, .faction = factionFromRaw(raw)});
+    }
+
+    if (slotInfos.size() != m_metadata.players.size()) {
+        throw CorruptDataException(
+            QString("player slot count did not match parsed player count"),
+            m_reader->lastOffset());
+    }
+
+    for (qsizetype i = 0; i < slotInfos.size(); i++) {
+        Player& player = m_metadata.players[i];
+        player.faction = slotInfos.at(i).faction;
+        if (!slotInfos.at(i).name.isEmpty()) {
+            player.playerName = slotInfos.at(i).name;
+        }
+    }
 }
 
 void Parser::parseOffsetAndMagic() {
@@ -187,6 +275,7 @@ void Parser::parseHeaderTail() {
 
     // read the header
     const QString header = m_reader->readFixedCharString<uint32_t>();
+    parsePlayerSlots(header);
 
     const auto replaySaver = m_reader->readByte<uint8_t>();
     if (replaySaver < m_metadata.players.size()) {

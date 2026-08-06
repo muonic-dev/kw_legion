@@ -15,13 +15,16 @@ enum class GameType : std::uint8_t {
     Multiplayer = 0x05,
 };
 
+// Values derived empirically from the ";S=" player-slot list in the header
+// string, cross-referenced against skirmish replays with a known faction per
+// side (see test/replays/skirmish_h<faction>_v_c<faction>.KWReplay).
 enum class Faction : std::uint8_t {
-    GDI,
+    GDI = 6,
     ST,
     ZOCOM,
     Nod,
-    MoK,
     BH,
+    MoK,
     Scrin,
     Reaper,
     Traveler,
@@ -33,6 +36,7 @@ struct Player {
     QString playerName;
     std::int8_t teamNumber;  // Only relevant for multiplayer
     bool isReplaySaver = false;
+    Faction faction = Faction::Unknown;
 };
 
 struct ReplayMetadata {
