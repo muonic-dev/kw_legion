@@ -1,6 +1,8 @@
 #include <legionparser/exception.h>
 #include <legionparser/parser.h>
 
+#include <QByteArrayView>
+#include <QCryptographicHash>
 #include <QDataStream>
 #include <QString>
 #include <QStringList>
@@ -26,9 +28,14 @@ constexpr std::size_t REPL_MAGIC_SIZE = 8;
 constexpr qsizetype HUMAN_FACTION_SLOT_FIELD = 5;
 constexpr qsizetype COMP_FACTION_SLOT_FIELD = 2;
 
-Parser::Parser(QIODevice& replayFile, ParserEventListener& listener)
+// The largest valid replay is a few MB at most; this bounds how much of a
+// corrupt/malicious file we'll read while fingerprinting the payload,
+// rather than trusting the device to eventually hit a real EOF.
+constexpr qint64 BODY_READ_CHUNK_SIZE = static_cast<qint64>(16 * 1024);
+constexpr size_t MAX_BODY_SIZE = static_cast<size_t>(32 * 1024 * 1024);
+
+Parser::Parser(QIODevice& replayFile)
     : m_reader(std::make_unique<Reader>(replayFile)),
-      m_evListener(listener),
       m_metadata{},
       m_offset{0} {}
 
@@ -37,7 +44,6 @@ Parser::~Parser() = default;
 void Parser::parse() {
     checkMagic();
     parseHeader();
-    m_evListener.onHeaderParsed(m_metadata);
     parseBody();
 }
 
@@ -341,19 +347,31 @@ void Parser::parseHeaderTail() {
     m_reader->readBlock(U2_SIZE * sizeof(std::uint32_t));
 }
 
-void Parser::parseBody() {}
+void Parser::parseBody() {
+    // The payload isn't parsed at this time; just fingerprint it so callers
+    // can cheaply compare/identify replay content. Read in bounded chunks
+    // rather than the whole remaining file at once, so a corrupt or
+    // maliciously oversized file can't force unbounded memory use.
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    size_t totalSize = 0;
+    m_reader->readRemainingChunked(
+        [&](QByteArrayView chunk) {
+            totalSize += static_cast<size_t>(chunk.size());
+            if (totalSize > MAX_BODY_SIZE) {
+                throw LimitExceededException(QString("replay payload"),
+                                             m_reader->offset(), MAX_BODY_SIZE,
+                                             totalSize);
+            }
+            hash.addData(chunk);
+        },
+        BODY_READ_CHUNK_SIZE);
 
-void Parser::parse(QIODevice& replayFile, ParserEventListener& eventListener) {
-    try {
-        Parser(replayFile, eventListener).parse();
-    } catch (const ReplayParseException& exc) {
-        // TODO: Consider removing me in favor of catches
-        eventListener.onError(exc);
-        throw;
-    }
+    m_metadata.payloadChecksum = hash.result();
 }
 
-void ParserEventListener::onError(const ReplayParseException& exc) {}
-
-void ParserEventListener::onHeaderParsed(const ReplayMetadata& exc) {}
+ReplayMetadata Parser::parse(QIODevice& replayFile) {
+    Parser parser{replayFile};
+    parser.parse();
+    return parser.metadata();
+}
 }  // namespace LegionParser

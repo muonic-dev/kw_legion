@@ -2,6 +2,7 @@
 
 #include <legionparser/legionparser_export.h>
 
+#include <QByteArray>
 #include <QDateTime>
 #include <QList>
 #include <QString>
@@ -79,5 +80,14 @@ struct ReplayMetadata {
      * string.
      */
     QString mapReference;
+
+    /**
+     * A SHA-256 checksum (raw 32 bytes; use toHex() for display) of the
+     * replay's raw payload body (everything after the header - the
+     * game-action chunks, end-of-chunks terminator, and footer). The body
+     * itself is not parsed; this exists as a cheap way to
+     * fingerprint/compare replay content.
+     */
+    QByteArray payloadChecksum;
 };
 }  // namespace LegionParser

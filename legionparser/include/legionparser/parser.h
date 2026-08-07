@@ -15,27 +15,6 @@ namespace LegionParser {
 
 class Reader;
 
-/**
- * @brief Base class for listening to events that occur during the parsing of
- * the replay
- *
- */
-class LEGIONPARSER_EXPORT ParserEventListener {
-   public:
-    ParserEventListener() = default;
-    ParserEventListener(const ParserEventListener&) = delete;
-    ParserEventListener(ParserEventListener&&) = delete;
-
-    ParserEventListener& operator=(const ParserEventListener&) = delete;
-    ParserEventListener& operator=(ParserEventListener&&) = delete;
-
-    virtual ~ParserEventListener() = default;
-
-    virtual void onError(const ReplayParseException& exc);
-
-    virtual void onHeaderParsed(const ReplayMetadata& exc);
-};
-
 class Parser {
    public:
     Parser(const Parser&) = delete;
@@ -53,15 +32,16 @@ class Parser {
      * thrown
      *
      * @param replayFile the file to parse from
-     * @param eventListener a listener as parse events occur
-     * @return whether the parsing event was successful. the precise error will
-     * be sent to the listener
+     * @return The parsed replay metadata
+     * @throws ReplayParseException describing the parsing failure
+     *
      */
-    static LEGIONPARSER_EXPORT void parse(QIODevice& replayFile,
-                                          ParserEventListener& eventListener);
+    static LEGIONPARSER_EXPORT ReplayMetadata parse(QIODevice& replayFile);
 
    private:
-    Parser(QIODevice&, ParserEventListener&);
+    explicit Parser(QIODevice&);
+
+    [[nodiscard]] const ReplayMetadata& metadata() const { return m_metadata; }
 
     void parse();
 
@@ -99,7 +79,6 @@ class Parser {
     void parseBody();
 
     std::unique_ptr<Reader> m_reader;
-    ParserEventListener& m_evListener;
     ReplayMetadata m_metadata;
 
     // Used during parsing to describe the length of the header starting at the

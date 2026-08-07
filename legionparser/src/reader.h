@@ -3,6 +3,7 @@
 #include <legionparser/exception.h>
 
 #include <QByteArray>
+#include <QByteArrayView>
 #include <QIODevice>
 #include <QString>
 #include <utility>
@@ -70,6 +71,27 @@ class Reader {
     }
 
     QByteArray readBlock(size_t length);
+
+    // Reads the remainder of the device in bounded chunks, invoking
+    // fn(chunk) once per chunk read, until EOF. Lets callers process a
+    // large/unbounded remaining payload without ever buffering the whole
+    // thing in memory at once.
+    void readRemainingChunked(std::invocable<QByteArrayView> auto&& fn,
+                              qint64 chunkSize = 16384) {
+        QByteArray buffer(static_cast<qsizetype>(chunkSize), Qt::Uninitialized);
+        for (;;) {
+            const qint64 bytesRead = m_replayFile.read(buffer.data(), chunkSize);
+            if (bytesRead < 0) {
+                throw CorruptDataException(QString("Error reading payload"),
+                                           m_offsetMgr.offset());
+            }
+            if (bytesRead == 0) {
+                break;
+            }
+            m_offsetMgr.increment(static_cast<size_t>(bytesRead));
+            fn(QByteArrayView(buffer.constData(), bytesRead));
+        }
+    }
 
     // Read a single integral value via QDataStream
     template <std::integral T>

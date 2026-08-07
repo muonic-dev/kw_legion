@@ -9,24 +9,12 @@ using namespace LegionParser;
 
 namespace {
 
-class HeaderCaptureListener : public ParserEventListener {
-   public:
-    void onHeaderParsed(const ReplayMetadata& metadata) override {
-        m_metadata = metadata;
-    }
-
-    ReplayMetadata m_metadata;
-};
-
 ReplayMetadata parseReplay(const QString& filename) {
     const QString replayPath =
         QDir(QString::fromUtf8(REPLAY_TEST_DATA_DIR)).filePath(filename);
     QFile replayFile(replayPath);
     REQUIRE(replayFile.open(QIODevice::ReadOnly));
-
-    HeaderCaptureListener listener;
-    LegionParser::Parser::parse(replayFile, listener);
-    return listener.m_metadata;
+    return LegionParser::Parser::parse(replayFile);
 }
 
 // Each test_<faction>s.KWReplay is a skirmish where Muonic played a mirror
