@@ -3,15 +3,16 @@ find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform)
 qt_standard_project_setup(REQUIRES 6.10)
 
 qt_add_executable(appkw_legion
-    main.cpp
+    cpp/main.cpp
+    cpp/prospector.cpp
 )
 
 qt_add_qml_module(appkw_legion
     URI kw_legion
     QML_FILES
-        Main.qml
+        qml/Main.qml
     RESOURCES
-        CNCKW_Marked_of_Kane_logo.png
+        qml/CNCKW_Marked_of_Kane_logo.png
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

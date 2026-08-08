@@ -19,7 +19,7 @@ ApplicationWindow {
 
     SystemTrayIcon {
         visible: true
-        icon.source: "qrc:/qt/qml/kw_legion/CNCKW_Marked_of_Kane_logo.png"
+        icon.source: "qrc:/qt/qml/kw_legion/qml/CNCKW_Marked_of_Kane_logo.png"
         tooltip: window.title
     }
 
