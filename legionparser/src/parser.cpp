@@ -7,6 +7,7 @@
 #include <QString>
 #include <QStringList>
 #include <QTimeZone>
+#include <QtEndian>
 #include <bit>
 #include <cstdint>
 #include <utility>
@@ -33,6 +34,29 @@ constexpr qsizetype COMP_FACTION_SLOT_FIELD = 2;
 // rather than trusting the device to eventually hit a real EOF.
 constexpr qint64 BODY_READ_CHUNK_SIZE = static_cast<qint64>(16 * 1024);
 constexpr size_t MAX_BODY_SIZE = static_cast<size_t>(32 * 1024 * 1024);
+
+// Footer format, per
+// https://github.com/louisdx/cnc-replayreaders/blob/master/eareplay.html :
+//   char footer_str[18];    // "C&C3 REPLAY FOOTER"
+//   uint32_t final_time_code;
+//   byte data[...];         // {0x02}, or {0x01, 0x02, uint32_t n, byte[n]}
+//   uint32_t footer_length; // total byte length of this whole structure
+constexpr const char* const FOOTER_MAGIC = "C&C3 REPLAY FOOTER";
+constexpr qsizetype FOOTER_MAGIC_SIZE = 18;
+constexpr qsizetype FOOTER_LENGTH_FIELD_SIZE =
+    static_cast<qsizetype>(sizeof(uint32_t));
+// Shortest possible footer: magic + final_time_code + the shortest data
+// variant (a single 0x02 byte) + footer_length. data itself is variable
+// length, so this is only a lower bound, not the footer's actual size.
+constexpr qsizetype FOOTER_MIN_SIZE =
+    FOOTER_MAGIC_SIZE + FOOTER_LENGTH_FIELD_SIZE + 1 + FOOTER_LENGTH_FIELD_SIZE;
+
+namespace {
+quint32 readLE32(QByteArrayView data, qsizetype offset) {
+    return qFromLittleEndian<quint32>(
+        reinterpret_cast<const uchar*>(data.data() + offset));
+}
+}  // namespace
 
 Parser::Parser(QIODevice& replayFile)
     : m_reader(std::make_unique<Reader>(replayFile)),
@@ -354,7 +378,12 @@ void Parser::parseBody() {
     // maliciously oversized file can't force unbounded memory use.
     QCryptographicHash hash(QCryptographicHash::Sha256);
     size_t totalSize = 0;
-    m_reader->readRemainingChunked(
+    // The footer lives in the last handful of bytes of the file, but isn't
+    // guaranteed to fall entirely within the very last chunk read - e.g. if
+    // the file size puts the footer's start right at a chunk boundary.
+    // readRemainingChunked hands back the last two chunks concatenated so
+    // the footer's bytes are guaranteed complete somewhere within it.
+    const QByteArray tail = m_reader->readRemainingChunked(
         [&](QByteArrayView chunk) {
             totalSize += static_cast<size_t>(chunk.size());
             if (totalSize > MAX_BODY_SIZE) {
@@ -366,7 +395,81 @@ void Parser::parseBody() {
         },
         BODY_READ_CHUNK_SIZE);
 
+    verifyFooter(tail);
+
     m_metadata.payloadChecksum = hash.result();
+}
+
+void Parser::verifyFooter(QByteArrayView lastChunk) const {
+    // footer_length is self-describing and lives in the final 4 bytes of
+    // the file, so we can slice out exactly the footer's bytes directly
+    // from the end rather than scanning for the magic string.
+    if (std::cmp_less(lastChunk.size(), FOOTER_LENGTH_FIELD_SIZE)) {
+        throw CorruptDataException(
+            QString("replay is missing a valid footer; the file may be a "
+                    "torn/incomplete read"),
+            m_reader->offset());
+    }
+
+    const quint32 footerLength =
+        readLE32(lastChunk, lastChunk.size() - FOOTER_LENGTH_FIELD_SIZE);
+    if (std::cmp_less(footerLength, FOOTER_MIN_SIZE) ||
+        std::cmp_greater(footerLength, lastChunk.size())) {
+        throw CorruptDataException(
+            QString("replay footer length is invalid; the file may be a "
+                    "torn/incomplete read"),
+            m_reader->offset());
+    }
+
+    const QByteArrayView footer =
+        lastChunk.last(static_cast<qsizetype>(footerLength));
+
+    const auto magicView = QByteArrayView(FOOTER_MAGIC, FOOTER_MAGIC_SIZE);
+    if (footer.first(magicView.size()) != magicView) {
+        throw CorruptDataException(
+            QString("replay is missing a valid footer; the file may be a "
+                    "torn/incomplete read"),
+            m_reader->offset());
+    }
+
+    // data sits between final_time_code and footer_length (the trailing 4
+    // bytes, whose value is footer.size() itself); it's either {0x02}, or
+    // {0x01, 0x02, uint32_t n, byte[n]}.
+    const qsizetype dataStart = FOOTER_MAGIC_SIZE + FOOTER_LENGTH_FIELD_SIZE;
+    const qsizetype dataSize =
+        footer.size() - dataStart - FOOTER_LENGTH_FIELD_SIZE;
+    const auto dataTag = static_cast<uchar>(footer.at(dataStart));
+
+    if (dataTag == 0x02) {
+        if (dataSize != 1) {
+            throw CorruptDataException(
+                QString("replay footer data has an unrecognized structure"),
+                m_reader->offset());
+        }
+    } else if (dataTag == 0x01) {
+        constexpr qsizetype extendedDataFixedSize =
+            2 + FOOTER_LENGTH_FIELD_SIZE;
+        // Bounds-check before reading the payload length field below - with
+        // the minimum-size data (dataSize == 1) that field would fall past
+        // the end of footer.
+        if (std::cmp_less(dataSize, extendedDataFixedSize) ||
+            static_cast<uchar>(footer.at(dataStart + 1)) != 0x02) {
+            throw CorruptDataException(
+                QString("replay footer data has an unrecognized structure"),
+                m_reader->offset());
+        }
+        const quint32 payloadLength = readLE32(footer, dataStart + 2);
+        if (dataSize !=
+            extendedDataFixedSize + static_cast<qsizetype>(payloadLength)) {
+            throw CorruptDataException(
+                QString("replay footer data has an unrecognized structure"),
+                m_reader->offset());
+        }
+    } else {
+        throw CorruptDataException(
+            QString("replay footer data has an unrecognized structure"),
+            m_reader->offset());
+    }
 }
 
 ReplayMetadata Parser::parse(QIODevice& replayFile) {

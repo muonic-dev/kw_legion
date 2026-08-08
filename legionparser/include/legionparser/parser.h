@@ -4,6 +4,7 @@
 #include <legionparser/legionparser_export.h>
 #include <legionparser/replay.h>
 
+#include <QByteArrayView>
 #include <QDataStream>
 #include <QDateTime>
 #include <QIODevice>
@@ -77,6 +78,13 @@ class Parser {
     static Faction factionFromRaw(int raw);
 
     void parseBody();
+
+    // Validates that lastChunk - the final chunk read while fingerprinting
+    // the body - ends with a semantically valid "C&C3 REPLAY FOOTER"
+    // structure. This lets us distinguish a torn read (e.g. parsing a
+    // replay the game is still actively writing, which truncates the file
+    // before the footer is appended) from other forms of corruption.
+    void verifyFooter(QByteArrayView lastChunk) const;
 
     std::unique_ptr<Reader> m_reader;
     ReplayMetadata m_metadata;

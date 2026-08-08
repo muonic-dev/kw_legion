@@ -1,3 +1,4 @@
+#include <legionparser/exception.h>
 #include <legionparser/parser.h>
 
 #include <QDir>
@@ -37,6 +38,15 @@ void checkMirrorMatchFaction(const QString& filename, Faction faction) {
 }
 
 }  // namespace
+
+TEST_CASE("torn read (footer cut off mid-write) is rejected",
+          "[legionparser][body]") {
+    // test_torn_footer.KWReplay is test_gdis.KWReplay truncated 5 bytes into
+    // the "C&C3 REPLAY FOOTER" magic, simulating a replay read while the
+    // game was still flushing its footer to disk.
+    CHECK_THROWS_AS(parseReplay(QString::fromUtf8("test_torn_footer.KWReplay")),
+                    CorruptDataException);
+}
 
 TEST_CASE("parses muonic v branston game 1", "[legionparser][metadata]") {
     const ReplayMetadata metadata =

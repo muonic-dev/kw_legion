@@ -6,6 +6,7 @@
 #include <QByteArrayView>
 #include <QIODevice>
 #include <QString>
+#include <array>
 #include <utility>
 
 namespace LegionParser {
@@ -76,11 +77,29 @@ class Reader {
     // fn(chunk) once per chunk read, until EOF. Lets callers process a
     // large/unbounded remaining payload without ever buffering the whole
     // thing in memory at once.
-    void readRemainingChunked(std::invocable<QByteArrayView> auto&& fn,
-                              qint64 chunkSize = 16384) {
-        QByteArray buffer(static_cast<qsizetype>(chunkSize), Qt::Uninitialized);
+    //
+    // Returns the last two chunks read, concatenated in file order (or
+    // fewer/none, if the payload was smaller than that) - letting callers
+    // validate trailing structure (e.g. a footer) that might straddle a
+    // chunk boundary, without every chunk needing to be copied out on the
+    // chance it turns out to be one of the final two.
+    QByteArray readRemainingChunked(std::invocable<QByteArrayView> auto&& fn,
+                                    qint64 chunkSize = 16384) {
+        // Fixed at chunkSize bytes for their whole lifetime - a short read
+        // doesn't shrink them, so buffers.at(i).size() is never the valid
+        // byte count. Track that separately in sizes below; Uninitialized
+        // avoids zero-filling bytes that a short read leaves untouched and
+        // that we then never look at.
+        std::array<QByteArray, 2> buffers{
+            QByteArray(static_cast<qsizetype>(chunkSize), Qt::Uninitialized),
+            QByteArray(static_cast<qsizetype>(chunkSize), Qt::Uninitialized)};
+        std::array<qsizetype, 2> sizes{0, 0};
+        // The slot that the next successful read will land in.
+        int next = 0;
+
         for (;;) {
-            const qint64 bytesRead = m_replayFile.read(buffer.data(), chunkSize);
+            const qint64 bytesRead =
+                m_replayFile.read(buffers.at(next).data(), chunkSize);
             if (bytesRead < 0) {
                 throw CorruptDataException(QString("Error reading payload"),
                                            m_offsetMgr.offset());
@@ -89,8 +108,21 @@ class Reader {
                 break;
             }
             m_offsetMgr.increment(static_cast<size_t>(bytesRead));
-            fn(QByteArrayView(buffer.constData(), bytesRead));
+            sizes.at(next) = static_cast<qsizetype>(bytesRead);
+            fn(QByteArrayView(buffers.at(next).constData(), bytesRead));
+            next = 1 - next;
         }
+
+        // `next` now names the slot holding the older of the last two
+        // chunks (or an untouched, zero-sized slot if fewer than two
+        // chunks were read); the other slot holds the most recent chunk.
+        const int older = next;
+        const int newer = 1 - next;
+        QByteArray tail;
+        tail.reserve(sizes.at(older) + sizes.at(newer));
+        tail.append(buffers.at(older).constData(), sizes.at(older));
+        tail.append(buffers.at(newer).constData(), sizes.at(newer));
+        return tail;
     }
 
     // Read a single integral value via QDataStream
