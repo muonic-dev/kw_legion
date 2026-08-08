@@ -1,2 +1,5 @@
 * text=auto eol=lf
 *.KWReplay binary
+*.jpg binary
+*.pdn binary
+*.png binary

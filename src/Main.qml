@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls.Basic
-
+import Qt.labs.platform
 
 ApplicationWindow {
     id: window
@@ -16,6 +16,12 @@ ApplicationWindow {
     property color dark: "#262626"
     property color reallyLight: "#e7e7e7"
     property color light: "#e0e0e0"
+
+    SystemTrayIcon {
+        visible: true
+        icon.source: "qrc:/qt/qml/kw_legion/CNCKW_Marked_of_Kane_logo.png"
+        tooltip: window.title
+    }
 
     GridLayout {
         id: grid
@@ -61,8 +67,7 @@ ApplicationWindow {
 
                 Button {
                     id: button1
-                    text: window.lightMode ? qsTr("\u263D  Dark mode")
-                                           : qsTr("\u263C  Light mode")
+                    text: window.lightMode ? qsTr("\u263D  Dark mode") : qsTr("\u263C  Light mode")
                     Layout.bottomMargin: 16
                     Layout.alignment: Qt.AlignHCenter | Qt.AlignBottom
 
@@ -86,5 +91,4 @@ ApplicationWindow {
             }
         }
     }
-
 }

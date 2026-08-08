@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Quick)
+find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform)
 
 qt_standard_project_setup(REQUIRES 6.10)
 
@@ -10,6 +10,8 @@ qt_add_qml_module(appkw_legion
     URI kw_legion
     QML_FILES
         Main.qml
+    RESOURCES
+        CNCKW_Marked_of_Kane_logo.png
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
@@ -26,6 +28,7 @@ set_target_properties(appkw_legion PROPERTIES
 target_link_libraries(appkw_legion
     PRIVATE
     Qt6::Quick
+    Qt6::LabsPlatform
 )
 
 install(TARGETS appkw_legion
