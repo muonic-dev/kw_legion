@@ -17,17 +17,18 @@ void fileMessageHandler(QtMsgType type, const QMessageLogContext& context,
     const QMutexLocker locker(&mutex);
 
     if (!file.isOpen()) {
-        const QString dir =
-            QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        const QString dir = QStandardPaths::writableLocation(
+            QStandardPaths::AppLocalDataLocation);
         QDir().mkpath(dir);
         file.setFileName(QDir(dir).filePath("kw_legion.log"));
+        // Keep trying to open it if this fails
         if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate |
                        QIODevice::Text)) {
             return;
         }
     }
 
-    const char* level = "Debug";
+    QString level;
     switch (type) {
         case QtDebugMsg:
             level = "Debug";
@@ -49,8 +50,11 @@ void fileMessageHandler(QtMsgType type, const QMessageLogContext& context,
     QTextStream stream(&file);
     stream << '[' << level << "] " << msg << " (" << context.file << ':'
            << context.line << ")\n";
-    stream.flush();
-    file.flush();
+    // Only flush for the important stuff
+    if (QtMsgType::QtWarningMsg <= type && type <= QtMsgType::QtCriticalMsg) {
+        stream.flush();
+        file.flush();
+    }
 }
 
 }  // namespace
