@@ -2,10 +2,14 @@
 #include <QDir>
 #include <QFile>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QMutex>
 #include <QQmlApplicationEngine>
 #include <QStandardPaths>
 #include <QTextStream>
+#include <QThread>
+
+#include "prospector.h"
 
 namespace {
 
@@ -48,8 +52,8 @@ void fileMessageHandler(QtMsgType type, const QMessageLogContext& context,
     }
 
     QTextStream stream(&file);
-    stream << '[' << level << "] " << msg << " (" << context.file << ':'
-           << context.line << ")\n";
+    stream << '[' << level << "] " << "<" << context.category << "> " << msg
+           << " (" << context.file << ':' << context.line << ")\n";
     // Only flush for the important stuff
     if (QtMsgType::QtWarningMsg <= type && type <= QtMsgType::QtCriticalMsg) {
         stream.flush();
@@ -59,6 +63,8 @@ void fileMessageHandler(QtMsgType type, const QMessageLogContext& context,
 
 }  // namespace
 
+using namespace KWLegion;
+
 // NOLINTNEXTLINE(modernize-avoid-c-arrays, cppcoreguidelines-avoid-c-arrays)
 int main(int argc, char* argv[]) {
     QCoreApplication::setApplicationName("kw_legion");
@@ -66,6 +72,20 @@ int main(int argc, char* argv[]) {
     qInstallMessageHandler(fileMessageHandler);
 
     QGuiApplication app(argc, argv);
+    app.setWindowIcon(
+        QIcon(":/qt/qml/kw_legion/qml/CNCKW_Marked_of_Kane_logo.png"));
+
+    // Background thread to run i/o jobs on
+    // Currently, the only requirement is to move the I/O processing
+    // off the GUI thread. We aren't trying to farm out to parse all the
+    // replays discovered as fast as possible so just one thread here
+    QThread ioThread;
+
+    ReplayProspector replayProspector;
+    replayProspector.moveToThread(&ioThread);
+
+    QObject::connect(&ioThread, &QThread::started, &replayProspector,
+                     &ReplayProspector::initialSweep);
 
     QQmlApplicationEngine engine;
     QObject::connect(
@@ -83,5 +103,12 @@ int main(int argc, char* argv[]) {
                      });
     engine.loadFromModule("kw_legion", "Main");
 
-    return QGuiApplication::exec();
+    ioThread.start();
+
+    const auto result = QGuiApplication::exec();
+
+    ioThread.quit();
+    ioThread.wait();
+
+    return result;
 }

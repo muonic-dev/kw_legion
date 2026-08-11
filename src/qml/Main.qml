@@ -12,6 +12,9 @@ ApplicationWindow {
     minimumHeight: 250
     visible: true
     title: qsTr("LEGION Replay Manager")
+
+    readonly property url appIcon: "qrc:/qt/qml/kw_legion/qml/CNCKW_Marked_of_Kane_logo.png"
+
     property bool lightMode: Application.styleHints.colorScheme === Qt.Light
     property color reallyDark: "#1f1f1f"
     property color dark: "#262626"
@@ -20,7 +23,7 @@ ApplicationWindow {
 
     SystemTrayIcon {
         visible: true
-        icon.source: "qrc:/qt/qml/kw_legion/qml/CNCKW_Marked_of_Kane_logo.png"
+        icon.source: window.appIcon
         tooltip: window.title
     }
 
