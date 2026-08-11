@@ -1,6 +1,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QIcon>
 #include <QMutex>
@@ -8,6 +9,7 @@
 #include <QStandardPaths>
 #include <QTextStream>
 #include <QThread>
+#include <iostream>
 
 #include "prospector.h"
 
@@ -21,10 +23,13 @@ void fileMessageHandler(QtMsgType type, const QMessageLogContext& context,
     const QMutexLocker locker(&mutex);
 
     if (!file.isOpen()) {
-        const QString dir = QStandardPaths::writableLocation(
-            QStandardPaths::AppLocalDataLocation);
-        QDir().mkpath(dir);
-        file.setFileName(QDir(dir).filePath("kw_legion.log"));
+        const QString logPath =
+            QStandardPaths::writableLocation(QStandardPaths::CacheLocation) +
+            "/kw_legion.log";
+        const QFileInfo logInfo(logPath);
+        QDir().mkpath(logInfo.dir().path());
+
+        file.setFileName(logPath);
         // Keep trying to open it if this fails
         if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate |
                        QIODevice::Text)) {
@@ -53,7 +58,7 @@ void fileMessageHandler(QtMsgType type, const QMessageLogContext& context,
 
     QTextStream stream(&file);
     stream << '[' << level << "] " << "<" << context.category << "> " << msg
-           << " (" << context.file << ':' << context.line << ")\n";
+           << "\n";
     // Only flush for the important stuff
     if (QtMsgType::QtWarningMsg <= type && type <= QtMsgType::QtCriticalMsg) {
         stream.flush();
@@ -72,7 +77,7 @@ int main(int argc, char* argv[]) {
     qInstallMessageHandler(fileMessageHandler);
 
     QGuiApplication app(argc, argv);
-    app.setWindowIcon(
+    QGuiApplication::setWindowIcon(
         QIcon(":/qt/qml/kw_legion/qml/CNCKW_Marked_of_Kane_logo.png"));
 
     // Background thread to run i/o jobs on
