@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Muonic
+
 #include <legionparser/exception.h>
 #include <legionparser/parser.h>
 
@@ -103,16 +106,7 @@ void Parser::parseHeader() {
 void Parser::parseGameType() {
     // Immediately following the magic is a header that appears to signify
     // skirmish (0x04) or multiplayer (0x05)
-    switch (m_reader->readByte<GameType>()) {
-        case GameType::Skirmish:
-            m_metadata.gameType = GameType::Skirmish;
-            break;
-        case GameType::Multiplayer:
-            m_metadata.gameType = GameType::Multiplayer;
-            break;
-        default:
-            m_metadata.gameType = GameType::Unknown;
-    }
+    m_metadata.gameType = gameTypeFromUint8(m_reader->readByte<std::uint8_t>());
 }
 
 void Parser::parseVersions() {
@@ -187,15 +181,6 @@ Player Parser::parseOnePlayer() {
     return Player{.playerId = playerId,
                   .playerName = playerName,
                   .teamNumber = teamNumber};
-}
-
-Faction Parser::factionFromRaw(int raw) {
-    constexpr auto factionMin = static_cast<int>(Faction::GDI);
-    constexpr auto factionMax = static_cast<int>(Faction::Traveler);
-    if (raw < factionMin || factionMax < raw) {
-        return Faction::Unknown;
-    }
-    return static_cast<Faction>(raw);
 }
 
 void Parser::parseMapReference(const QStringView header) {
@@ -300,7 +285,13 @@ void Parser::parsePlayerSlots(const QStringView header) {
                 QString("player type %s non-numeric").arg(playerIdx),
                 m_reader->lastOffset());
         }
-        player->faction = factionFromRaw(factionOrdinal);
+        player->faction =
+            (std::cmp_less(factionOrdinal, 0) ||
+                     std::cmp_greater_equal(
+                         factionOrdinal,
+                         static_cast<std::uint8_t>(Faction::Unknown))
+                 ? Faction::Unknown
+                 : factionFromUint8(static_cast<std::uint8_t>(factionOrdinal)));
 
         // At the end, prepare for the next path
         slotStart = slotEnd + 1;

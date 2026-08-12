@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Muonic
+
+#include <kwlegion_core/prospector.h>
+#include <kwlegion_core/store.h>
+
 #include <QDebug>
 #include <QDir>
 #include <QFile>
@@ -10,9 +16,6 @@
 #include <QTextStream>
 #include <QThread>
 #include <iostream>
-
-#include <kwlegion_core/prospector.h>
-#include <kwlegion_core/store.h>
 
 namespace {
 
@@ -95,7 +98,7 @@ int main(int argc, char* argv[]) {
     QObject::connect(&replayProspector, &ReplayProspector::starting,
                      &replayStore, &ReplayStore::startup);
     QObject::connect(&replayProspector, &ReplayProspector::replayDiscovered,
-                     &replayStore, &ReplayStore::analyzeReplay);
+                     &replayStore, &ReplayStore::receiveReplay);
 
     QObject::connect(&ioThread, &QThread::started, &replayProspector,
                      &ReplayProspector::initialSweep);

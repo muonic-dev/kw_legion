@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Muonic
+
 #pragma once
 
 #include <QByteArray>
@@ -14,6 +17,21 @@ enum class GameType : std::uint8_t {
     Multiplayer = 0x05,
 };
 
+constexpr std::uint8_t toUint8(GameType type) {
+    return static_cast<std::uint8_t>(type);
+}
+
+constexpr GameType gameTypeFromUint8(std::uint8_t raw) {
+    switch (raw) {
+        case toUint8(GameType::Skirmish):
+            return GameType::Skirmish;
+        case toUint8(GameType::Multiplayer):
+            return GameType::Multiplayer;
+        default:
+            return GameType::Unknown;
+    }
+}
+
 // Values derived empirically from the ";S=" player-slot list in the header
 // string, cross-referenced against skirmish replays with a known faction per
 // side (see test/replays/skirmish_h<faction>_v_c<faction>.KWReplay).
@@ -29,6 +47,17 @@ enum class Faction : std::uint8_t {
     Traveler,
     Unknown
 };
+
+constexpr std::uint8_t toUint8(Faction faction) {
+    return static_cast<std::uint8_t>(faction);
+}
+
+constexpr Faction factionFromUint8(std::uint8_t raw) {
+    if (raw < toUint8(Faction::GDI) || toUint8(Faction::Traveler) < raw) {
+        return Faction::Unknown;
+    }
+    return static_cast<Faction>(raw);
+}
 
 struct Player {
     std::uint32_t playerId = std::numeric_limits<std::uint32_t>::max();

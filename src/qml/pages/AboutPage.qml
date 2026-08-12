@@ -1,14 +1,69 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Muonic
+
 import QtQuick
 import QtQuick.Controls.Basic
+import QtQuick.Layouts
 
 Page {
+    id: root
+
     background: Rectangle {
         color: window.lightMode ? window.reallyLight : window.reallyDark
     }
-    Label {
-        anchors.centerIn: parent
-        text: qsTr("About")
-        color: window.lightMode ? window.dark : window.light
-        font.pixelSize: 32
+
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 24
+        spacing: 12
+
+        Image {
+            Layout.alignment: Qt.AlignHCenter
+            Layout.preferredWidth: 64
+            Layout.preferredHeight: 64
+            source: window.appIcon
+            fillMode: Image.PreserveAspectFit
+        }
+
+        Label {
+            Layout.alignment: Qt.AlignHCenter
+            text: qsTr("LEGION Replay Manager")
+            color: window.lightMode ? window.dark : window.light
+            font.pixelSize: 24
+            font.bold: true
+        }
+
+        Label {
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            color: window.lightMode ? window.dark : window.light
+            text: qsTr(
+                "Copyright © 2026 Muonic\n\n" +
+                "This program is free software: you can redistribute it and/or " +
+                "modify it under the terms of the GNU General Public License as " +
+                "published by the Free Software Foundation, either version 3 of " +
+                "the License, or (at your option) any later version.\n\n" +
+                "This program is distributed in the hope that it will be useful, " +
+                "but WITHOUT ANY WARRANTY; without even the implied warranty of " +
+                "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU " +
+                "General Public License for more details.")
+        }
+
+        Label {
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            font.italic: true
+            color: window.lightMode ? window.dark : window.light
+            text: qsTr(
+                "This application is built with Qt 6, © The Qt Company Ltd. " +
+                "and other contributors, used here under the GNU Lesser General " +
+                "Public License version 3 (LGPLv3); Qt is linked dynamically so " +
+                "its shared libraries may be replaced or relinked as the LGPL " +
+                "permits. See https://www.qt.io/licensing/ for details.")
+        }
+
+        Item {
+            Layout.fillHeight: true
+        }
     }
 }

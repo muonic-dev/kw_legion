@@ -1,5 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Muonic
+
 #pragma once
 
+#include <legionparser/replay.h>
+
+#include <QByteArrayView>
 #include <QDir>
 #include <QLoggingCategory>
 #include <QObject>
@@ -15,7 +21,10 @@ class ReplayStore : public QObject {
     explicit ReplayStore(QObject* parent = nullptr);
 
     void startup();
-    void analyzeReplay(const QString& path);
+    void receiveReplay(const QString& path);
+
+   signals:
+    void ingestionError();
 
    private:
     void ensureDb();
@@ -23,9 +32,15 @@ class ReplayStore : public QObject {
     // Run all of the relevant ddl to bring the database up to current version
     void executeDdl();
 
+    // Perform all the steps to try and receive a replay
+    void ingestReplay(QFile& file,
+                      const LegionParser::ReplayMetadata& metadata);
+
+    [[nodiscard]] QString computeIngestionPath(
+        const QByteArray& checksum) const;
+
     QSqlDatabase m_db;
     QString m_dbPath;
     QString m_replayDir;
-    QString m_scratchDir;
 };
 }  // namespace KWLegionCore

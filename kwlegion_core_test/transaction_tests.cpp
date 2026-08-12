@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Muonic
+
 #include <kwlegion_core/transaction.h>
 
 #include <QSqlDatabase>

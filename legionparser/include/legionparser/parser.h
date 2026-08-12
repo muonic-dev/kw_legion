@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Muonic
+
 #pragma once
 
 #include <legionparser/exception.h>
@@ -73,8 +76,6 @@ class Parser {
     // each slot's name (where present) and faction onto the corresponding
     // entry in m_metadata.players, matched positionally in slot order.
     void parsePlayerSlots(QStringView header);
-
-    static Faction factionFromRaw(int raw);
 
     void parseBody();
 
