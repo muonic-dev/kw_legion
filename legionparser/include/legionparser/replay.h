@@ -1,7 +1,5 @@
 #pragma once
 
-#include <legionparser/legionparser_export.h>
-
 #include <QByteArray>
 #include <QDateTime>
 #include <QList>

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <kwlegion_core/kwlegion_core_export.h>
-
 #include <QDir>
 #include <QLoggingCategory>
 #include <QObject>
@@ -10,7 +8,7 @@
 Q_DECLARE_LOGGING_CATEGORY(logStore);
 
 namespace KWLegionCore {
-class KWLEGION_CORE_EXPORT ReplayStore : public QObject {
+class ReplayStore : public QObject {
     Q_OBJECT
 
    public:

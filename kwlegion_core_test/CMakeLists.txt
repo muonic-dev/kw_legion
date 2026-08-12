@@ -7,7 +7,7 @@ add_executable(kwlegion_core_tests
 
 target_link_libraries(kwlegion_core_tests
     PRIVATE
-        kwlegion::core_static
+        kwlegion::core
         Catch2::Catch2
 )
 

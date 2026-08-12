@@ -6,7 +6,7 @@ add_executable(legionparser_tests
 
 target_link_libraries(legionparser_tests
     PRIVATE
-        legionparser::legionparser_static
+        legionparser::legionparser
         Catch2::Catch2WithMain
 )
 

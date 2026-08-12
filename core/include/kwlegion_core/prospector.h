@@ -1,7 +1,5 @@
 #pragma once
 
-#include <kwlegion_core/kwlegion_core_export.h>
-
 #include <QFileInfo>
 #include <QFileSystemWatcher>
 #include <QLoggingCategory>
@@ -17,7 +15,7 @@ namespace KWLegionCore {
  * Wrath replays folder. This includes identifying replays that are added or
  * changed. Specifically, it is expected that replays such as Last
  * Replay.KWReplay will change over time KW writes the latest replays.*/
-class KWLEGION_CORE_EXPORT ReplayProspector : public QObject {
+class ReplayProspector : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString replayDirectory READ replayDirectory WRITE
                    setReplayDirectory NOTIFY replayDirectoryChanged)

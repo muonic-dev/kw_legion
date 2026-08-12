@@ -1,7 +1,6 @@
 #pragma once
 
 #include <legionparser/exception.h>
-#include <legionparser/legionparser_export.h>
 #include <legionparser/replay.h>
 
 #include <QByteArrayView>
@@ -37,7 +36,7 @@ class Parser {
      * @throws ReplayParseException describing the parsing failure
      *
      */
-    static LEGIONPARSER_EXPORT ReplayMetadata parse(QIODevice& replayFile);
+    static ReplayMetadata parse(QIODevice& replayFile);
 
    private:
     explicit Parser(QIODevice&);
