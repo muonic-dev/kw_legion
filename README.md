@@ -1,5 +1,7 @@
 
-# Specific Configuration
+# LEGION Replay Manager
+
+Organize Kane's Wrath replays.
 
 ## License
 
