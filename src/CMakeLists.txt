@@ -4,9 +4,6 @@ qt_standard_project_setup(REQUIRES 6.10)
 
 qt_add_executable(kw_legion
     cpp/main.cpp
-    cpp/prospector.cpp
-    cpp/store.cpp
-    cpp/transaction.cpp
 )
 
 qt_add_qml_module(kw_legion
@@ -38,6 +35,15 @@ target_link_libraries(kw_legion
     Qt6::Quick
     Qt6::LabsPlatform
     Qt6::Sql
+    legionparser::legionparser
+    kwlegion::core
+)
+
+add_custom_command(TARGET kw_legion POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_RUNTIME_DLLS:kw_legion>
+        $<TARGET_FILE_DIR:kw_legion>
+    COMMAND_EXPAND_LISTS
 )
 
 install(TARGETS kw_legion

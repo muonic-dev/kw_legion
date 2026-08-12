@@ -1,9 +1,11 @@
 #pragma once
 
+#include <kwlegion_core/kwlegion_core_export.h>
+
 #include <QSqlDatabase>
 
-namespace KWLegion {
-class SqlTransactionGuard {
+namespace KWLegionCore {
+class KWLEGION_CORE_EXPORT SqlTransactionGuard {
    public:
     explicit SqlTransactionGuard(QSqlDatabase);
 
@@ -22,4 +24,4 @@ class SqlTransactionGuard {
     bool m_inTx;
 };
 
-}  // namespace KWLegion
+}  // namespace KWLegionCore

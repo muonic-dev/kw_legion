@@ -21,12 +21,24 @@ add_custom_target(copy-compile-commands ALL
     BYPRODUCTS ${CMAKE_SOURCE_DIR}/compile_commands.json
     COMMENT "Copying compile_commands.json to the project root for editor tooling")
 
+add_subdirectory(legionparser)
+add_subdirectory(core)
 add_subdirectory(src)
 
 include(CTest)
 
-add_subdirectory(legionparser)
-
 if(BUILD_TESTING)
-    add_subdirectory(test)
+    include(FetchContent)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.7.1
+    )
+    FetchContent_MakeAvailable(Catch2)
+
+    list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
+    include(Catch)
+
+    add_subdirectory(legionparser_test)
+    add_subdirectory(kwlegion_core_test)
 endif()

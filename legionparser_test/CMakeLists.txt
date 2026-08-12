@@ -1,13 +1,5 @@
 find_package(Qt6 REQUIRED COMPONENTS Core)
 
-include(FetchContent)
-FetchContent_Declare(
-    Catch2
-    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG v3.7.1
-)
-FetchContent_MakeAvailable(Catch2)
-
 add_executable(legionparser_tests
     legionparser_tests.cpp
 )
@@ -30,6 +22,4 @@ add_custom_command(TARGET legionparser_tests POST_BUILD
     COMMAND_EXPAND_LISTS
 )
 
-list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
-include(Catch)
 catch_discover_tests(legionparser_tests)

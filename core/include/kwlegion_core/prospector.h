@@ -1,5 +1,7 @@
 #pragma once
 
+#include <kwlegion_core/kwlegion_core_export.h>
+
 #include <QFileInfo>
 #include <QFileSystemWatcher>
 #include <QLoggingCategory>
@@ -9,13 +11,13 @@
 
 Q_DECLARE_LOGGING_CATEGORY(logProspector)
 
-namespace KWLegion {
+namespace KWLegionCore {
 
 /* The replay prospector identifies and tracks replays that are in the Kane's
  * Wrath replays folder. This includes identifying replays that are added or
  * changed. Specifically, it is expected that replays such as Last
  * Replay.KWReplay will change over time KW writes the latest replays.*/
-class ReplayProspector : public QObject {
+class KWLEGION_CORE_EXPORT ReplayProspector : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString replayDirectory READ replayDirectory WRITE
                    setReplayDirectory NOTIFY replayDirectoryChanged)
@@ -61,4 +63,4 @@ class ReplayProspector : public QObject {
     QMap<QString, QFileInfo> m_knownFiles;
 };
 
-}  // namespace KWLegion
+}  // namespace KWLegionCore

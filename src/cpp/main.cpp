@@ -11,8 +11,8 @@
 #include <QThread>
 #include <iostream>
 
-#include "prospector.h"
-#include "store.h"
+#include <kwlegion_core/prospector.h>
+#include <kwlegion_core/store.h>
 
 namespace {
 
@@ -69,7 +69,7 @@ void fileMessageHandler(QtMsgType type, const QMessageLogContext& context,
 
 }  // namespace
 
-using namespace KWLegion;
+using namespace KWLegionCore;
 
 // NOLINTNEXTLINE(modernize-avoid-c-arrays, cppcoreguidelines-avoid-c-arrays)
 int main(int argc, char* argv[]) {

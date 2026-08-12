@@ -1,6 +1,6 @@
-#include "transaction.h"
+#include <kwlegion_core/transaction.h>
 
-namespace KWLegion {
+namespace KWLegionCore {
 SqlTransactionGuard::SqlTransactionGuard(QSqlDatabase db)
     : m_db(db), m_inTx(db.transaction()) {}
 
@@ -18,4 +18,4 @@ bool SqlTransactionGuard::commit() {
     m_inTx = !m_db.commit();
     return !m_inTx;
 }
-}  // namespace KWLegion
+}  // namespace KWLegionCore

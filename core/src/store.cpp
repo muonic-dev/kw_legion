@@ -1,5 +1,6 @@
-#include "store.h"
+#include <kwlegion_core/store.h>
 
+#include <kwlegion_core/transaction.h>
 #include <legionparser/parser.h>
 
 #include <QDebug>
@@ -9,12 +10,10 @@
 #include <array>
 #include <string>
 
-#include "transaction.h"
-
 
 Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
 
-namespace KWLegion {
+namespace KWLegionCore {
 
 constexpr std::array MIGRATIONS{
     // Store the replay here
@@ -158,4 +157,4 @@ void ReplayStore::ensureDirectories() {
         }
     }
 }
-}  // namespace KWLegion
+}  // namespace KWLegionCore

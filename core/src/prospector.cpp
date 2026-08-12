@@ -1,4 +1,4 @@
-#include "prospector.h"
+#include <kwlegion_core/prospector.h>
 
 #include <QDebug>
 #include <QDir>
@@ -9,7 +9,7 @@
 
 Q_LOGGING_CATEGORY(logProspector, "kwlegion.prospector")
 
-namespace KWLegion {
+namespace KWLegionCore {
 
 // TODO: Some way to signal that an I/O error happened
 
@@ -107,4 +107,4 @@ void ReplayProspector::handleUpdatedItem(const QString& canonicalPath,
     emit replayDiscovered(canonicalPath);
 }
 
-}  // namespace KWLegion
+}  // namespace KWLegionCore
