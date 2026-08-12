@@ -49,6 +49,7 @@ constexpr std::array MIGRATIONS{
         external_path TEXT NOT NULL,
 
         PRIMARY KEY(replay_checksum, external_path)
+    );
     )",
 
     R"(CREATE TABLE replay_players(
