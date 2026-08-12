@@ -1,5 +1,7 @@
 #include "store.h"
 
+#include <legionparser/parser.h>
+
 #include <QDebug>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -9,13 +11,19 @@
 
 #include "transaction.h"
 
+
 Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
 
 namespace KWLegion {
 
 constexpr std::array MIGRATIONS{
+    // Store the replay here
+    // Note: we use the checksum to compute a stored path
+    // When the replay is stored in the Replays folder then
+    // replay_folder_path will not be null
     R"(CREATE TABLE replays (
         id INTEGER PRIMARY KEY,
+        checksum BLOB NOT NULL UNIQUE,
         match_title TEXT NOT NULL,
         match_description TEXT NOT NULL,
         map_name TEXT NOT NULL,
@@ -25,16 +33,16 @@ constexpr std::array MIGRATIONS{
         has_commentary INT NOT NULL,
         filename TEXT NOT NULL,
         map_reference TEXT NOT NULL,
-        checksum BLOB NOT NULL UNIQUE,
 
         version_major INT,
         version_minor INT,
         build_major INT,
         build_minor INT
+
+        replay_folder_path TEXT,
+
     ) STRICT;
     )",
-
-    R"(CREATE INDEX replays_id ON replays(id);)",
 
     R"(CREATE TABLE replay_players(
         id INT NOT NULL,
@@ -48,6 +56,10 @@ constexpr std::array MIGRATIONS{
         PRIMARY KEY(id, player_id)
     ) STRICT;
     )",
+    // We are frequently going to be testing whether or not we've inserted a
+    // replay with this checksum
+    R"(CREATE INDEX replays_checksum ON replays(checksum);)",
+
     R"(CREATE INDEX replay_players_id ON replay_players(id);)",
 };
 
