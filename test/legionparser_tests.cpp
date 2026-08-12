@@ -69,9 +69,9 @@ TEST_CASE("parses muonic v branston game 1", "[legionparser][metadata]") {
     CHECK(metadata.players.at(2).faction == Faction::Unknown);
 
     // 7/8/2026 4:31:09 PM GMT
-    QDateTime replayTimestamp(QDate(2026, 7, 8), QTime(16, 31, 9),
-                              QTimeZone(QTimeZone::UTC));
-    CHECK(metadata.replayTimestamp == replayTimestamp);
+    QDateTime timestamp(QDate(2026, 7, 8), QTime(16, 31, 9),
+                        QTimeZone(QTimeZone::UTC));
+    CHECK(metadata.timestamp == timestamp);
 }
 
 TEST_CASE("faction: GDI mirror match", "[legionparser][faction]") {

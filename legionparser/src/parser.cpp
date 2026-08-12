@@ -331,7 +331,7 @@ void Parser::parseOffsetAndMagic() {
 void Parser::parseHeaderTail() {
     // no mod_info in kw
     const auto ts = m_reader->readIntegral<uint32_t>();
-    m_metadata.replayTimestamp = QDateTime::fromSecsSinceEpoch(
+    m_metadata.timestamp = QDateTime::fromSecsSinceEpoch(
         static_cast<qint64>(ts), QTimeZone(QTimeZone::UTC));
 
     // read and discard the unknown1 block
@@ -397,7 +397,7 @@ void Parser::parseBody() {
 
     verifyFooter(tail);
 
-    m_metadata.payloadChecksum = hash.result();
+    m_metadata.checksum = hash.result();
 }
 
 void Parser::verifyFooter(QByteArrayView lastChunk) const {

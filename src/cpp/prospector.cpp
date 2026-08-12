@@ -40,7 +40,9 @@ void ReplayProspector::setReplayDirectory() {
 }
 
 void ReplayProspector::initialSweep() {
-    qCDebug(logProspector) << "Performing initial sweep";
+    qCDebug(logProspector) << "initial sweep";
+    // Let downstream things trigger to do their own initialization
+    emit starting();
 
     if (m_replayDirectory.isNull() || m_replayDirectory.isEmpty()) {
         qCDebug(logProspector) << "No valid replay path, skipping sweep";
@@ -50,7 +52,6 @@ void ReplayProspector::initialSweep() {
     const QFileInfo replayDirInfo(m_replayDirectory);
     if (!replayDirInfo.isDir()) {
         qCWarning(logProspector) << "Replay path is not a directory";
-        emit onError("The replay's path is not a folder");
         return;
     }
 
@@ -68,8 +69,6 @@ void ReplayProspector::initialSweep() {
 
 void ReplayProspector::processItem(const QFileInfo& info) {
     const QString canonicalPath = info.canonicalFilePath();
-    qCDebug(logProspector) << "Processing file: " << canonicalPath;
-
     // If this is a directory we should add it to the watcher if we haven't
     // already done so
     if (info.isDir()) {
@@ -79,27 +78,33 @@ void ReplayProspector::processItem(const QFileInfo& info) {
                info.fileName().endsWith(".KWReplay", Qt::CaseInsensitive)) {
         const auto it = m_knownFiles.find(canonicalPath);
         if (it == m_knownFiles.cend()) {
-            // The file has never been seen before so track and emit
-            qCDebug(logProspector) << "Found new file: " << canonicalPath;
-            m_knownFiles.insert(canonicalPath, info);
-            emit replayDiscovered(canonicalPath);
+            handleUpdatedItem(canonicalPath, info);
         } else {
             // The file has been seen before so we need to see if it has
             // changed since we last tracked it
             // This is important for things like Last Replay.KWReplay
             // which will change periodically
             if (it->lastModified() != info.lastModified()) {
-                qCDebug(logProspector) << "Found modified file: " << canonicalPath;
-                m_knownFiles.insert(canonicalPath, info);
-                emit replayDiscovered(canonicalPath);
+                qCDebug(logProspector)
+                    << "Found modified file: " << canonicalPath;
+                handleUpdatedItem(canonicalPath, info);
             } else {
                 // The file hasn't changed since last time so do nothing
-                qCDebug(logProspector) << "Found existing file: " << canonicalPath;
+                qCDebug(logProspector)
+                    << "Found existing file: " << canonicalPath;
             }
         }
     } else {
         qCDebug(logProspector) << "Discarding file: " << canonicalPath;
     }
+}
+
+void ReplayProspector::handleUpdatedItem(const QString& canonicalPath,
+                                         const QFileInfo& info) {
+    // The file has never been seen before so track and emit
+    qCDebug(logProspector) << "Replay data new/changed: " << canonicalPath;
+    m_knownFiles.insert(canonicalPath, info);
+    emit replayDiscovered(canonicalPath);
 }
 
 }  // namespace KWLegion

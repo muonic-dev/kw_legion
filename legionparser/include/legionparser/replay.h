@@ -59,7 +59,7 @@ struct ReplayMetadata {
 
     QList<Player> players;
 
-    QDateTime replayTimestamp;
+    QDateTime timestamp;
 
     /**
      * The filename embedded within the replay. This will be unreliable and
@@ -88,6 +88,6 @@ struct ReplayMetadata {
      * itself is not parsed; this exists as a cheap way to
      * fingerprint/compare replay content.
      */
-    QByteArray payloadChecksum;
+    QByteArray checksum;
 };
 }  // namespace LegionParser

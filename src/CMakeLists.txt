@@ -1,10 +1,12 @@
-find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform)
+find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform Sql)
 
 qt_standard_project_setup(REQUIRES 6.10)
 
 qt_add_executable(kw_legion
     cpp/main.cpp
     cpp/prospector.cpp
+    cpp/store.cpp
+    cpp/transaction.cpp
 )
 
 qt_add_qml_module(kw_legion
@@ -35,6 +37,7 @@ target_link_libraries(kw_legion
     PRIVATE
     Qt6::Quick
     Qt6::LabsPlatform
+    Qt6::Sql
 )
 
 install(TARGETS kw_legion

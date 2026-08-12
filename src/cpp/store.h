@@ -1,0 +1,31 @@
+#pragma once
+
+#include <QDir>
+#include <QLoggingCategory>
+#include <QObject>
+#include <QSqlDatabase>
+
+Q_DECLARE_LOGGING_CATEGORY(logStore);
+
+namespace KWLegion {
+class ReplayStore : public QObject {
+    Q_OBJECT
+
+   public:
+    explicit ReplayStore(QObject* parent = nullptr);
+
+    void startup();
+    void analyzeReplay(const QString& path);
+
+   private:
+    void ensureDb();
+    void ensureDirectories();
+    // Run all of the relevant ddl to bring the database up to current version
+    void executeDdl();
+
+    QSqlDatabase m_db;
+    QString m_dbPath;
+    QString m_replayDir;
+    QString m_scratchDir;
+};
+}  // namespace KWLegion

@@ -45,12 +45,14 @@ class ReplayProspector : public QObject {
     void initialSweep();
 
    signals:
+    void starting();
     void replayDirectoryChanged(const QString& path);
     void replayDiscovered(const QString& filePath);
-    void onError(const QString& issue);
 
    private:
-    void processItem(const QFileInfo& info);
+    void processItem(const QFileInfo&);
+    // If the item is new or updated handle the insert and emission
+    void handleUpdatedItem(const QString&, const QFileInfo&);
 
     QFileSystemWatcher m_watcher;
     QString m_replayDirectory;

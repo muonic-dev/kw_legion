@@ -12,6 +12,7 @@
 #include <iostream>
 
 #include "prospector.h"
+#include "store.h"
 
 namespace {
 
@@ -88,6 +89,13 @@ int main(int argc, char* argv[]) {
 
     ReplayProspector replayProspector;
     replayProspector.moveToThread(&ioThread);
+    ReplayStore replayStore;
+    replayStore.moveToThread(&ioThread);
+
+    QObject::connect(&replayProspector, &ReplayProspector::starting,
+                     &replayStore, &ReplayStore::startup);
+    QObject::connect(&replayProspector, &ReplayProspector::replayDiscovered,
+                     &replayStore, &ReplayStore::analyzeReplay);
 
     QObject::connect(&ioThread, &QThread::started, &replayProspector,
                      &ReplayProspector::initialSweep);
