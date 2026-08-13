@@ -75,7 +75,8 @@ void ReplayProspector::processItem(const QFileInfo& info) {
     // If this is a directory we should add it to the watcher if we haven't
     // already done so
     if (info.isDir()) {
-        qCDebug(logProspector) << "Adding directory for watch";
+        qCDebug(logProspector)
+            << "Adding directory for watch: " << canonicalPath;
         m_watcher.addPath(canonicalPath);
     } else if (info.isFile() &&
                info.fileName().endsWith(".KWReplay", Qt::CaseInsensitive)) {

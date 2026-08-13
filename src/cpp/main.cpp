@@ -15,12 +15,12 @@
 #include <QStandardPaths>
 #include <QTextStream>
 #include <QThread>
-#include <iostream>
+#include <cstdio>
 
 namespace {
 
-void fileMessageHandler(QtMsgType type, const QMessageLogContext& context,
-                        const QString& msg) {
+void logMessageHandler(QtMsgType type, const QMessageLogContext& context,
+                       const QString& msg) {
     static QMutex mutex;
     static QFile file;
 
@@ -60,13 +60,21 @@ void fileMessageHandler(QtMsgType type, const QMessageLogContext& context,
             break;
     }
 
-    QTextStream stream(&file);
-    stream << '[' << level << "] " << "<" << context.category << "> " << msg
-           << "\n";
+    QTextStream fileStream(&file);
+    QTextStream stderrStream(stderr);
+
+    fileStream << '[' << level << "] " << "<" << context.category << "> " << msg
+               << " <" << context.line << "> " << "\n";
+    stderrStream << '[' << level << "] " << "<" << context.category << "> "
+                 << " <" << context.line << "> " << msg << "\n";
+
     // Only flush for the important stuff
     if (QtMsgType::QtWarningMsg <= type && type <= QtMsgType::QtCriticalMsg) {
-        stream.flush();
+        fileStream.flush();
         file.flush();
+
+        stderrStream.flush();
+        fflush(stderr);
     }
 }
 
@@ -78,7 +86,7 @@ using namespace KWLegionCore;
 int main(int argc, char* argv[]) {
     QCoreApplication::setApplicationName("kw_legion");
 
-    qInstallMessageHandler(fileMessageHandler);
+    qInstallMessageHandler(logMessageHandler);
 
     QGuiApplication app(argc, argv);
     QGuiApplication::setWindowIcon(
