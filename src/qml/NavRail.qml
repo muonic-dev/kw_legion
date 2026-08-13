@@ -13,6 +13,9 @@ Rectangle {
     property var sections: []
     property int currentIndex: 0
 
+    readonly property color navTextColor: window.lightMode ? window.reallyDark : window.reallyLight
+    readonly property color navCheckedOverlay: window.lightMode ? Qt.rgba(0, 0, 0, 0.15) : Qt.rgba(1, 1, 1, 0.15)
+
     color: window.lightMode ? window.light : window.dark
 
     ColumnLayout {
@@ -33,9 +36,16 @@ Rectangle {
                 checked: root.currentIndex === index
                 onClicked: root.currentIndex = index
 
+                contentItem: Text {
+                    text: navButton.text
+                    color: root.navTextColor
+                    horizontalAlignment: Text.AlignLeft
+                    verticalAlignment: Text.AlignVCenter
+                }
+
                 background: Rectangle {
                     radius: 4
-                    color: navButton.checked ? Qt.rgba(0, 0, 0, 0.15) : "transparent"
+                    color: navButton.checked ? root.navCheckedOverlay : "transparent"
                 }
             }
         }
