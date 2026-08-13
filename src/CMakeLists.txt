@@ -39,13 +39,6 @@ target_link_libraries(kw_legion
     kwlegion::core
 )
 
-add_custom_command(TARGET kw_legion POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        $<TARGET_RUNTIME_DLLS:kw_legion>
-        $<TARGET_FILE_DIR:kw_legion>
-    COMMAND_EXPAND_LISTS
-)
-
 install(TARGETS kw_legion
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
