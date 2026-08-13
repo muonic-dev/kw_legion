@@ -7,23 +7,24 @@
     },
     "configurePresets": [
         {
-            "name": "base",
+            "name": "Base",
             "hidden": true,
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build"
+            "generator": "Ninja"
         },
         {
-            "name": "debug",
+            "name": "Debug",
             "displayName": "Debug",
-            "inherits": "base",
+            "inherits": "Base",
+            "binaryDir": "${sourceDir}/build-debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
             }
         },
         {
-            "name": "release",
+            "name": "Release",
             "displayName": "Release",
-            "inherits": "base",
+            "inherits": "Base",
+            "binaryDir": "${sourceDir}/build-release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
@@ -31,25 +32,25 @@
     ],
     "buildPresets": [
         {
-            "name": "debug",
-            "configurePreset": "debug"
+            "name": "Debug",
+            "configurePreset": "Debug"
         },
         {
-            "name": "release",
-            "configurePreset": "release"
+            "name": "Release",
+            "configurePreset": "Release"
         }
     ],
     "testPresets": [
         {
-            "name": "debug",
-            "configurePreset": "debug",
+            "name": "Debug",
+            "configurePreset": "Debug",
             "output": {
                 "outputOnFailure": true
             }
         },
         {
-            "name": "release",
-            "configurePreset": "release"
+            "name": "Release",
+            "configurePreset": "Release"
         }
     ]
 }
