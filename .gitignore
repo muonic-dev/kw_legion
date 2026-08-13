@@ -93,3 +93,6 @@ CMakeLists.txt.user*
 
 # personal CMake preset overrides, not meant to be shared
 /CMakeUserPresets.json
+
+# Debug builds write a log file to cwd
+/*.log

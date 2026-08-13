@@ -19,6 +19,13 @@
 
 namespace {
 
+inline constexpr bool DEBUG_BUILD =
+#ifdef QT_DEBUG
+    true;
+#else
+    false;
+#endif
+
 void logMessageHandler(QtMsgType type, const QMessageLogContext& context,
                        const QString& msg) {
     static QMutex mutex;
@@ -27,9 +34,12 @@ void logMessageHandler(QtMsgType type, const QMessageLogContext& context,
     const QMutexLocker locker(&mutex);
 
     if (!file.isOpen()) {
-        const QString logPath =
-            QStandardPaths::writableLocation(QStandardPaths::CacheLocation) +
-            "/kw_legion.log";
+        const QString logPath = DEBUG_BUILD
+                                    ? "./kw_legion.log"
+                                    : QStandardPaths::writableLocation(
+                                          QStandardPaths::CacheLocation) +
+                                          "/kw_legion.log";
+
         const QFileInfo logInfo(logPath);
         QDir().mkpath(logInfo.dir().path());
 

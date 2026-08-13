@@ -93,7 +93,7 @@ bool Queries::isReplayKnown(const QByteArray& checksum) {
     prepare("SELECT count(*) FROM replays WHERE checksum = :checksum");
     m_query.bindValue(":checksum", checksum);
     exec();
-
+    m_query.next();  // it's a count, there must be 1 row
     return m_query.value(0).toInt() != 0;
 }
 
