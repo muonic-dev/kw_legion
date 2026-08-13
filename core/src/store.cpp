@@ -13,6 +13,7 @@
 
 #include "queries.h"
 
+
 Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
 
 namespace KWLegionCore {
@@ -89,41 +90,7 @@ void ReplayStore::ensureDb() {
         return;
     }
 
-    executeDdl();
-}
-
-void ReplayStore::executeDdl() {
-    QSqlQuery query(m_db);
-    query.exec("PRAGMA user_version");
-    query.next();
-    const size_t currentVersion = query.value(0).toULongLong();
-
-    qDebug(logStore) << "Current schema version is: " << currentVersion;
-
-    // The behavior of PRAGMA user_version starts at 0 so this is always the
-    // next thing to execute
-    for (size_t nextExec = currentVersion; nextExec < MIGRATIONS.size();
-         nextExec++) {
-        SqlTransactionGuard tx(m_db);
-        if (!query.exec(MIGRATIONS.at(nextExec))) {
-            qCritical(logStore) << "Failed to execute migration: " << nextExec
-                                << ": " << query.lastError().text();
-            return;
-        }
-        if (!query.exec(QStringLiteral("PRAGMA user_version = %1;")
-                            .arg(nextExec + 1))) {
-            qCritical(logStore) << "Failed to execute migration: " << nextExec
-                                << ": " << query.lastError().text();
-            return;
-        }
-        if (!tx.commit()) {
-            qCritical(logStore) << "Failed to execute migration: " << nextExec
-                                << ": " << query.lastError().text();
-            return;
-        }
-    }
-
-    qDebug(logStore) << "Migrations successful";
+    Queries::migrate(m_db);
 }
 
 void ReplayStore::ensureDirectories() {

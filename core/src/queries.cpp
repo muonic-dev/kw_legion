@@ -3,21 +3,91 @@
 
 #include "queries.h"
 
+#include <kwlegion_core/transaction.h>
+
 #include <QSqlError>
-#include <stdexcept>
+
+#include "exception.h"
 
 namespace KWLegionCore {
 
-namespace {
-// Local class that we can throw when something fails to unwind
-// This should never propogate outside this TU. The SqlTransactionGuard should
-// correctly roll back.
-class IngestionException : public std::runtime_error {
-   public:
-    IngestionException(const QString& what)
-        : std::runtime_error(what.toStdString()) {}
+constexpr std::array MIGRATIONS{
+    // Store the replay here
+    // Note: we use the checksum to compute a stored local state path
+    R"(CREATE TABLE replays
+        ( checksum BLOB PRIMARY KEY
+        , match_title TEXT NOT NULL
+        , match_description TEXT NOT NULL
+        , map_name TEXT NOT NULL
+        , map_id TEXT NOT NULL
+        , game_type INT NOT NULL
+        , timestamp INT NOT NULL
+        , has_commentary INT NOT NULL
+        , filename TEXT NOT NULL
+        , map_reference TEXT NOT NULL
+        , version_major INT
+        , version_minor INT
+        , build_major INT
+        , build_minor INT
+        ) STRICT, WITHOUT ROWID;
+    )",
+
+    // Replays might occur more than once in the replay folder for whatever
+    // reason so a single storage is not good enough
+    // external_path is a full canonical path
+    R"(CREATE TABLE replay_external_paths
+        ( replay_checksum BLOB NOT NULL
+        , external_path TEXT NOT NULL
+        , PRIMARY KEY(replay_checksum, external_path)
+        ) STRICT, WITHOUT ROWID;
+    )",
+
+    R"(CREATE TABLE replay_players
+        ( replay_checksum INT NOT NULL
+        , player_id INT NOT NULL
+        , player_name TEXT NOT NULL
+        , team_number INT
+        , faction INT NOT NULL
+        , is_computer INT NOT NULL
+        , is_replay_saver INT NOT NULL
+        , PRIMARY KEY(replay_checksum, player_id)
+        ) STRICT, WITHOUT ROWID;
+    )",
 };
-}  // namespace
+
+void Queries::migrate(const QSqlDatabase& db) {
+    QSqlQuery query(db);
+    query.exec("PRAGMA user_version");
+    query.next();
+    const size_t currentVersion = query.value(0).toULongLong();
+
+    qDebug() << "Current schema version is: " << currentVersion;
+
+    // The behavior of PRAGMA user_version starts at 0 so this is always the
+    // next thing to execute
+    for (size_t nextExec = currentVersion; nextExec < MIGRATIONS.size();
+         nextExec++) {
+        SqlTransactionGuard tx(db);
+        if (!query.exec(MIGRATIONS.at(nextExec))) {
+            qCritical() << "Failed to execute migration: " << nextExec << ": "
+                        << query.lastError().text();
+            return;
+        }
+        if (!query.exec(QStringLiteral("PRAGMA user_version = %1;")
+                            .arg(nextExec + 1))) {
+            qCritical() << "Failed to execute migration: " << nextExec << ": "
+                        << query.lastError().text();
+            return;
+        }
+        if (!tx.commit()) {
+            qCritical() << "Failed to execute migration: " << nextExec << ": "
+                        << query.lastError().text();
+            return;
+        }
+    }
+
+    qDebug() << "Migrations successful";
+}
 
 bool Queries::isReplayKnown(const QByteArray& checksum) {
     prepare("SELECT count(*) FROM replays WHERE checksum = :checksum");

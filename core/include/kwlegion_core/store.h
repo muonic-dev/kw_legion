@@ -29,8 +29,6 @@ class ReplayStore : public QObject {
    private:
     void ensureDb();
     void ensureDirectories();
-    // Run all of the relevant ddl to bring the database up to current version
-    void executeDdl();
 
     // Perform all the steps to try and receive a replay
     void ingestReplay(QFile& file,
