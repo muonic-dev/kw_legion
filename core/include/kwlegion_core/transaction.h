@@ -18,7 +18,10 @@ class SqlTransactionGuard {
     SqlTransactionGuard& operator=(const SqlTransactionGuard&) = delete;
     SqlTransactionGuard& operator=(SqlTransactionGuard&&) = delete;
 
-    bool commit();
+    // Only commit is no-discard to force checks on whether the commit actually
+    // succeeded
+    [[nodiscard]] bool commit();
+    bool rollback();
 
    private:
     QSqlDatabase m_db;

@@ -29,6 +29,7 @@ constexpr std::array MIGRATIONS{
         , version_minor INT
         , build_major INT
         , build_minor INT
+        , canonical_name TEXT
         ) STRICT, WITHOUT ROWID;
     )",
 
@@ -42,6 +43,9 @@ constexpr std::array MIGRATIONS{
         ) STRICT, WITHOUT ROWID;
     )",
 
+    // player_id isn't reliably unique per replay - e.g. the trailing
+    // commentator player's id is consistently 0, and skirmish replays leave
+    // every player's id at 0 - so rows are identified by rowid instead.
     R"(CREATE TABLE replay_players
         ( replay_checksum BLOB NOT NULL
         , player_id INT NOT NULL
@@ -50,8 +54,11 @@ constexpr std::array MIGRATIONS{
         , faction INT NOT NULL
         , is_computer INT NOT NULL
         , is_replay_saver INT NOT NULL
-        , PRIMARY KEY(replay_checksum, player_id)
-        ) STRICT, WITHOUT ROWID;
+        ) STRICT;
+    )",
+
+    R"(CREATE INDEX idx_replay_players_checksum
+        ON replay_players(replay_checksum);
     )",
 };
 
@@ -176,17 +183,21 @@ void Queries::insertReplayPlayers(const QByteArray& checksum,
     }
 }
 
-void Queries::insertExternalFilename(const QByteArray& checksum,
+bool Queries::insertExternalFilename(const QByteArray& checksum,
                                      const QString& path) {
+    // ON CONFLICT so that this is useable for both brand new and existing
+    // replay
     prepare(R"(INSERT INTO replay_external_paths
             ( replay_checksum
             , external_path)
             VALUES
             ( :replay_checksum
-            , :external_path);)");
+            , :external_path)
+            ON CONFLICT DO NOTHING;)");
     m_query.bindValue(":replay_checksum", checksum);
     m_query.bindValue(":external_path", path);
     exec();
+    return m_query.numRowsAffected() > 0;
 }
 
 void Queries::prepare(const QString& sql) {

@@ -57,24 +57,40 @@ void ReplayStore::receiveReplay(const QString& path) {
     }
 }
 
-void ReplayStore::ingestReplay(const QFile& file,
+void ReplayStore::ingestReplay(QFile& file,
                                const LegionParser::ReplayMetadata& metadata) {
     SqlTransactionGuard tx(m_db);
     Queries queries{QSqlQuery(m_db)};
 
     if (queries.isReplayKnown(metadata.checksum)) {
         // If the replay has been seen before then we need to add a path to it
+        qDebug(logStore) << "Existing replay being ingested: "
+                         << file.fileName();
+        if (!queries.insertExternalFilename(metadata.checksum,
+                                            file.fileName())) {
+            qDebug(logStore)
+                << "Existing replay was already tracked" << file.fileName();
+        }
     } else {
-        // This is the first time the replay has been seen so we need to perform
-        // to insert everything
+        qInfo(logStore) << "New replay being ingested: " << file.fileName();
+        // This is the first time the replay has been seen so
+        // we need to perform to insert everything
         queries.insertReplay(metadata);
         queries.insertReplayPlayers(metadata.checksum, metadata.players);
         queries.insertExternalFilename(metadata.checksum, file.fileName());
 
-        // TODO: If it fails we should pro
+        // Before committing we should copy to the canonical path
+        if (!file.copy(computeIngestionPath(metadata.checksum))) {
+            qCritical(logStore)
+                << "Failed to copy the replay file to the store";
+            tx.rollback();
+            return;  // don't hit the commit below
+        }
     }
 
-    tx.commit();
+    if (!tx.commit()) {
+        qCritical(logStore) << "Failed to commit: " << m_db.lastError().text();
+    }
 }
 
 QString ReplayStore::computeIngestionPath(const QByteArray& checksum) const {

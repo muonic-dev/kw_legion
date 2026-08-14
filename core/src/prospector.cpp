@@ -106,7 +106,7 @@ void ReplayProspector::processItem(const QFileInfo& info) {
 void ReplayProspector::handleUpdatedItem(const QString& canonicalPath,
                                          const QFileInfo& info) {
     // The file has never been seen before so track and emit
-    qCDebug(logProspector) << "Replay data new/changed: " << canonicalPath;
+    qCDebug(logProspector) << "Replay file new/changed: " << canonicalPath;
     m_knownFiles.insert(canonicalPath, info);
     emit replayDiscovered(canonicalPath);
 }

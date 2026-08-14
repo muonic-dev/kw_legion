@@ -36,7 +36,8 @@ class Queries final {
     void insertReplayPlayers(const QByteArray& checksum,
                              const QList<LegionParser::Player>& players);
 
-    void insertExternalFilename(const QByteArray& checksum,
+    // Insert an external filename, returns true when the file is new
+    bool insertExternalFilename(const QByteArray& checksum,
                                 const QString& path);
 
     // Attempt to perform migrations

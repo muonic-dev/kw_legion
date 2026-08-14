@@ -32,7 +32,7 @@ class ReplayStore : public QObject {
 
     // Perform all the steps to try and receive a replay
     // File should probably be an absolute path
-    void ingestReplay(const QFile& file,
+    void ingestReplay(QFile& file,
                       const LegionParser::ReplayMetadata& metadata);
 
     [[nodiscard]] QString computeIngestionPath(

@@ -13,6 +13,14 @@ SqlTransactionGuard::~SqlTransactionGuard() {
     }
 }
 
+bool SqlTransactionGuard::rollback() {
+    if (!m_inTx) {
+        return false;
+    }
+    m_inTx = !m_db.rollback();
+    return !m_inTx;
+}
+
 bool SqlTransactionGuard::commit() {
     if (!m_inTx) {
         return false;
