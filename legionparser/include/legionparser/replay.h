@@ -60,6 +60,10 @@ constexpr Faction factionFromUint8(std::uint8_t raw) {
 }
 
 struct Player {
+    // In a parsed online replay the player id seems to be consistent
+    // likely a unique id assigned by the server for login.
+    // In skirmish, the player id appears to always be zero.
+    // The behavior in network is currently unclear.
     std::uint32_t playerId = std::numeric_limits<std::uint32_t>::max();
     QString playerName = QLatin1String("");
     // Only relevant for multiplayer
