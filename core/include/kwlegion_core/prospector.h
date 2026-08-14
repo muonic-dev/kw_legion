@@ -50,6 +50,8 @@ class ReplayProspector : public QObject {
    signals:
     void starting();
     void replayDirectoryChanged(const QString& path);
+    // The canonical file path of a replay that was discovered in the search
+    // directory
     void replayDiscovered(const QString& filePath);
 
    private:

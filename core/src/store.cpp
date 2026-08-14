@@ -11,8 +11,8 @@
 #include <QStandardPaths>
 #include <stdexcept>
 
+#include "exception.h"
 #include "queries.h"
-
 
 Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
 
@@ -50,12 +50,14 @@ void ReplayStore::receiveReplay(const QString& path) {
         ingestReplay(replayFile, metadata);
     } catch (LegionParser::ReplayParseException& ex) {
         qWarning(logStore) << "Unable to parse " << path << " " << ex.what();
-    } catch (std::runtime_error& ex) {
+    } catch (IngestionException& ex) {
+        // If it fails we should probably do something to mark the replay for
+        // future processing
         qCritical(logStore) << "Unable to ingest the replay " << ex.what();
     }
 }
 
-void ReplayStore::ingestReplay(QFile& file,
+void ReplayStore::ingestReplay(const QFile& file,
                                const LegionParser::ReplayMetadata& metadata) {
     SqlTransactionGuard tx(m_db);
     Queries queries{QSqlQuery(m_db)};
@@ -65,6 +67,11 @@ void ReplayStore::ingestReplay(QFile& file,
     } else {
         // This is the first time the replay has been seen so we need to perform
         // to insert everything
+        queries.insertReplay(metadata);
+        queries.insertReplayPlayers(metadata.checksum, metadata.players);
+        queries.insertExternalFilename(metadata.checksum, file.fileName());
+
+        // TODO: If it fails we should pro
     }
 
     tx.commit();

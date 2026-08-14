@@ -54,19 +54,19 @@ void logMessageHandler(QtMsgType type, const QMessageLogContext& context,
     QString level;
     switch (type) {
         case QtDebugMsg:
-            level = "Debug";
+            level = QLatin1String("Debug");
             break;
         case QtInfoMsg:
-            level = "Info";
+            level = QLatin1String("Info");
             break;
         case QtWarningMsg:
-            level = "Warning";
+            level = QLatin1String("Warning");
             break;
         case QtCriticalMsg:
-            level = "Critical";
+            level = QLatin1String("Critical");
             break;
         case QtFatalMsg:
-            level = "Fatal";
+            level = QLatin1String("Fatal");
             break;
     }
 

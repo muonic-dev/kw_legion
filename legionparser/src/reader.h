@@ -52,7 +52,7 @@ class Reader {
     QString readFixedUtf16String() {
         const auto length = readIntegral<T>();
         if (std::cmp_greater(length, MAX_STRING_LENGTH)) {
-            throw LimitExceededException(QString("utf16 string"),
+            throw LimitExceededException(QLatin1String("utf16 string"),
                                          m_offsetMgr.lastOffset(),
                                          MAX_STRING_LENGTH, length);
         }
@@ -67,7 +67,7 @@ class Reader {
     QString readFixedCharString() {
         const auto length = readIntegral<T>();
         if (std::cmp_greater(length, MAX_STRING_LENGTH)) {
-            throw LimitExceededException(QString("ascii string"),
+            throw LimitExceededException(QLatin1String("ascii string"),
                                          m_offsetMgr.lastOffset(),
                                          MAX_STRING_LENGTH, length);
         }
@@ -104,7 +104,7 @@ class Reader {
             const qint64 bytesRead =
                 m_replayFile.read(buffers.at(next).data(), chunkSize);
             if (bytesRead < 0) {
-                throw CorruptDataException(QString("Error reading payload"),
+                throw CorruptDataException(QLatin1String("Error reading payload"),
                                            m_offsetMgr.offset());
             }
             if (bytesRead == 0) {
@@ -143,7 +143,7 @@ class Reader {
             T value{};
             stream >> value;
             if (stream.status() != QDataStream::Ok) {
-                throw CorruptDataException(QString("Unexpected EOF"),
+                throw CorruptDataException(QLatin1String("Unexpected EOF"),
                                            m_offsetMgr.offset());
             }
             m_offsetMgr.increment(sizeof(T));
@@ -163,7 +163,7 @@ class Reader {
     T readByte() {
         char value = 0x0;
         if (!m_replayFile.getChar(&value)) {
-            throw CorruptDataException(QString("Unexpected EOF"),
+            throw CorruptDataException(QLatin1String("Unexpected EOF"),
                                        m_offsetMgr.offset());
         }
         m_offsetMgr.increment(1);
@@ -174,7 +174,7 @@ class Reader {
     void discardZero() {
         const auto zero = readIntegral<T>();
         if (std::cmp_not_equal(zero, 0)) {
-            throw CorruptDataException(QString("Expected 0"),
+            throw CorruptDataException(QLatin1String("Expected 0"),
                                        m_offsetMgr.lastOffset());
         }
     }

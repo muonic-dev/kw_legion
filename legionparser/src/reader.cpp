@@ -16,7 +16,9 @@ QString Reader::readUtf16String() {
     // (UTF-16LE) code units
     QDataStream stream(&m_replayFile);
     stream.setByteOrder(QDataStream::LittleEndian);
-    QString result;
+    // Explicitly non-null so an empty string doesn't decay into a null
+    // QString, which QSqlQuery::bindValue would bind as SQL NULL.
+    QString result{QLatin1String("")};
     quint16 codeUnit = 0;
     // We must always read at least 1 byte
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-do-while)
@@ -25,7 +27,7 @@ QString Reader::readUtf16String() {
         if (codeUnit != 0) {
             if (std::cmp_greater_equal(result.size(), MAX_STRING_LENGTH)) {
                 throw LimitExceededException(
-                    QString("match metadata string"), m_offsetMgr.lastOffset(),
+                    QLatin1String("match metadata string"), m_offsetMgr.lastOffset(),
                     MAX_STRING_LENGTH, MAX_STRING_LENGTH + 1);
             }
             result.append(QChar(codeUnit));
@@ -53,7 +55,7 @@ QString Reader::readFixedCharString(std::size_t length) {
 QByteArray Reader::readBlock(size_t length) {
     const QByteArray raw = m_replayFile.read(static_cast<qint64>(length));
     if (std::cmp_not_equal(raw.size(), length)) {
-        throw CorruptDataException(QString("Unexpected EOF"),
+        throw CorruptDataException(QLatin1String("Unexpected EOF"),
                                    m_offsetMgr.offset());
     }
     m_offsetMgr.increment(length);

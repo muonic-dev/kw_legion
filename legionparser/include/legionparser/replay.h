@@ -61,7 +61,7 @@ constexpr Faction factionFromUint8(std::uint8_t raw) {
 
 struct Player {
     std::uint32_t playerId = std::numeric_limits<std::uint32_t>::max();
-    QString playerName = "";
+    QString playerName = QLatin1String("");
     // Only relevant for multiplayer
     // The default will also be larger than the input
     std::int32_t teamNumber = std::numeric_limits<std::int32_t>::max();

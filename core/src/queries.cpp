@@ -43,7 +43,7 @@ constexpr std::array MIGRATIONS{
     )",
 
     R"(CREATE TABLE replay_players
-        ( replay_checksum INT NOT NULL
+        ( replay_checksum BLOB NOT NULL
         , player_id INT NOT NULL
         , player_name TEXT NOT NULL
         , team_number INT
@@ -153,6 +153,7 @@ void Queries::insertReplayPlayers(const QByteArray& checksum,
         , player_id
         , player_name
         , team_number
+        , faction
         , is_computer
         , is_replay_saver )
         VALUES
@@ -160,6 +161,7 @@ void Queries::insertReplayPlayers(const QByteArray& checksum,
         , :player_id
         , :player_name
         , :team_number
+        , :faction
         , :is_computer
         , :is_replay_saver);)");
     for (const auto& player : players) {
@@ -167,9 +169,24 @@ void Queries::insertReplayPlayers(const QByteArray& checksum,
         m_query.bindValue(":player_id", player.playerId);
         m_query.bindValue(":player_name", player.playerName);
         m_query.bindValue(":team_number", player.teamNumber);
+        m_query.bindValue(":faction", LegionParser::toUint8(player.faction));
         m_query.bindValue(":is_computer", player.isComputer ? 1 : 0);
         m_query.bindValue(":is_replay_saver", player.isReplaySaver ? 1 : 0);
+        exec();
     }
+}
+
+void Queries::insertExternalFilename(const QByteArray& checksum,
+                                     const QString& path) {
+    prepare(R"(INSERT INTO replay_external_paths
+            ( replay_checksum
+            , external_path)
+            VALUES
+            ( :replay_checksum
+            , :external_path);)");
+    m_query.bindValue(":replay_checksum", checksum);
+    m_query.bindValue(":external_path", path);
+    exec();
 }
 
 void Queries::prepare(const QString& sql) {

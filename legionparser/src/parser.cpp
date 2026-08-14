@@ -77,7 +77,7 @@ void Parser::parse() {
 void Parser::checkMagic() {
     const QByteArray magic = m_reader->readBlock(MAGIC_SIZE);
     if (magic != QByteArray(CNC_MAGIC, MAGIC_SIZE)) {
-        throw CorruptDataException(QString("replay magic"),
+        throw CorruptDataException(QLatin1String("replay magic"),
                                    m_reader->offset() - MAGIC_SIZE);
     }
 }
@@ -141,7 +141,7 @@ void Parser::parseCommentaryFlag() {
 
     const auto zero1 = m_reader->readByte<uint8_t>();
     if (zero1 != 0x0) {
-        throw CorruptDataException(QString("reserved byte"),
+        throw CorruptDataException(QLatin1String("reserved byte"),
                                    m_reader->lastOffset());
     }
 }
@@ -156,11 +156,11 @@ void Parser::parseMatchStrings() {
 void Parser::parsePlayers() {
     const auto playerCount = m_reader->readByte<uint8_t>();
     if (playerCount == 0) {
-        throw CorruptDataException(QString("Player count is 0"),
+        throw CorruptDataException(QLatin1String("Player count is 0"),
                                    m_reader->lastOffset());
     }
     if (playerCount > MAX_PLAYERS) {
-        throw CorruptDataException(QString("Player count is improbably large"),
+        throw CorruptDataException(QLatin1String("Player count is improbably large"),
                                    m_reader->lastOffset());
     }
     for (uint8_t i = 0; i < playerCount; i++) {
@@ -194,7 +194,7 @@ void Parser::parseMapReference(const QStringView header) {
     constexpr QLatin1String pathAnchor("data/");
 
     if (!header.startsWith(mapMarker)) {
-        throw CorruptDataException(QString("header missing map reference"),
+        throw CorruptDataException(QLatin1String("header missing map reference"),
                                    m_reader->lastOffset());
     }
 
@@ -202,14 +202,14 @@ void Parser::parseMapReference(const QStringView header) {
         header.indexOf(pathAnchor, mapMarker.size(), Qt::CaseInsensitive);
     if (mapStart < 0) {
         throw CorruptDataException(
-            QString("header map reference missing data/ prefix"),
+            QLatin1String("header map reference missing data/ prefix"),
             m_reader->lastOffset());
     }
 
     const qsizetype mapEnd = header.indexOf(QLatin1Char(';'), mapStart);
     if (mapEnd < 0) {
         throw CorruptDataException(
-            QString("header map reference missing terminator"),
+            QLatin1String("header map reference missing terminator"),
             m_reader->lastOffset());
     }
 
@@ -228,7 +228,7 @@ void Parser::parsePlayerSlots(const QStringView header) {
     const QLatin1String slotMarker(";S=");
     qsizetype slotStart = header.indexOf(slotMarker);
     if (slotStart < 0) {
-        throw CorruptDataException(QString("header missing player slot list"),
+        throw CorruptDataException(QLatin1String("header missing player slot list"),
                                    m_reader->lastOffset());
     }
     // Move past the starting token
@@ -243,9 +243,9 @@ void Parser::parsePlayerSlots(const QStringView header) {
 
         // find the end of the current slot. This is either the following ':',
         // the next ';', or the end of the header.
-        qsizetype slotEnd = header.indexOf(QString(":"), slotStart);
+        qsizetype slotEnd = header.indexOf(QLatin1String(":"), slotStart);
         if (slotEnd == -1) {
-            slotEnd = header.indexOf(QString(";"), slotStart);
+            slotEnd = header.indexOf(QLatin1String(";"), slotStart);
         }
         if (slotEnd == -1) {
             slotEnd = header.size();
@@ -303,7 +303,7 @@ void Parser::parseOffsetAndMagic() {
     // Read this manually since we want to mark mid-read so we track it
     const auto strReplLength = m_reader->readIntegral<uint32_t>();
     if (strReplLength != REPL_MAGIC_SIZE) {
-        throw CorruptDataException(QString("CNC3RPL magic incorrect length"),
+        throw CorruptDataException(QLatin1String("CNC3RPL magic incorrect length"),
                                    m_reader->lastOffset());
     }
 
@@ -314,7 +314,7 @@ void Parser::parseOffsetAndMagic() {
     const QByteArray strReplMagic = m_reader->readBlock(REPL_MAGIC_SIZE);
 
     if (strReplMagic != QByteArray(REPL_MAGIC, REPL_MAGIC_SIZE)) {
-        throw CorruptDataException(QString("CNC3RPL magic incorrect value"),
+        throw CorruptDataException(QLatin1String("CNC3RPL magic incorrect value"),
                                    m_reader->lastOffset());
     }
 }
@@ -378,7 +378,7 @@ void Parser::parseBody() {
         [&](QByteArrayView chunk) {
             totalSize += static_cast<size_t>(chunk.size());
             if (totalSize > MAX_BODY_SIZE) {
-                throw LimitExceededException(QString("replay payload"),
+                throw LimitExceededException(QLatin1String("replay payload"),
                                              m_reader->offset(), MAX_BODY_SIZE,
                                              totalSize);
             }
@@ -397,8 +397,8 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
     // from the end rather than scanning for the magic string.
     if (std::cmp_less(lastChunk.size(), FOOTER_LENGTH_FIELD_SIZE)) {
         throw CorruptDataException(
-            QString("replay is missing a valid footer; the file may be a "
-                    "torn/incomplete read"),
+            QLatin1String("replay is missing a valid footer; the file may be a "
+                          "torn/incomplete read"),
             m_reader->offset());
     }
 
@@ -407,8 +407,8 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
     if (std::cmp_less(footerLength, FOOTER_MIN_SIZE) ||
         std::cmp_greater(footerLength, lastChunk.size())) {
         throw CorruptDataException(
-            QString("replay footer length is invalid; the file may be a "
-                    "torn/incomplete read"),
+            QLatin1String("replay footer length is invalid; the file may be a "
+                          "torn/incomplete read"),
             m_reader->offset());
     }
 
@@ -418,8 +418,8 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
     const auto magicView = QByteArrayView(FOOTER_MAGIC, FOOTER_MAGIC_SIZE);
     if (footer.first(magicView.size()) != magicView) {
         throw CorruptDataException(
-            QString("replay is missing a valid footer; the file may be a "
-                    "torn/incomplete read"),
+            QLatin1String("replay is missing a valid footer; the file may be a "
+                          "torn/incomplete read"),
             m_reader->offset());
     }
 
@@ -434,7 +434,7 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
     if (dataTag == 0x02) {
         if (dataSize != 1) {
             throw CorruptDataException(
-                QString("replay footer data has an unrecognized structure"),
+                QLatin1String("replay footer data has an unrecognized structure"),
                 m_reader->offset());
         }
     } else if (dataTag == 0x01) {
@@ -446,19 +446,19 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
         if (std::cmp_less(dataSize, extendedDataFixedSize) ||
             static_cast<uchar>(footer.at(dataStart + 1)) != 0x02) {
             throw CorruptDataException(
-                QString("replay footer data has an unrecognized structure"),
+                QLatin1String("replay footer data has an unrecognized structure"),
                 m_reader->offset());
         }
         const quint32 payloadLength = readLE32(footer, dataStart + 2);
         if (dataSize !=
             extendedDataFixedSize + static_cast<qsizetype>(payloadLength)) {
             throw CorruptDataException(
-                QString("replay footer data has an unrecognized structure"),
+                QLatin1String("replay footer data has an unrecognized structure"),
                 m_reader->offset());
         }
     } else {
         throw CorruptDataException(
-            QString("replay footer data has an unrecognized structure"),
+            QLatin1String("replay footer data has an unrecognized structure"),
             m_reader->offset());
     }
 }
