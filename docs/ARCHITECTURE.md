@@ -11,11 +11,11 @@ them.
 | Component | Location | Responsibility |
 |---|---|---|
 | `LegionParser::Parser` | `legionparser/` | Parses the `.KWReplay` binary format from a `QIODevice` into `ReplayMetadata` (players, factions, map, timestamp, checksum). This is only a format parser. There is no knowledge of persistence of the filesystem beyond whatever QIODevice is handed in. |
-| `KWLegionCore::ReplayProspector` | `core/` | Watches the configured replay directory (`QFileSystemWatcher`), performs an initial sweep, and emits paths as replays are discovered or removed. |
-| `KWLegionCore::ReplayStore` | `core/` | Owns the SQLite-backed catalog. Parses paths it's handed via `LegionParser::Parser`, ingests new/changed replays, and emits domain events. |
-| `KWLegionCore::StoreModel` | `core/` | `QAbstractListModel` adapter exposing the store's replay list to QML. |
-| App shell | `src/` | Wires the components together, owns the background I/O thread, registers the QML singleton, boots the engine. |
-| UI | `src/qml/` | `Main.qml` / `NavRail.qml` shell plus pages (`ReplaysPage`, `StatisticsPage`, `SettingsPage`, `AboutPage`) that bind to the `StoreModel` singleton. |
+| `KWLegionCore::ReplayProspector` | `kwlegion_core/` | Watches the configured replay directory (`QFileSystemWatcher`), performs an initial sweep, and emits paths as replays are discovered or removed. |
+| `KWLegionCore::ReplayStore` | `kwlegion_core/` | Owns the SQLite-backed catalog. Parses paths it's handed via `LegionParser::Parser`, ingests new/changed replays, and emits domain events. |
+| `KWLegionCore::StoreModel` | `kwlegion_core/` | `QAbstractListModel` adapter exposing the store's replay list to QML. |
+| App shell | `kwlegion_ui/` | Wires the components together, owns the background I/O thread, registers the QML singleton, boots the engine. |
+| UI | `kwlegion_ui/qml/` | `Main.qml` / `NavRail.qml` shell plus pages (`ReplaysPage`, `StatisticsPage`, `SettingsPage`, `AboutPage`) that bind to the `StoreModel` singleton. |
 
 ## Threading
 

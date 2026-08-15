@@ -22,8 +22,8 @@ add_custom_target(copy-compile-commands ALL
     COMMENT "Copying compile_commands.json to the project root for editor tooling")
 
 add_subdirectory(legionparser)
-add_subdirectory(core)
-add_subdirectory(src)
+add_subdirectory(kwlegion_core)
+add_subdirectory(kwlegion_ui)
 
 include(CTest)
 

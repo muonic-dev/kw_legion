@@ -22,7 +22,7 @@ Checks: >
 
 WarningsAsErrors: ''
 
-HeaderFilterRegex: '[/\\](legionparser|src)[/\\](include|src)[/\\]'
+HeaderFilterRegex: '[/\\](legionparser|kwlegion_ui)[/\\](include|src)[/\\]'
 
 FormatStyle: file
 
