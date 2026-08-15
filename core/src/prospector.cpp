@@ -45,7 +45,6 @@ void ReplayProspector::setReplayDirectory() {
 void ReplayProspector::initialSweep() {
     qCDebug(logProspector) << "initial sweep";
     // Let downstream things trigger to do their own initialization
-    emit starting();
 
     if (m_replayDirectory.isNull() || m_replayDirectory.isEmpty()) {
         qCDebug(logProspector) << "No valid replay path, skipping sweep";
@@ -108,7 +107,7 @@ void ReplayProspector::handleUpdatedItem(const QString& canonicalPath,
     // The file has never been seen before so track and emit
     qCDebug(logProspector) << "Replay file new/changed: " << canonicalPath;
     m_knownFiles.insert(canonicalPath, info);
-    emit replayDiscovered(canonicalPath);
+    emit replayFileChanged(canonicalPath);
 }
 
 }  // namespace KWLegionCore

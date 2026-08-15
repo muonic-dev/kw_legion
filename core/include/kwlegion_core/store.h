@@ -22,13 +22,11 @@ class ReplayStore : public QObject {
     explicit ReplayStore(QObject* parent = nullptr);
 
     void startup();
-    void receiveReplay(const QString& path);
+
+    void analyzeReplayFile(const QString& path);
+    void removeReplayFile(const QString& path);
 
    signals:
-    // An error occurred in storage and the app is probably unstable
-    // TODO: Wire this
-    void storageError();
-
     void replaysLoaded(QList<Replay>);
     // A replay was was discovered for the first time
     void replayDiscovered(Replay);

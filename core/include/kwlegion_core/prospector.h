@@ -17,7 +17,23 @@ namespace KWLegionCore {
 /* The replay prospector identifies and tracks replays that are in the Kane's
  * Wrath replays folder. This includes identifying replays that are added or
  * changed. Specifically, it is expected that replays such as Last
- * Replay.KWReplay will change over time KW writes the latest replays.*/
+ * Replay.KWReplay will change over time KW writes the latest replays.
+ *
+ * The expected sequence of events is as follows.
+ * Something (such as QThread::started) should trigger initialSweep
+ * The initialSweep will sweep the input directory for the full list of known
+ * files and setup watches.
+ *
+ * It will then emit initialSweepComplete(QList<QString>)
+ *
+ * constaining all the paths that were discovered in this sweep.
+ *
+ * Subsequently, anytime something in the watch directory changes it will emit
+ * either replayDiscovered or replayRemoved with the path that changed.
+ *
+ * It does this by maintaining a current model of the filesystem that is built
+ * during the initial sweep
+ */
 class ReplayProspector : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString replayDirectory READ replayDirectory WRITE
@@ -34,7 +50,13 @@ class ReplayProspector : public QObject {
 
     [[nodiscard]] QString replayDirectory() const { return m_replayDirectory; }
 
+    /**
+     * Set the replay directory
+     *
+     * After setting this you should call initialSweep.
+     */
     void setReplayDirectory(const QString& path);
+
     /**
      * Set the default replay directory
      */
@@ -48,14 +70,33 @@ class ReplayProspector : public QObject {
     void initialSweep();
 
    signals:
-    void starting();
+
+    /**
+     * Emitted when the replay directory is changed
+     */
     void replayDirectoryChanged(const QString& path);
-    // The canonical file path of a replay that was discovered in the search
-    // directory
-    void replayDiscovered(const QString& filePath);
+
+    /**
+     * Emitted when the initial sweep completes.
+     *
+     * This will contain all subpaths under the replay directory that may be KW
+     * Replays
+     */
+    void initialSweepCompleted(QList<QString> paths);
+
+    /**
+     * Emitted when a replay path is discovered under the replay directory
+     */
+    void replayFileChanged(const QString& filePath);
+
+    /**
+     * Emitted when a replay path that was known no longer exists
+     */
+    void replayFileRemoved(const QString& filePath);
 
    private:
     void processItem(const QFileInfo&);
+
     // If the item is new or updated handle the insert and emission
     void handleUpdatedItem(const QString&, const QFileInfo&);
 

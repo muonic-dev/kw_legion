@@ -116,13 +116,13 @@ int main(int argc, char* argv[]) {
     ReplayStore replayStore;
     replayStore.moveToThread(&ioThread);
 
-    QObject::connect(&replayProspector, &ReplayProspector::starting,
-                     &replayStore, &ReplayStore::startup);
-    QObject::connect(&replayProspector, &ReplayProspector::replayDiscovered,
-                     &replayStore, &ReplayStore::receiveReplay);
+    // QObject::connect(&replayProspector, &ReplayProspector::starting,
+    //                  &replayStore, &ReplayStore::startup);
+    // QObject::connect(&replayProspector, &ReplayProspector::replayDiscovered,
+    //                  &replayStore, &ReplayStore::receiveReplay);
 
-    QObject::connect(&ioThread, &QThread::started, &replayProspector,
-                     &ReplayProspector::initialSweep);
+    // QObject::connect(&ioThread, &QThread::started, &replayProspector,
+    //                  &ReplayProspector::initialSweep);
 
     StoreModel storeModel;
 

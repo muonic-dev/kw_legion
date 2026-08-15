@@ -38,7 +38,7 @@ void ReplayStore::startup() {
     }
 }
 
-void ReplayStore::receiveReplay(const QString& path) {
+void ReplayStore::analyzeReplayFile(const QString& path) {
     qDebug(logStore) << "Analyzing replay: " << path;
     // First thing we do is copy into the staging directory before we run it
 
