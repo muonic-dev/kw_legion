@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <kwlegion_core/replay.h>
 #include <legionparser/replay.h>
 
 #include <QByteArray>
@@ -12,6 +13,7 @@
 #include <QSqlQuery>
 #include <QString>
 #include <array>
+#include <optional>
 
 namespace KWLegionCore {
 
@@ -40,15 +42,26 @@ class Queries final {
     bool insertExternalFilename(const QByteArray& checksum,
                                 const QString& path);
 
+    QList<Replay> selectReplays();
+
+    std::optional<Replay> selectReplay(const QByteArray& checksum);
+
     // Attempt to perform migrations
     // Fails and logs when issues occur
     static void migrate(const QSqlDatabase& db);
 
    private:
     void prepare(const QString& sql);
+
     void exec();
+
     void execBatch();
+
     void throwLast() const;
+
+    void throwLastIfFailed() const;
+
+    [[nodiscard]] Replay readReplay() const;
 
     QSqlQuery m_query;
 };

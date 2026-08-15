@@ -6,12 +6,11 @@
 #include <QString>
 #include <stdexcept>
 
-
 namespace KWLegionCore {
 
-class IngestionException : public std::runtime_error {
+class StorageException : public std::runtime_error {
    public:
-    IngestionException(const QString& what)
+    StorageException(const QString& what)
         : std::runtime_error(what.toStdString()) {}
 };
 }  // namespace KWLegionCore

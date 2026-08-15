@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <kwlegion_core/replay.h>
 #include <legionparser/replay.h>
 
 #include <QByteArrayView>
@@ -24,7 +25,17 @@ class ReplayStore : public QObject {
     void receiveReplay(const QString& path);
 
    signals:
-    void ingestionError();
+    // An error occurred in storage and the app is probably unstable
+    // TODO: Wire this
+    void storageError();
+
+    void replaysLoaded(QList<Replay>);
+    // A replay was was discovered for the first time
+    void replayDiscovered(Replay);
+    // A replay that was already known by checksum was found
+    void replayChanged(Replay);
+    // A replay that did exist disappeared
+    void replayRemoved(QByteArray);
 
    private:
     void ensureDb();

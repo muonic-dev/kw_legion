@@ -29,6 +29,13 @@ ReplayStore::ReplayStore(QObject* parent)
 void ReplayStore::startup() {
     ensureDirectories();
     ensureDb();
+
+    Queries queries{QSqlQuery(m_db)};
+    try {
+        emit replaysLoaded(queries.selectReplays());
+    } catch (StorageException& ex) {
+        qCritical(logStore) << "Unable to access the replays " << ex.what();
+    }
 }
 
 void ReplayStore::receiveReplay(const QString& path) {
@@ -50,7 +57,7 @@ void ReplayStore::receiveReplay(const QString& path) {
         ingestReplay(replayFile, metadata);
     } catch (LegionParser::ReplayParseException& ex) {
         qWarning(logStore) << "Unable to parse " << path << " " << ex.what();
-    } catch (IngestionException& ex) {
+    } catch (StorageException& ex) {
         // If it fails we should probably do something to mark the replay for
         // future processing
         qCritical(logStore) << "Unable to ingest the replay " << ex.what();
@@ -83,8 +90,7 @@ void ReplayStore::ingestReplay(QFile& file,
         if (!file.copy(computeIngestionPath(metadata.checksum))) {
             qCritical(logStore)
                 << "Failed to copy the replay file to the store";
-            tx.rollback();
-            return;  // don't hit the commit below
+            throw StorageException("failed to copy");
         }
     }
 

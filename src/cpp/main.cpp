@@ -3,6 +3,7 @@
 
 #include <kwlegion_core/prospector.h>
 #include <kwlegion_core/store.h>
+#include <kwlegion_core/storemodel.h>
 
 #include <QDebug>
 #include <QDir>
@@ -102,6 +103,8 @@ int main(int argc, char* argv[]) {
     QGuiApplication::setWindowIcon(
         QIcon(":/qt/qml/kw_legion/qml/CNCKW_Marked_of_Kane_logo.png"));
 
+    qRegisterMetaType<KWLegionCore::Replay>();
+
     // Background thread to run i/o jobs on
     // Currently, the only requirement is to move the I/O processing
     // off the GUI thread. We aren't trying to farm out to parse all the
@@ -120,6 +123,17 @@ int main(int argc, char* argv[]) {
 
     QObject::connect(&ioThread, &QThread::started, &replayProspector,
                      &ReplayProspector::initialSweep);
+
+    StoreModel storeModel;
+
+    qmlRegisterSingletonInstance("kw_legion", 1, 0, "StoreModel", &storeModel);
+
+    QObject::connect(&replayStore, &ReplayStore::replaysLoaded, &storeModel,
+                     &StoreModel::replaysLoaded);
+    QObject::connect(&replayStore, &ReplayStore::replayDiscovered, &storeModel,
+                     &StoreModel::replayDiscovered);
+    QObject::connect(&replayStore, &ReplayStore::replayChanged, &storeModel,
+                     &StoreModel::replayChanged);
 
     QQmlApplicationEngine engine;
     QObject::connect(

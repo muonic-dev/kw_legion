@@ -200,6 +200,61 @@ bool Queries::insertExternalFilename(const QByteArray& checksum,
     return m_query.numRowsAffected() > 0;
 }
 
+QList<Replay> Queries::selectReplays() {
+    prepare(R"(SELECT checksum
+                    , timestamp
+                    , map_name
+                    , EXISTS (
+                        SELECT 1 FROM replay_external_paths
+                        WHERE replay_checksum = replays.checksum
+                      ) AS has_external_path
+                    
+               FROM replays)");
+    exec();
+
+    QList<Replay> replays;
+    while (m_query.next()) {
+        replays.append(readReplay());
+    }
+
+    throwLastIfFailed();
+
+    return replays;
+}
+
+std::optional<Replay> Queries::selectReplay(const QByteArray& checksum) {
+    prepare(R"(SELECT checksum
+                    , timestamp
+                    , map_name
+                    , EXISTS (
+                        SELECT 1 FROM replay_external_paths
+                        WHERE replay_checksum = replays.checksum
+                      ) AS has_external_path
+                    
+               FROM replays
+               WHERE checksum = :checksum)");
+    m_query.bindValue(":checksum", checksum);
+
+    exec();
+
+    if (m_query.next()) {
+        return readReplay();
+    }
+
+    // Check for termination due to error
+    throwLastIfFailed();
+
+    return std::nullopt;
+}
+
+Replay Queries::readReplay() const {
+    return Replay{.checksum = m_query.value(0).toByteArray(),
+                  .timestamp = QDateTime::fromSecsSinceEpoch(
+                      m_query.value(1).toLongLong()),
+                  .mapName = m_query.value(2).toString(),
+                  .hasExternalPath = m_query.value(3).toBool()};
+}
+
 void Queries::prepare(const QString& sql) {
     if (!m_query.prepare(sql)) {
         throwLast();
@@ -219,7 +274,13 @@ void Queries::execBatch() {
 }
 
 void Queries::throwLast() const {
-    throw IngestionException(m_query.lastError().text());
+    throw StorageException(m_query.lastError().text());
+}
+
+void Queries::throwLastIfFailed() const {
+    if (m_query.lastError().isValid()) {
+        throw StorageException(m_query.lastError().text());
+    }
 }
 
 }  // namespace KWLegionCore
