@@ -40,7 +40,8 @@ class ReplayProspector : public QObject {
                    setReplayDirectory NOTIFY replayDirectoryChanged)
 
    public:
-    explicit ReplayProspector(QObject* parent = nullptr);
+    explicit ReplayProspector(QString replayDir = defaultReplayDirectory(),
+                              QObject* parent = nullptr);
 
     // Best-effort guess at this machine's Kane's Wrath replay folder, based
     // on the current Documents location. This is only a suggestion for

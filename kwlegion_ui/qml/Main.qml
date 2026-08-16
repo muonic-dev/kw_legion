@@ -8,7 +8,7 @@ import Qt.labs.platform
 import "pages"
 
 ApplicationWindow {
-    id: window
+    id: appWindow
     width: 640
     height: 480
     minimumWidth: 200
@@ -26,8 +26,8 @@ ApplicationWindow {
 
     SystemTrayIcon {
         visible: true
-        icon.source: window.appIcon
-        tooltip: window.title
+        icon.source: appWindow.appIcon
+        tooltip: appWindow.title
     }
 
     RowLayout {
@@ -46,7 +46,9 @@ ApplicationWindow {
             Layout.fillHeight: true
             currentIndex: navRail.currentIndex
 
-            ReplaysPage {}
+            ReplaysPage {
+                window: appWindow
+            }
             StatisticsPage {}
             SettingsPage {}
             AboutPage {}

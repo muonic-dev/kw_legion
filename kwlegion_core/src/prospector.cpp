@@ -9,6 +9,7 @@
 #include <QStack>
 #include <QStandardPaths>
 #include <QThread>
+#include <utility>
 
 Q_LOGGING_CATEGORY(logProspector, "kwlegion.prospector")
 
@@ -16,10 +17,10 @@ namespace KWLegionCore {
 
 // TODO: Some way to signal that an I/O error happened
 
-ReplayProspector::ReplayProspector(QObject* parent)
+ReplayProspector::ReplayProspector(QString replayDir, QObject* parent)
     : QObject(parent),
       m_watcher(this),
-      m_replayDirectory(defaultReplayDirectory()) {}
+      m_replayDirectory(std::move(replayDir)) {}
 
 QString ReplayProspector::defaultReplayDirectory() {
     const QString documents =
