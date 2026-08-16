@@ -6,6 +6,7 @@
 #include <kwlegion_core/storemodel.h>
 
 #include <algorithm>
+#include <utility>
 
 namespace KWLegionCore {
 StoreModel::StoreModel(QObject* parent) : QAbstractListModel(parent) {
@@ -21,20 +22,27 @@ StoreModel::StoreModel(QObject* parent) : QAbstractListModel(parent) {
 
 StoreModel::~StoreModel() = default;
 
+StoreModel* StoreModel::create(QQmlEngine* /*qmlEngine*/,
+                               QJSEngine* /*jsEngine*/) {
+    // Signature is Qt's QML_SINGLETON factory contract - must return T*, not
+    // gsl::owner<T*>. Ownership transfers to the QML engine at the call site.
+    return new StoreModel();  // NOLINT(cppcoreguidelines-owning-memory)
+}
+
 void StoreModel::replaysLoaded(QList<Replay> replays) {
     beginResetModel();
-    m_replays = replays;
+    m_replays = std::move(replays);
     endResetModel();
 }
 
-void StoreModel::replayDiscovered(Replay replay) {
+void StoreModel::replayDiscovered(const Replay& replay) {
     const int size = static_cast<int>(m_replays.size());
     beginInsertRows(QModelIndex(), size, size);
     m_replays.append(replay);
     endInsertRows();
 }
 
-void StoreModel::replayChanged(Replay replay) {
+void StoreModel::replayChanged(const Replay& replay) {
     auto it = std::ranges::find_if(m_replays, [&replay](const Replay& r) {
         return r.checksum == replay.checksum;
     });

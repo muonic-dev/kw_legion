@@ -5,15 +5,12 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls.Basic
-import kw_legion
+import KWLegionUI
+import KWLegionCore
 
 Page {
-    id: root
-
-    required property Main window
-
     background: Rectangle {
-        color: root.window.lightMode ? root.window.reallyLight : root.window.reallyDark
+        color: Theme.lightMode ? Theme.reallyLight : Theme.reallyDark
     }
 
     ListView {
@@ -38,12 +35,12 @@ Page {
 
                 Label {
                     text: delegateRoot.mapName
-                    color: root.window.lightMode ? root.window.dark : root.window.light
+                    color: Theme.lightMode ? Theme.dark : Theme.light
                 }
 
                 Label {
                     text: delegateRoot.timestamp.toLocaleString(Qt.locale())
-                    color: root.window.lightMode ? root.window.dark : root.window.light
+                    color: Theme.lightMode ? Theme.dark : Theme.light
                 }
             }
         }

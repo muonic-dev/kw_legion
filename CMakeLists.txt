@@ -10,6 +10,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Any subdirectory that calls qt_add_qml_module() (kwlegion_core, kwlegion_ui)
+# needs this to have run first, so it lives here rather than in one of them.
+find_package(Qt6 REQUIRED COMPONENTS Core)
+qt_standard_project_setup(REQUIRES 6.10)
+
 # clang-tidy/clangd resolve compile_commands.json by walking up from the
 # source file to the project root - they don't know to look inside build/.
 # Symlinking it to the root works on Linux but needs elevated privileges on

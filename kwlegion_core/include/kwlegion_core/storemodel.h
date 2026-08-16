@@ -8,11 +8,14 @@
 #include <kwlegion_core/replay.h>
 
 #include <QAbstractListModel>
+#include <QQmlEngine>
 
 namespace KWLegionCore {
 
 class StoreModel : public QAbstractListModel {
     Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
 
    public:
     enum class Roles : std::uint16_t {
@@ -34,9 +37,14 @@ class StoreModel : public QAbstractListModel {
     StoreModel& operator=(const StoreModel&) = delete;
     StoreModel& operator=(StoreModel&&) = delete;
 
+    // Forces the engine to construct the singleton eagerly (rather than on
+    // first QML access) so main.cpp can retrieve the instance and wire up
+    // signals before Main.qml loads.
+    static StoreModel* create(QQmlEngine* qmlEngine, QJSEngine* jsEngine);
+
     void replaysLoaded(QList<Replay>);
-    void replayDiscovered(Replay);
-    void replayChanged(Replay);
+    void replayDiscovered(const Replay&);
+    void replayChanged(const Replay&);
 
     [[nodiscard]] QHash<int, QByteArray> roleNames() const override;
     [[nodiscard]] QVariant data(const QModelIndex& index,

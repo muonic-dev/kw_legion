@@ -6,6 +6,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import KWLegionUI
 
 Rectangle {
     id: root
@@ -13,10 +14,10 @@ Rectangle {
     property var sections: []
     property int currentIndex: 0
 
-    readonly property color navTextColor: window.lightMode ? window.reallyDark : window.reallyLight
-    readonly property color navCheckedOverlay: window.lightMode ? Qt.rgba(0, 0, 0, 0.15) : Qt.rgba(1, 1, 1, 0.15)
+    readonly property color navTextColor: Theme.lightMode ? Theme.reallyDark : Theme.reallyLight
+    readonly property color navCheckedOverlay: Theme.lightMode ? Qt.rgba(0, 0, 0, 0.15) : Qt.rgba(1, 1, 1, 0.15)
 
-    color: window.lightMode ? window.light : window.dark
+    color: Theme.lightMode ? Theme.light : Theme.dark
 
     ColumnLayout {
         anchors.fill: parent

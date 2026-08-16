@@ -4,12 +4,11 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import KWLegionUI
 
 Page {
-    id: root
-
     background: Rectangle {
-        color: window.lightMode ? window.reallyLight : window.reallyDark
+        color: Theme.lightMode ? Theme.reallyLight : Theme.reallyDark
     }
 
     ColumnLayout {
@@ -21,14 +20,14 @@ Page {
             Layout.alignment: Qt.AlignHCenter
             Layout.preferredWidth: 64
             Layout.preferredHeight: 64
-            source: window.appIcon
+            source: Theme.appIcon
             fillMode: Image.PreserveAspectFit
         }
 
         Label {
             Layout.alignment: Qt.AlignHCenter
             text: qsTr("LEGION Replay Manager")
-            color: window.lightMode ? window.dark : window.light
+            color: Theme.lightMode ? Theme.dark : Theme.light
             font.pixelSize: 24
             font.bold: true
         }
@@ -36,7 +35,7 @@ Page {
         Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            color: window.lightMode ? window.dark : window.light
+            color: Theme.lightMode ? Theme.dark : Theme.light
             text: qsTr(
                 "Copyright © 2026 Muonic\n\n" +
                 "This program is free software: you can redistribute it and/or " +
@@ -53,7 +52,7 @@ Page {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
             font.italic: true
-            color: window.lightMode ? window.dark : window.light
+            color: Theme.lightMode ? Theme.dark : Theme.light
             text: qsTr(
                 "This application is built with Qt 6, © The Qt Company Ltd. " +
                 "and other contributors, used here under the GNU Lesser General " +

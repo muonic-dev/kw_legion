@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
 
     QGuiApplication app(argc, argv);
     QGuiApplication::setWindowIcon(
-        QIcon(":/qt/qml/kw_legion/qml/CNCKW_Marked_of_Kane_logo.png"));
+        QIcon(":/qt/qml/KWLegionUI/qml/CNCKW_Marked_of_Kane_logo.png"));
 
     qRegisterMetaType<KWLegionCore::Replay>();
 
@@ -124,17 +124,6 @@ int main(int argc, char* argv[]) {
     // QObject::connect(&ioThread, &QThread::started, &replayProspector,
     //                  &ReplayProspector::initialSweep);
 
-    StoreModel storeModel;
-
-    qmlRegisterSingletonInstance("kw_legion", 1, 0, "StoreModel", &storeModel);
-
-    QObject::connect(&replayStore, &ReplayStore::replaysLoaded, &storeModel,
-                     &StoreModel::replaysLoaded);
-    QObject::connect(&replayStore, &ReplayStore::replayDiscovered, &storeModel,
-                     &StoreModel::replayDiscovered);
-    QObject::connect(&replayStore, &ReplayStore::replayChanged, &storeModel,
-                     &StoreModel::replayChanged);
-
     QQmlApplicationEngine engine;
     QObject::connect(
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
@@ -149,7 +138,18 @@ int main(int argc, char* argv[]) {
                              qWarning() << error.toString();
                          }
                      });
-    engine.loadFromModule("kw_legion", "Main");
+
+    auto* storeModel =
+        engine.singletonInstance<StoreModel*>("KWLegionCore", "StoreModel");
+
+    QObject::connect(&replayStore, &ReplayStore::replaysLoaded, storeModel,
+                     &StoreModel::replaysLoaded);
+    QObject::connect(&replayStore, &ReplayStore::replayDiscovered, storeModel,
+                     &StoreModel::replayDiscovered);
+    QObject::connect(&replayStore, &ReplayStore::replayChanged, storeModel,
+                     &StoreModel::replayChanged);
+
+    engine.loadFromModule("KWLegionUI", "Main");
 
     ioThread.start();
 

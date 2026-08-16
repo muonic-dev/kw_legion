@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls.Basic
 import Qt.labs.platform
+import KWLegionUI
 import "pages"
 
 ApplicationWindow {
@@ -16,17 +17,9 @@ ApplicationWindow {
     visible: true
     title: qsTr("LEGION Replay Manager")
 
-    readonly property url appIcon: "qrc:/qt/qml/kw_legion/qml/CNCKW_Marked_of_Kane_logo.png"
-
-    property bool lightMode: Application.styleHints.colorScheme === Qt.Light
-    property color reallyDark: "#1f1f1f"
-    property color dark: "#262626"
-    property color reallyLight: "#e7e7e7"
-    property color light: "#e0e0e0"
-
     SystemTrayIcon {
         visible: true
-        icon.source: appWindow.appIcon
+        icon.source: Theme.appIcon
         tooltip: appWindow.title
     }
 
@@ -46,9 +39,7 @@ ApplicationWindow {
             Layout.fillHeight: true
             currentIndex: navRail.currentIndex
 
-            ReplaysPage {
-                window: appWindow
-            }
+            ReplaysPage {}
             StatisticsPage {}
             SettingsPage {}
             AboutPage {}

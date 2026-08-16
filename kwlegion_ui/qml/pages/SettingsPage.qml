@@ -3,15 +3,16 @@
 
 import QtQuick
 import QtQuick.Controls.Basic
+import KWLegionUI
 
 Page {
     background: Rectangle {
-        color: window.lightMode ? window.reallyLight : window.reallyDark
+        color: Theme.lightMode ? Theme.reallyLight : Theme.reallyDark
     }
     Label {
         anchors.centerIn: parent
         text: qsTr("Settings")
-        color: window.lightMode ? window.dark : window.light
+        color: Theme.lightMode ? Theme.dark : Theme.light
         font.pixelSize: 32
     }
 }
