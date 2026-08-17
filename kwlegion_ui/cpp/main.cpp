@@ -121,8 +121,8 @@ int main(int argc, char* argv[]) {
     // QObject::connect(&replayProspector, &ReplayProspector::replayDiscovered,
     //                  &replayStore, &ReplayStore::receiveReplay);
 
-    // QObject::connect(&ioThread, &QThread::started, &replayProspector,
-    //                  &ReplayProspector::initialSweep);
+    QObject::connect(&ioThread, &QThread::started, &replayProspector,
+                     &ReplayProspector::initialSweep);
 
     QQmlApplicationEngine engine;
     QObject::connect(

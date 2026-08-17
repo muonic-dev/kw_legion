@@ -1,7 +1,8 @@
-find_package(Qt6 REQUIRED COMPONENTS Core Sql)
+find_package(Qt6 REQUIRED COMPONENTS Core Sql Test)
 
 add_executable(kwlegion_core_tests
     main.cpp
+    prospector_tests.cpp
     transaction_tests.cpp
 )
 
@@ -9,6 +10,7 @@ target_link_libraries(kwlegion_core_tests
     PRIVATE
         kwlegion::core
         Catch2::Catch2
+        Qt6::Test
 )
 
 add_custom_command(TARGET kwlegion_core_tests POST_BUILD

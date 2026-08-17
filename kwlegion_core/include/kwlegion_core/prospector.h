@@ -40,8 +40,9 @@ class ReplayProspector : public QObject {
                    setReplayDirectory NOTIFY replayDirectoryChanged)
 
    public:
-    explicit ReplayProspector(QString replayDir = defaultReplayDirectory(),
-                              QObject* parent = nullptr);
+    explicit ReplayProspector(
+        const QString& replayDir = defaultReplayDirectory(),
+        QObject* parent = nullptr);
 
     // Best-effort guess at this machine's Kane's Wrath replay folder, based
     // on the current Documents location. This is only a suggestion for
@@ -96,10 +97,13 @@ class ReplayProspector : public QObject {
     void replayFileRemoved(const QString& filePath);
 
    private:
-    void processItem(const QFileInfo&);
+    void watchedDirectoryChanged(const QString& path);
 
-    // If the item is new or updated handle the insert and emission
-    void handleUpdatedItem(const QString&, const QFileInfo&);
+    // Starts watching path and everything nested beneath it, emitting
+    // replayFileChanged for any matching files already present there. Used
+    // when a directory shows up after the initial sweep, since it wouldn't
+    // otherwise be under watch until something inside it changes again.
+    void watchDirectoryTree(const QString& path);
 
     QFileSystemWatcher m_watcher;
     QString m_replayDirectory;
