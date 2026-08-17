@@ -46,8 +46,35 @@ target_link_libraries(kw_legion
     kwlegion::coreplugin
 )
 
+# QSqlDatabase loads QSQLITE as a plugin at runtime rather than linking it
+# directly, so it needs to be deployed into a sqldrivers/ folder next to the
+# dev-build executable - otherwise QSqlDatabase::addDatabase("QSQLITE")
+# silently fails to find a driver. This can't be left to piggyback on
+# kwlegion_core_test's identical copy (both targets' RUNTIME_OUTPUT_DIRECTORY
+# happen to coincide on Windows - see qt_standard_project_setup()) since a
+# build that never builds the test target would leave kw_legion.exe without
+# it.
+add_custom_command(TARGET kw_legion POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        $<TARGET_FILE_DIR:kw_legion>/sqldrivers
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:Qt6::QSQLiteDriverPlugin>
+        $<TARGET_FILE_DIR:kw_legion>/sqldrivers
+)
+
 install(TARGETS kw_legion
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+# install(TARGETS) only knows about the kw_legion binary itself 
+# We need the rest of the magic that supports the Qml runtime
+# That script only runs as an install-time
+
+qt_generate_deploy_qml_app_script(
+    TARGET kw_legion
+    OUTPUT_SCRIPT deploy_script
+    NO_TRANSLATIONS
+)
+install(SCRIPT ${deploy_script})
