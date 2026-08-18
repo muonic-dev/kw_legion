@@ -3,6 +3,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Sql Test)
 add_executable(kwlegion_core_tests
     main.cpp
     prospector_tests.cpp
+    queries_tests.cpp
     transaction_tests.cpp
 )
 
@@ -11,6 +12,14 @@ target_link_libraries(kwlegion_core_tests
         kwlegion::core
         Catch2::Catch2
         Qt6::Test
+)
+
+# queries.h/exception.h are private headers that live alongside queries.cpp
+# rather than under kwlegion_core's public include/ directory, so the test
+# target needs this path explicitly to exercise Queries directly.
+target_include_directories(kwlegion_core_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/kwlegion_core/src
 )
 
 add_custom_command(TARGET kwlegion_core_tests POST_BUILD

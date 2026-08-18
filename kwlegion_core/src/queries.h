@@ -31,6 +31,10 @@ class Queries final {
     Queries& operator=(const Queries&) = delete;
     Queries& operator=(Queries&&) = delete;
 
+    // Returns false on failure. Caller should inspect the db for whatever the
+    // error was
+    bool migrate();
+
     bool isReplayKnown(const QByteArray& checksum);
 
     void insertReplay(const LegionParser::ReplayMetadata& metadata);
@@ -42,13 +46,23 @@ class Queries final {
     bool insertExternalFilename(const QByteArray& checksum,
                                 const QString& path);
 
+    // If a replay's content changes at the same external path (e.g. the
+    // game's rolling "Last Replay.KWReplay" gets overwritten with a new
+    // match), the path may still be registered against the checksum of what
+    // used to live there. Removes all registrations of path under any
+    // checksum other than the given (current) one. Returns true when a
+    // stale registration was actually removed.
+    bool removeStaleExternalFilename(const QByteArray& checksum,
+                                     const QString& path);
+
+    // Forget replays that don't exist in current paths
+    // These are replays that did exist in external paths but we should
+    // dump
+    void forgetMissingReplays(const QList<QString>& currentPaths);
+
     QList<Replay> selectReplays();
 
     std::optional<Replay> selectReplay(const QByteArray& checksum);
-
-    // Attempt to perform migrations
-    // Fails and logs when issues occur
-    static void migrate(const QSqlDatabase& db);
 
    private:
     void prepare(const QString& sql);

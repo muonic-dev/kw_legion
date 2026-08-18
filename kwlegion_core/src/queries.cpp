@@ -6,6 +6,8 @@
 #include <kwlegion_core/transaction.h>
 
 #include <QSqlError>
+#include <QStringList>
+#include <QTimeZone>
 
 #include "exception.h"
 
@@ -62,11 +64,10 @@ constexpr std::array MIGRATIONS{
     )",
 };
 
-void Queries::migrate(const QSqlDatabase& db) {
-    QSqlQuery query(db);
-    query.exec("PRAGMA user_version");
-    query.next();
-    const size_t currentVersion = query.value(0).toULongLong();
+bool Queries::migrate() {
+    m_query.exec("PRAGMA user_version");
+    m_query.next();
+    const size_t currentVersion = m_query.value(0).toULongLong();
 
     qDebug() << "Current schema version is: " << currentVersion;
 
@@ -74,26 +75,16 @@ void Queries::migrate(const QSqlDatabase& db) {
     // next thing to execute
     for (size_t nextExec = currentVersion; nextExec < MIGRATIONS.size();
          nextExec++) {
-        SqlTransactionGuard tx(db);
-        if (!query.exec(MIGRATIONS.at(nextExec))) {
-            qCritical() << "Failed to execute migration: " << nextExec << ": "
-                        << query.lastError().text();
-            return;
+        if (!m_query.exec(MIGRATIONS.at(nextExec))) {
+            return false;
         }
-        if (!query.exec(QStringLiteral("PRAGMA user_version = %1;")
-                            .arg(nextExec + 1))) {
-            qCritical() << "Failed to execute migration: " << nextExec << ": "
-                        << query.lastError().text();
-            return;
-        }
-        if (!tx.commit()) {
-            qCritical() << "Failed to execute migration: " << nextExec << ": "
-                        << query.lastError().text();
-            return;
+        if (!m_query.exec(QStringLiteral("PRAGMA user_version = %1;")
+                              .arg(nextExec + 1))) {
+            return false;
         }
     }
 
-    qDebug() << "Migrations successful";
+    return true;
 }
 
 bool Queries::isReplayKnown(const QByteArray& checksum) {
@@ -200,6 +191,44 @@ bool Queries::insertExternalFilename(const QByteArray& checksum,
     return m_query.numRowsAffected() > 0;
 }
 
+bool Queries::removeStaleExternalFilename(const QByteArray& checksum,
+                                          const QString& path) {
+    // The same external path (e.g. the game's rolling "Last Replay.KWReplay")
+    // can be re-written with different content over time, so it may still be
+    // registered under a checksum from a previous match. Once we know the
+    // current checksum for that path, any other checksum still claiming it
+    // is stale and should be dropped.
+    prepare(R"(DELETE FROM replay_external_paths
+            WHERE external_path = :external_path
+              AND replay_checksum != :replay_checksum;)");
+    m_query.bindValue(":external_path", path);
+    m_query.bindValue(":replay_checksum", checksum);
+    exec();
+    return m_query.numRowsAffected() > 0;
+}
+
+void Queries::forgetMissingReplays(const QList<QString>& knownPaths) {
+    // NOT IN needs one bound placeholder per path - QSqlQuery has no way to
+    // bind a whole list to a single placeholder. An empty knownPaths yields
+    // "NOT IN ()", which SQLite evaluates as true for every row, so this
+    // still does the right thing when nothing is known to exist.
+    QStringList placeholders;
+    placeholders.reserve(knownPaths.size());
+    for (qsizetype i = 0; i < knownPaths.size(); i++) {
+        placeholders.append(QStringLiteral(":p%1").arg(i));
+    }
+
+    prepare(QStringLiteral("DELETE FROM replay_external_paths "
+                           "WHERE external_path NOT IN (%1)")
+                .arg(placeholders.join(QStringLiteral(", "))));
+
+    for (qsizetype i = 0; i < knownPaths.size(); i++) {
+        m_query.bindValue(QStringLiteral(":p%1").arg(i), knownPaths.at(i));
+    }
+
+    exec();
+}
+
 QList<Replay> Queries::selectReplays() {
     prepare(R"(SELECT checksum
                     , timestamp
@@ -250,7 +279,7 @@ std::optional<Replay> Queries::selectReplay(const QByteArray& checksum) {
 Replay Queries::readReplay() const {
     return Replay{.checksum = m_query.value(0).toByteArray(),
                   .timestamp = QDateTime::fromSecsSinceEpoch(
-                      m_query.value(1).toLongLong()),
+                      m_query.value(1).toLongLong(), QTimeZone(QTimeZone::UTC)),
                   .mapName = m_query.value(2).toString(),
                   .hasExternalPath = m_query.value(3).toBool()};
 }
