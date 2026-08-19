@@ -18,13 +18,10 @@ Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
 
 namespace KWLegionCore {
 
-ReplayStore::ReplayStore(QObject* parent)
+ReplayStore::ReplayStore(const QString& statePath, QObject* parent)
     : QObject(parent),
-      m_dbPath(QStandardPaths::writableLocation(QStandardPaths::StateLocation) +
-               "/replays.db"),
-      m_replayDir(
-          QStandardPaths::writableLocation(QStandardPaths::StateLocation) +
-          "/replays") {}
+      m_dbPath(statePath + "/replays.db"),
+      m_replayDir(statePath + "/replays") {}
 
 void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     // Perform initial setup operation on the startup signal

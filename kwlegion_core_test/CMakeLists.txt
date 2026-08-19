@@ -4,6 +4,7 @@ add_executable(kwlegion_core_tests
     main.cpp
     prospector_tests.cpp
     queries_tests.cpp
+    store_tests.cpp
     transaction_tests.cpp
 )
 
@@ -12,6 +13,11 @@ target_link_libraries(kwlegion_core_tests
         kwlegion::core
         Catch2::Catch2
         Qt6::Test
+)
+
+target_compile_definitions(kwlegion_core_tests
+    PRIVATE
+        REPLAY_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/replays"
 )
 
 # queries.h/exception.h are private headers that live alongside queries.cpp

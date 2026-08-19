@@ -1,16 +1,19 @@
 find_package(Qt6 REQUIRED COMPONENTS Core Qml Sql)
 
 add_library(kwlegion_core STATIC
-    # These sources trigger moc for the builddid I
+    # These sources trigger moc
     include/kwlegion_core/prospector.h
     include/kwlegion_core/store.h
     include/kwlegion_core/storemodel.h
+    src/teammodel.h
+    # Main src
     src/prospector.cpp
     src/store.cpp
     src/transaction.cpp
     src/queries.cpp
     src/replay.cpp
     src/storemodel.cpp
+    src/teammodel.cpp
 )
 add_library(kwlegion::core ALIAS kwlegion_core)
 

@@ -183,10 +183,13 @@ std::optional<QByteArray> Queries::checksumForExternalPath(
         "WHERE external_path = :external_path");
     m_query.bindValue(":external_path", path);
     exec();
+    std::optional<QByteArray> result;
     if (m_query.next()) {
-        return m_query.value(0).toByteArray();
+        result = m_query.value(0).toByteArray();
     }
-    return std::nullopt;
+    // We aren't draining so call finish explicitly
+    m_query.finish();
+    return result;
 }
 
 bool Queries::insertExternalFilename(const QByteArray& checksum,
@@ -221,10 +224,13 @@ std::optional<QByteArray> Queries::removeExternalFilename(const QString& path) {
     m_query.bindValue(":external_path", path);
     exec();
 
+    std::optional<QByteArray> result;
     if (m_query.next()) {
-        return m_query.value(0).toByteArray();
+        result = m_query.value(0).toByteArray();
     }
-    return std::nullopt;
+    // We aren't draining so finish explicitly
+    m_query.finish();
+    return result;
 }
 
 void Queries::forgetMissingReplays(const QList<QString>& knownPaths) {

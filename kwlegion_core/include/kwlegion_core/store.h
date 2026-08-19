@@ -10,6 +10,8 @@
 #include <QLoggingCategory>
 #include <QObject>
 #include <QSqlDatabase>
+#include <QStandardPaths>
+#include <QString>
 
 Q_DECLARE_LOGGING_CATEGORY(logStore);
 
@@ -20,18 +22,20 @@ class ReplayStore : public QObject {
     Q_OBJECT
 
    public:
-    explicit ReplayStore(QObject* parent = nullptr);
+    ReplayStore(const QString& statePath = QStandardPaths::writableLocation(
+                    QStandardPaths::StateLocation),
+                QObject* parent = nullptr);
 
     /**
      * The initial paths that exist in the replay folder
      *
-     * The startup source of truth that will be used to determine replays that
-     * exist in the replay folder. The store determines what is known, what is
-     * new, and what has disappeared.
+     * The startup source of truth that will be used to determine replays
+     * that exist in the replay folder. The store determines what is known,
+     * what is new, and what has disappeared.
      *
      * This doubles as the startup trigger for migrations and setup and will
-     * cause the emission of the replaysLoaded(QList<Replay>) so that we don't
-     * flash stale content
+     * cause the emission of the replaysLoaded(QList<Replay>) so that we
+     * don't flash stale content
      */
     void receiveInitialReplayPaths(const QList<QString>& paths);
 
