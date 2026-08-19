@@ -6,8 +6,8 @@
 #include <kwlegion_core/transaction.h>
 
 #include <QSqlError>
-#include <QStringList>
 #include <QTimeZone>
+#include <QVariantList>
 
 #include "exception.h"
 
@@ -208,24 +208,37 @@ bool Queries::removeStaleExternalFilename(const QByteArray& checksum,
 }
 
 void Queries::forgetMissingReplays(const QList<QString>& knownPaths) {
-    // NOT IN needs one bound placeholder per path - QSqlQuery has no way to
-    // bind a whole list to a single placeholder. An empty knownPaths yields
-    // "NOT IN ()", which SQLite evaluates as true for every row, so this
-    // still does the right thing when nothing is known to exist.
-    QStringList placeholders;
-    placeholders.reserve(knownPaths.size());
-    for (qsizetype i = 0; i < knownPaths.size(); i++) {
-        placeholders.append(QStringLiteral(":p%1").arg(i));
+    // Binding one placeholder per path (the previous "NOT IN (:p0, :p1, ...)"
+    // approach) hits SQLite's per-statement bound-parameter limit once a
+    // replay folder has accumulated enough files over time - some builds
+    // cap this as low as 999. Stage the known paths into a temp table
+    // instead (via execBatch, which reuses a single placeholder across many
+    // rows) and drive the delete off a subquery against it, so there's no
+    // limit on how many paths this can handle.
+    prepare(
+        QStringLiteral("CREATE TEMP TABLE IF NOT EXISTS known_replay_paths "
+                       "(path TEXT NOT NULL)"));
+    exec();
+
+    prepare(QStringLiteral("DELETE FROM known_replay_paths"));
+    exec();
+
+    if (!knownPaths.isEmpty()) {
+        prepare(QStringLiteral(
+            "INSERT INTO known_replay_paths (path) VALUES (:path)"));
+
+        for (const auto& path : knownPaths) {
+            m_query.bindValue(":path", path);
+            exec();
+        }
     }
 
-    prepare(QStringLiteral("DELETE FROM replay_external_paths "
-                           "WHERE external_path NOT IN (%1)")
-                .arg(placeholders.join(QStringLiteral(", "))));
-
-    for (qsizetype i = 0; i < knownPaths.size(); i++) {
-        m_query.bindValue(QStringLiteral(":p%1").arg(i), knownPaths.at(i));
-    }
-
+    // An empty knownPaths leaves known_replay_paths empty too, so the
+    // subquery matches nothing and every row still gets deleted - the same
+    // "nothing is known to exist" behavior as before.
+    prepare(QStringLiteral(
+        "DELETE FROM replay_external_paths "
+        "WHERE external_path NOT IN (SELECT path FROM known_replay_paths)"));
     exec();
 }
 

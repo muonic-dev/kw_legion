@@ -23,7 +23,25 @@ class ReplayStore : public QObject {
 
     void startup();
 
+    /**
+     * The initial paths that exist in the replay folder
+     *
+     * The startup source of truth that will be used to determine replays that
+     * exist in the replay folder. The store determines what is known, what is
+     * new, and what has disappeared.
+     *
+     * This doubles as the final startup trigger and will cause the emission of
+     * the replaysLoaded(QList<Replay>) so that we don't flash stale content
+     */
+    void initialReplayPaths(const QList<QString>& paths);
+
+    /**
+     * A replay file definitely just appeared
+     */
     void analyzeReplayFile(const QString& path);
+    /**
+     * A replay file has disappeared
+     */
     void removeReplayFile(const QString& path);
 
    signals:

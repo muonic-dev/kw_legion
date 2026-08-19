@@ -29,7 +29,18 @@ ReplayStore::ReplayStore(QObject* parent)
 void ReplayStore::startup() {
     ensureDirectories();
     ensureDb();
+}
 
+void ReplayStore::initialReplayPaths(const QList<QString>& paths) {
+    // Ingest every path that we have
+    for (const auto& path : paths) {
+        // TODO: Maybe we can avoid making this a ton of transactions
+        analyzeReplayFile(path);
+    }
+
+    // What replays did we know about but seem to no longer exist.
+
+    // Now that we've done all the initial processing we will emit the query
     Queries queries{QSqlQuery(m_db)};
     try {
         emit replaysLoaded(queries.selectReplays());
@@ -114,12 +125,21 @@ void ReplayStore::ensureDb() {
     m_db.setDatabaseName(m_dbPath);
     if (!m_db.open()) {
         qCCritical(logStore)
-            << "Failed to open database: " << m_db.lastError().driverText()
-            << " " << m_db.lastError().databaseText();
+            << "Failed to open database: " << m_db.lastError().text();
         return;
     }
 
-    Queries::migrate(m_db);
+    // TODO: Do we need some kind of internally broken structure?
+    SqlTransactionGuard tx(m_db);
+    Queries queries{QSqlQuery(m_db)};
+    if (!queries.migrate()) {
+        qCritical(logStore)
+            << "Failed to migrate database: " << m_db.lastError().text();
+    }
+    if (!tx.commit()) {
+        qCritical(logStore)
+            << "Failed to migrate database: " << m_db.lastError().text();
+    }
 }
 
 void ReplayStore::ensureDirectories() {

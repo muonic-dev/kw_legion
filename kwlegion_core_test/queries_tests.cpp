@@ -323,6 +323,38 @@ TEST_CASE(
     QSqlDatabase::removeDatabase("queries_forget_missing");
 }
 
+TEST_CASE(
+    "Queries forgetMissingReplays handles more paths than SQLite's bound "
+    "parameter limit") {
+    QSqlDatabase db = openMigratedDb("queries_forget_missing_many");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-many-paths";
+    queries.insertReplay(makeMetadata(checksum));
+
+    // A large replay folder may accumulate m any files
+    constexpr int totalPaths = 35000;
+    constexpr int keptPaths = 33000;
+    QList<QString> knownPaths;
+    knownPaths.reserve(keptPaths);
+    for (int i = 0; i < totalPaths; i++) {
+        const QString path =
+            QStringLiteral("C:/replays/replay-%1.KWReplay").arg(i);
+        queries.insertExternalFilename(checksum, path);
+        if (i < keptPaths) {
+            knownPaths.append(path);
+        }
+    }
+    REQUIRE(countExternalPaths(db, checksum) == totalPaths);
+
+    queries.forgetMissingReplays(knownPaths);
+
+    CHECK(countExternalPaths(db, checksum) == keptPaths);
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_forget_missing_many");
+}
+
 TEST_CASE("Queries selectReplays reports hasExternalPath per replay") {
     QSqlDatabase db = openMigratedDb("queries_select_replays");
     Queries queries{QSqlQuery(db)};
