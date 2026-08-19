@@ -6,7 +6,6 @@
 #include <kwlegion_core/replay.h>
 #include <legionparser/replay.h>
 
-#include <QByteArrayView>
 #include <QDir>
 #include <QLoggingCategory>
 #include <QObject>
@@ -15,13 +14,13 @@
 Q_DECLARE_LOGGING_CATEGORY(logStore);
 
 namespace KWLegionCore {
+class Queries;
+
 class ReplayStore : public QObject {
     Q_OBJECT
 
    public:
     explicit ReplayStore(QObject* parent = nullptr);
-
-    void startup();
 
     /**
      * The initial paths that exist in the replay folder
@@ -30,10 +29,11 @@ class ReplayStore : public QObject {
      * exist in the replay folder. The store determines what is known, what is
      * new, and what has disappeared.
      *
-     * This doubles as the final startup trigger and will cause the emission of
-     * the replaysLoaded(QList<Replay>) so that we don't flash stale content
+     * This doubles as the startup trigger for migrations and setup and will
+     * cause the emission of the replaysLoaded(QList<Replay>) so that we don't
+     * flash stale content
      */
-    void initialReplayPaths(const QList<QString>& paths);
+    void receiveInitialReplayPaths(const QList<QString>& paths);
 
     /**
      * A replay file definitely just appeared
@@ -45,13 +45,11 @@ class ReplayStore : public QObject {
     void removeReplayFile(const QString& path);
 
    signals:
-    void replaysLoaded(QList<Replay>);
-    // A replay was was discovered for the first time
-    void replayDiscovered(Replay);
-    // A replay that was already known by checksum was found
-    void replayChanged(Replay);
+    void replaysLoaded(const QList<Replay>&);
+    // A replay was was discovered or updated
+    void replaysChanged(const QList<Replay>&);
     // A replay that did exist disappeared
-    void replayRemoved(QByteArray);
+    void replayRemoved(const QByteArray&);
 
    private:
     void ensureDb();
@@ -59,8 +57,21 @@ class ReplayStore : public QObject {
 
     // Perform all the steps to try and receive a replay
     // File should probably be an absolute path
-    void ingestReplay(QFile& file,
-                      const LegionParser::ReplayMetadata& metadata);
+    // Returns the checksums that were impacted by the ingestion
+    // This is guaranteed to contain metadata.checksum
+    QList<QByteArray> ingestReplay(
+        QFile& file, const LegionParser::ReplayMetadata& metadata);
+    // The replay file at the path is gone or otherwise corrupt so we should
+    // remove it
+    std::optional<QByteArray> removeReplayAtPath(const QString& path);
+
+    // Handles dealing with any existing checksums at a given path (which can
+    // occur on multiple branches in ingestReplay)
+    static void handleExistingReplayAtPath(Queries& queries,
+                                           const QString& path,
+                                           QList<QByteArray>& checksums);
+
+    void forwardChangedReplays(const QList<QByteArray>& checksums);
 
     [[nodiscard]] QString computeIngestionPath(
         const QByteArray& checksum) const;

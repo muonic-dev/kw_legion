@@ -42,9 +42,8 @@ class StoreModel : public QAbstractListModel {
     // signals before Main.qml loads.
     static StoreModel* create(QQmlEngine* qmlEngine, QJSEngine* jsEngine);
 
-    void replaysLoaded(QList<Replay>);
-    void replayDiscovered(const Replay&);
-    void replayChanged(const Replay&);
+    void replaysLoaded(const QList<Replay>&);
+    void replaysChanged(const QList<Replay>&);
 
     [[nodiscard]] QHash<int, QByteArray> roleNames() const override;
     [[nodiscard]] QVariant data(const QModelIndex& index,

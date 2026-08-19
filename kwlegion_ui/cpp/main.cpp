@@ -123,6 +123,13 @@ int main(int argc, char* argv[]) {
 
     QObject::connect(&ioThread, &QThread::started, &replayProspector,
                      &ReplayProspector::initialSweep);
+    QObject::connect(&replayProspector,
+                     &ReplayProspector::initialSweepCompleted, &replayStore,
+                     &ReplayStore::receiveInitialReplayPaths);
+    QObject::connect(&replayProspector, &ReplayProspector::replayFileChanged,
+                     &replayStore, &ReplayStore::analyzeReplayFile);
+    QObject::connect(&replayProspector, &ReplayProspector::replayFileRemoved,
+                     &replayStore, &ReplayStore::removeReplayFile);
 
     QQmlApplicationEngine engine;
     QObject::connect(
@@ -144,10 +151,8 @@ int main(int argc, char* argv[]) {
 
     QObject::connect(&replayStore, &ReplayStore::replaysLoaded, storeModel,
                      &StoreModel::replaysLoaded);
-    QObject::connect(&replayStore, &ReplayStore::replayDiscovered, storeModel,
-                     &StoreModel::replayDiscovered);
-    QObject::connect(&replayStore, &ReplayStore::replayChanged, storeModel,
-                     &StoreModel::replayChanged);
+    QObject::connect(&replayStore, &ReplayStore::replaysChanged, storeModel,
+                     &StoreModel::replaysChanged);
 
     engine.loadFromModule("KWLegionUI", "Main");
 

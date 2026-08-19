@@ -42,18 +42,21 @@ class Queries final {
     void insertReplayPlayers(const QByteArray& checksum,
                              const QList<LegionParser::Player>& players);
 
-    // Insert an external filename, returns true when the file is new
+    // The checksum currently registered for path, if the path is tracked at
+    // all.
+    std::optional<QByteArray> checksumForExternalPath(const QString& path);
+
+    // Insert an external filename, returns true when the file is new or was
+    // reassigned from a different checksum (e.g. the game's rolling
+    // "Last Replay.KWReplay" being overwritten with a new match) - a path
+    // can only ever belong to one checksum, so this atomically reassigns it
+    // rather than erroring or leaving the old registration in place.
     bool insertExternalFilename(const QByteArray& checksum,
                                 const QString& path);
 
-    // If a replay's content changes at the same external path (e.g. the
-    // game's rolling "Last Replay.KWReplay" gets overwritten with a new
-    // match), the path may still be registered against the checksum of what
-    // used to live there. Removes all registrations of path under any
-    // checksum other than the given (current) one. Returns true when a
-    // stale registration was actually removed.
-    bool removeStaleExternalFilename(const QByteArray& checksum,
-                                     const QString& path);
+    // The content at path is not longer a valid replay so remove it
+    // Returns the hash of the replay that was dropped (if any)
+    std::optional<QByteArray> removeExternalFilename(const QString& path);
 
     // Forget replays that don't exist in current paths
     // These are replays that did exist in external paths but we should

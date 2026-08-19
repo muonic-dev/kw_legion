@@ -29,29 +29,24 @@ StoreModel* StoreModel::create(QQmlEngine* /*qmlEngine*/,
     return new StoreModel();  // NOLINT(cppcoreguidelines-owning-memory)
 }
 
-void StoreModel::replaysLoaded(QList<Replay> replays) {
+void StoreModel::replaysLoaded(const QList<Replay>& replays) {
     beginResetModel();
-    m_replays = std::move(replays);
+    m_replays = replays;
     endResetModel();
 }
 
-void StoreModel::replayDiscovered(const Replay& replay) {
-    const int size = static_cast<int>(m_replays.size());
-    beginInsertRows(QModelIndex(), size, size);
-    m_replays.append(replay);
-    endInsertRows();
-}
+void StoreModel::replaysChanged(const QList<Replay>& replays) {
+    for (const auto& replay : replays) {
+        auto it = std::ranges::find_if(m_replays, [&replay](const Replay& r) {
+            return r.checksum == replay.checksum;
+        });
 
-void StoreModel::replayChanged(const Replay& replay) {
-    auto it = std::ranges::find_if(m_replays, [&replay](const Replay& r) {
-        return r.checksum == replay.checksum;
-    });
-
-    if (it != m_replays.end()) {
-        *it = replay;
-        const int row = static_cast<int>(it - m_replays.begin());
-        const QModelIndex idx = index(row);
-        emit dataChanged(idx, idx);
+        if (it != m_replays.end()) {
+            *it = replay;
+            const int row = static_cast<int>(it - m_replays.begin());
+            const QModelIndex idx = index(row);
+            emit dataChanged(idx, idx);
+        }
     }
 }
 

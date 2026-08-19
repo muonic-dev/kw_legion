@@ -249,9 +249,9 @@ TEST_CASE("Queries insertExternalFilename reports whether the path is new") {
 }
 
 TEST_CASE(
-    "Queries removeStaleExternalFilename drops the path's registration "
-    "under other checksums") {
-    QSqlDatabase db = openMigratedDb("queries_remove_stale_external");
+    "Queries insertExternalFilename reassigns a path claimed by a "
+    "different checksum") {
+    QSqlDatabase db = openMigratedDb("queries_insert_external_reassign");
     Queries queries{QSqlQuery(db)};
 
     const QByteArray oldChecksum = "checksum-old";
@@ -262,35 +262,91 @@ TEST_CASE(
     queries.insertReplay(makeMetadata(newChecksum));
     queries.insertExternalFilename(oldChecksum, path);
 
-    // The path is only registered under the old checksum, so re-pointing it
-    // at the new checksum should find and remove a stale row.
-    CHECK(queries.removeStaleExternalFilename(newChecksum, path));
+    // external_path is the sole key - a path can only ever point at one
+    // checksum, so re-inserting it under a new checksum (e.g. the game's
+    // rolling "Last Replay.KWReplay" being overwritten by a new match) must
+    // atomically move the row rather than erroring or leaving a duplicate.
+    CHECK(queries.insertExternalFilename(newChecksum, path));
     CHECK(countExternalPaths(db, oldChecksum) == 0);
+    CHECK(countExternalPaths(db, newChecksum) == 1);
 
-    queries.insertExternalFilename(newChecksum, path);
-
-    // Now nothing else claims the path, so there is no stale row to remove.
-    CHECK_FALSE(queries.removeStaleExternalFilename(newChecksum, path));
+    // Re-inserting the same (checksum, path) pair again is a true no-op.
+    CHECK_FALSE(queries.insertExternalFilename(newChecksum, path));
     CHECK(countExternalPaths(db, newChecksum) == 1);
 
     db = QSqlDatabase();
-    QSqlDatabase::removeDatabase("queries_remove_stale_external");
+    QSqlDatabase::removeDatabase("queries_insert_external_reassign");
 }
 
-TEST_CASE("Queries removeStaleExternalFilename leaves other paths untouched") {
-    QSqlDatabase db = openMigratedDb("queries_remove_stale_external_other");
+TEST_CASE(
+    "Queries checksumForExternalPath reflects the current owner of a path") {
+    QSqlDatabase db = openMigratedDb("queries_checksum_for_path");
     Queries queries{QSqlQuery(db)};
 
-    const QByteArray checksum = "checksum-unrelated";
-    queries.insertReplay(makeMetadata(checksum));
-    queries.insertExternalFilename(checksum, "C:/replays/other.KWReplay");
+    const QByteArray checksum = "checksum-lookup";
+    const QString path = "C:/replays/Last Replay.KWReplay";
 
-    CHECK_FALSE(queries.removeStaleExternalFilename(
-        checksum, "C:/replays/Last Replay.KWReplay"));
+    CHECK_FALSE(queries.checksumForExternalPath(path).has_value());
+
+    queries.insertReplay(makeMetadata(checksum));
+    queries.insertExternalFilename(checksum, path);
+
+    const std::optional<QByteArray> found =
+        queries.checksumForExternalPath(path);
+    REQUIRE(found.has_value());
+    CHECK(found.value() == checksum);
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_checksum_for_path");
+}
+
+TEST_CASE("Queries removeExternalFilename drops only the given path") {
+    QSqlDatabase db = openMigratedDb("queries_remove_external");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-remove-external";
+    queries.insertReplay(makeMetadata(checksum));
+    queries.insertExternalFilename(checksum, "C:/replays/a.KWReplay");
+    queries.insertExternalFilename(checksum, "C:/replays/b.KWReplay");
+
+    const std::optional<QByteArray> dropped =
+        queries.removeExternalFilename("C:/replays/a.KWReplay");
+    REQUIRE(dropped.has_value());
+    CHECK(dropped.value() == checksum);
+
+    CHECK(countExternalPaths(db, checksum) == 1);
+
+    QSqlQuery check(db);
+    REQUIRE(check.prepare(
+        "SELECT COUNT(*) FROM replay_external_paths WHERE external_path = "
+        ":path"));
+    check.bindValue(":path", "C:/replays/b.KWReplay");
+    REQUIRE(check.exec());
+    REQUIRE(check.next());
+    CHECK(check.value(0).toInt() == 1);
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_remove_external");
+}
+
+TEST_CASE(
+    "Queries removeExternalFilename on an unregistered path is a harmless "
+    "no-op") {
+    QSqlDatabase db = openMigratedDb("queries_remove_external_missing");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-remove-external-missing";
+    queries.insertReplay(makeMetadata(checksum));
+    queries.insertExternalFilename(checksum, "C:/replays/a.KWReplay");
+
+    CHECK_FALSE(
+        queries.removeExternalFilename("C:/replays/does-not-exist.KWReplay")
+            .has_value());
+
     CHECK(countExternalPaths(db, checksum) == 1);
 
     db = QSqlDatabase();
-    QSqlDatabase::removeDatabase("queries_remove_stale_external_other");
+    QSqlDatabase::removeDatabase("queries_remove_external_missing");
 }
 
 TEST_CASE(

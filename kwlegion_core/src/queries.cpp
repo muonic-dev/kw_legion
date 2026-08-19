@@ -37,11 +37,13 @@ constexpr std::array MIGRATIONS{
 
     // Replays might occur more than once in the replay folder for whatever
     // reason so a single storage is not good enough
-    // external_path is a full canonical path
+    // external_path is a full canonical path. A path can only ever point at
+    // one file on disk, so it can only ever belong to one checksum at a
+    // time
     R"(CREATE TABLE replay_external_paths
         ( replay_checksum BLOB NOT NULL
         , external_path TEXT NOT NULL
-        , PRIMARY KEY(replay_checksum, external_path)
+        , PRIMARY KEY(external_path)
         ) STRICT, WITHOUT ROWID;
     )",
 
@@ -174,58 +176,71 @@ void Queries::insertReplayPlayers(const QByteArray& checksum,
     }
 }
 
+std::optional<QByteArray> Queries::checksumForExternalPath(
+    const QString& path) {
+    prepare(
+        "SELECT replay_checksum FROM replay_external_paths "
+        "WHERE external_path = :external_path");
+    m_query.bindValue(":external_path", path);
+    exec();
+    if (m_query.next()) {
+        return m_query.value(0).toByteArray();
+    }
+    return std::nullopt;
+}
+
 bool Queries::insertExternalFilename(const QByteArray& checksum,
                                      const QString& path) {
-    // ON CONFLICT so that this is useable for both brand new and existing
-    // replay
+    // external_path is the sole key, so a conflict means either this exact
+    // (checksum, path) pair is already tracked (the WHERE guard makes that a
+    // no-op) or the path is re-appearing under a new checksum (e.g. the
+    // game's rolling "Last Replay.KWReplay" being overwritten with a new
+    // match) - in which case the row is reassigned to the new checksum right
+    // here, atomically.
     prepare(R"(INSERT INTO replay_external_paths
             ( replay_checksum
             , external_path)
             VALUES
             ( :replay_checksum
             , :external_path)
-            ON CONFLICT DO NOTHING;)");
+            ON CONFLICT(external_path) DO UPDATE
+                SET replay_checksum = excluded.replay_checksum
+                WHERE replay_checksum != excluded.replay_checksum;)");
     m_query.bindValue(":replay_checksum", checksum);
     m_query.bindValue(":external_path", path);
     exec();
     return m_query.numRowsAffected() > 0;
 }
 
-bool Queries::removeStaleExternalFilename(const QByteArray& checksum,
-                                          const QString& path) {
-    // The same external path (e.g. the game's rolling "Last Replay.KWReplay")
-    // can be re-written with different content over time, so it may still be
-    // registered under a checksum from a previous match. Once we know the
-    // current checksum for that path, any other checksum still claiming it
-    // is stale and should be dropped.
-    prepare(R"(DELETE FROM replay_external_paths
-            WHERE external_path = :external_path
-              AND replay_checksum != :replay_checksum;)");
+std::optional<QByteArray> Queries::removeExternalFilename(const QString& path) {
+    // external_path is unique, so this affects at most one row.
+    prepare(
+        "DELETE FROM replay_external_paths "
+        "WHERE external_path = :external_path "
+        "RETURNING replay_checksum;");
     m_query.bindValue(":external_path", path);
-    m_query.bindValue(":replay_checksum", checksum);
     exec();
-    return m_query.numRowsAffected() > 0;
+
+    if (m_query.next()) {
+        return m_query.value(0).toByteArray();
+    }
+    return std::nullopt;
 }
 
 void Queries::forgetMissingReplays(const QList<QString>& knownPaths) {
     // Binding one placeholder per path (the previous "NOT IN (:p0, :p1, ...)"
     // approach) hits SQLite's per-statement bound-parameter limit once a
-    // replay folder has accumulated enough files over time - some builds
-    // cap this as low as 999. Stage the known paths into a temp table
-    // instead (via execBatch, which reuses a single placeholder across many
-    // rows) and drive the delete off a subquery against it, so there's no
-    // limit on how many paths this can handle.
+    // replay folder has accumulated enough files over time
     prepare(
-        QStringLiteral("CREATE TEMP TABLE IF NOT EXISTS known_replay_paths "
-                       "(path TEXT NOT NULL)"));
+        "CREATE TEMP TABLE IF NOT EXISTS known_replay_paths "
+        "(path TEXT NOT NULL)");
     exec();
 
-    prepare(QStringLiteral("DELETE FROM known_replay_paths"));
+    prepare("DELETE FROM known_replay_paths");
     exec();
 
     if (!knownPaths.isEmpty()) {
-        prepare(QStringLiteral(
-            "INSERT INTO known_replay_paths (path) VALUES (:path)"));
+        prepare("INSERT INTO known_replay_paths (path) VALUES (:path)");
 
         for (const auto& path : knownPaths) {
             m_query.bindValue(":path", path);
@@ -236,9 +251,9 @@ void Queries::forgetMissingReplays(const QList<QString>& knownPaths) {
     // An empty knownPaths leaves known_replay_paths empty too, so the
     // subquery matches nothing and every row still gets deleted - the same
     // "nothing is known to exist" behavior as before.
-    prepare(QStringLiteral(
+    prepare(
         "DELETE FROM replay_external_paths "
-        "WHERE external_path NOT IN (SELECT path FROM known_replay_paths)"));
+        "WHERE external_path NOT IN (SELECT path FROM known_replay_paths)");
     exec();
 }
 
