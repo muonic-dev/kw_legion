@@ -9,6 +9,15 @@
 namespace KWLegionCore {
 Replay Replay::fromReplay(const LegionParser::ReplayMetadata& replay,
                           bool hasExternalPath) {
+    QList<Player> players;
+    players.reserve(replay.players.size());
+    for (const auto& player : replay.players) {
+        players.append(Player{.id = player.id,
+                              .teamNumber = player.teamNumber,
+                              .faction = player.faction,
+                              .name = player.name,
+                              .isComputer = player.isComputer});
+    }
     return Replay{.checksum = replay.checksum,
                   .timestamp = replay.timestamp,
                   .mapName = replay.mapName,

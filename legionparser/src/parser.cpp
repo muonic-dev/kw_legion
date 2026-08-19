@@ -13,6 +13,7 @@
 #include <QtEndian>
 #include <bit>
 #include <cstdint>
+#include <limits>
 #include <utility>
 
 #include "reader.h"
@@ -55,9 +56,8 @@ constexpr qsizetype FOOTER_MIN_SIZE =
     FOOTER_MAGIC_SIZE + FOOTER_LENGTH_FIELD_SIZE + 1 + FOOTER_LENGTH_FIELD_SIZE;
 
 namespace {
-quint32 readLE32(QByteArrayView data, qsizetype offset) {
-    return qFromLittleEndian<quint32>(
-        reinterpret_cast<const uchar*>(data.data() + offset));
+quint32 readLE32(QByteArrayView data) {
+    return qFromLittleEndian<quint32>(data.data());
 }
 }  // namespace
 
@@ -160,8 +160,9 @@ void Parser::parsePlayers() {
                                    m_reader->lastOffset());
     }
     if (playerCount > MAX_PLAYERS) {
-        throw CorruptDataException(QLatin1String("Player count is improbably large"),
-                                   m_reader->lastOffset());
+        throw CorruptDataException(
+            QLatin1String("Player count is improbably large"),
+            m_reader->lastOffset());
     }
     for (uint8_t i = 0; i < playerCount; i++) {
         m_metadata.players.append(parseOnePlayer());
@@ -171,16 +172,15 @@ void Parser::parsePlayers() {
 }
 
 Player Parser::parseOnePlayer() {
-    const auto playerId = m_reader->readIntegral<std::uint32_t>();
+    const auto id = m_reader->readIntegral<std::uint32_t>();
 
-    const QString playerName = m_reader->readUtf16String();
-    int8_t teamNumber = 0;
+    const QString name = m_reader->readUtf16String();
+    uint32_t teamNumber = std::numeric_limits<std::uint32_t>::max();
     if (m_metadata.gameType == GameType::Multiplayer) {
-        teamNumber = m_reader->readByte<std::int8_t>();
+        teamNumber =
+            static_cast<std::uint32_t>(m_reader->readByte<std::uint8_t>());
     }
-    return Player{.playerId = playerId,
-                  .playerName = playerName,
-                  .teamNumber = teamNumber};
+    return Player{.id = id, .name = name, .teamNumber = teamNumber};
 }
 
 void Parser::parseMapReference(const QStringView header) {
@@ -194,8 +194,9 @@ void Parser::parseMapReference(const QStringView header) {
     constexpr QLatin1String pathAnchor("data/");
 
     if (!header.startsWith(mapMarker)) {
-        throw CorruptDataException(QLatin1String("header missing map reference"),
-                                   m_reader->lastOffset());
+        throw CorruptDataException(
+            QLatin1String("header missing map reference"),
+            m_reader->lastOffset());
     }
 
     const qsizetype mapStart =
@@ -228,8 +229,9 @@ void Parser::parsePlayerSlots(const QStringView header) {
     const QLatin1String slotMarker(";S=");
     qsizetype slotStart = header.indexOf(slotMarker);
     if (slotStart < 0) {
-        throw CorruptDataException(QLatin1String("header missing player slot list"),
-                                   m_reader->lastOffset());
+        throw CorruptDataException(
+            QLatin1String("header missing player slot list"),
+            m_reader->lastOffset());
     }
     // Move past the starting token
     slotStart += slotMarker.size();
@@ -303,8 +305,9 @@ void Parser::parseOffsetAndMagic() {
     // Read this manually since we want to mark mid-read so we track it
     const auto strReplLength = m_reader->readIntegral<uint32_t>();
     if (strReplLength != REPL_MAGIC_SIZE) {
-        throw CorruptDataException(QLatin1String("CNC3RPL magic incorrect length"),
-                                   m_reader->lastOffset());
+        throw CorruptDataException(
+            QLatin1String("CNC3RPL magic incorrect length"),
+            m_reader->lastOffset());
     }
 
     // We mark now because the offset is from the start of the magic string to
@@ -314,8 +317,9 @@ void Parser::parseOffsetAndMagic() {
     const QByteArray strReplMagic = m_reader->readBlock(REPL_MAGIC_SIZE);
 
     if (strReplMagic != QByteArray(REPL_MAGIC, REPL_MAGIC_SIZE)) {
-        throw CorruptDataException(QLatin1String("CNC3RPL magic incorrect value"),
-                                   m_reader->lastOffset());
+        throw CorruptDataException(
+            QLatin1String("CNC3RPL magic incorrect value"),
+            m_reader->lastOffset());
     }
 }
 
@@ -403,7 +407,7 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
     }
 
     const quint32 footerLength =
-        readLE32(lastChunk, lastChunk.size() - FOOTER_LENGTH_FIELD_SIZE);
+        readLE32(lastChunk.sliced(lastChunk.size() - FOOTER_LENGTH_FIELD_SIZE));
     if (std::cmp_less(footerLength, FOOTER_MIN_SIZE) ||
         std::cmp_greater(footerLength, lastChunk.size())) {
         throw CorruptDataException(
@@ -434,7 +438,8 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
     if (dataTag == 0x02) {
         if (dataSize != 1) {
             throw CorruptDataException(
-                QLatin1String("replay footer data has an unrecognized structure"),
+                QLatin1String(
+                    "replay footer data has an unrecognized structure"),
                 m_reader->offset());
         }
     } else if (dataTag == 0x01) {
@@ -446,14 +451,16 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
         if (std::cmp_less(dataSize, extendedDataFixedSize) ||
             static_cast<uchar>(footer.at(dataStart + 1)) != 0x02) {
             throw CorruptDataException(
-                QLatin1String("replay footer data has an unrecognized structure"),
+                QLatin1String(
+                    "replay footer data has an unrecognized structure"),
                 m_reader->offset());
         }
-        const quint32 payloadLength = readLE32(footer, dataStart + 2);
+        const quint32 payloadLength = readLE32(footer.sliced(dataStart + 2));
         if (dataSize !=
             extendedDataFixedSize + static_cast<qsizetype>(payloadLength)) {
             throw CorruptDataException(
-                QLatin1String("replay footer data has an unrecognized structure"),
+                QLatin1String(
+                    "replay footer data has an unrecognized structure"),
                 m_reader->offset());
         }
     } else {

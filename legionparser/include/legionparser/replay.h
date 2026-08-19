@@ -64,11 +64,11 @@ struct Player {
     // likely a unique id assigned by the server for login.
     // In skirmish, the player id appears to always be zero.
     // The behavior in network is currently unclear.
-    std::uint32_t playerId = std::numeric_limits<std::uint32_t>::max();
-    QString playerName = QLatin1String("");
+    std::uint32_t id = std::numeric_limits<std::uint32_t>::max();
+    QString name = QLatin1String("");
     // Only relevant for multiplayer
     // The default will also be larger than the input
-    std::int32_t teamNumber = std::numeric_limits<std::int32_t>::max();
+    std::uint32_t teamNumber = std::numeric_limits<std::uint32_t>::max();
     Faction faction = Faction::Unknown;
     bool isComputer = false;
     bool isReplaySaver = false;

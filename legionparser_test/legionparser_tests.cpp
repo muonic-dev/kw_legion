@@ -29,11 +29,11 @@ void checkMirrorMatchFaction(const QString& filename, Faction faction) {
 
     REQUIRE(metadata.players.size() == 3);
 
-    CHECK(metadata.players.at(0).playerName == QLatin1String("Muonic"));
+    CHECK(metadata.players.at(0).name == QLatin1String("Muonic"));
     CHECK(metadata.players.at(0).isReplaySaver);
     CHECK(metadata.players.at(0).faction == faction);
 
-    CHECK(metadata.players.at(1).playerName == QLatin1String("Hard AI"));
+    CHECK(metadata.players.at(1).name == QLatin1String("Hard AI"));
     CHECK(metadata.players.at(1).faction == faction);
 
     // The trailing commentator slot's faction field isn't a real faction ID.
@@ -62,9 +62,9 @@ TEST_CASE("parses muonic v branston game 1", "[legionparser][metadata]") {
     CHECK(metadata.mapId == QLatin1String("FakeMapID"));
 
     REQUIRE(metadata.players.size() == 3);
-    CHECK(metadata.players.at(0).playerName == QLatin1String("Scrub"));
+    CHECK(metadata.players.at(0).name == QLatin1String("Scrub"));
     CHECK(metadata.players.at(0).faction == Faction::BH);
-    CHECK(metadata.players.at(1).playerName == QLatin1String("Muonic"));
+    CHECK(metadata.players.at(1).name == QLatin1String("Muonic"));
     CHECK(metadata.players.at(1).faction == Faction::Nod);
     CHECK(metadata.players.at(0).teamNumber !=
           metadata.players.at(1).teamNumber);

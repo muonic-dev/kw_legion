@@ -166,8 +166,8 @@ void Queries::insertReplayPlayers(const QByteArray& checksum,
         , :is_replay_saver);)");
     for (const auto& player : players) {
         m_query.bindValue(":replay_checksum", checksum);
-        m_query.bindValue(":player_id", player.playerId);
-        m_query.bindValue(":player_name", player.playerName);
+        m_query.bindValue(":player_id", player.id);
+        m_query.bindValue(":player_name", player.name);
         m_query.bindValue(":team_number", player.teamNumber);
         m_query.bindValue(":faction", LegionParser::toUint8(player.faction));
         m_query.bindValue(":is_computer", player.isComputer ? 1 : 0);

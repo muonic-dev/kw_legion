@@ -104,8 +104,9 @@ class Reader {
             const qint64 bytesRead =
                 m_replayFile.read(buffers.at(next).data(), chunkSize);
             if (bytesRead < 0) {
-                throw CorruptDataException(QLatin1String("Error reading payload"),
-                                           m_offsetMgr.offset());
+                throw CorruptDataException(
+                    QLatin1String("Error reading payload"),
+                    m_offsetMgr.offset());
             }
             if (bytesRead == 0) {
                 break;

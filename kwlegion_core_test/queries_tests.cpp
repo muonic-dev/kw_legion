@@ -180,14 +180,14 @@ TEST_CASE("Queries insertReplayPlayers stores every player for a replay") {
     queries.insertReplay(makeMetadata(checksum));
 
     const QList<LegionParser::Player> players{
-        LegionParser::Player{.playerId = 1,
-                             .playerName = "Alice",
+        LegionParser::Player{.id = 1,
+                             .name = "Alice",
                              .teamNumber = 0,
                              .faction = LegionParser::Faction::GDI,
                              .isComputer = false,
                              .isReplaySaver = true},
-        LegionParser::Player{.playerId = 2,
-                             .playerName = "Bob",
+        LegionParser::Player{.id = 2,
+                             .name = "Bob",
                              .teamNumber = 1,
                              .faction = LegionParser::Faction::Nod,
                              .isComputer = true,
