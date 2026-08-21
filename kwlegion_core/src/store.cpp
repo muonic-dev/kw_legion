@@ -40,7 +40,12 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
         // What replays did we know about but seem to no longer exist.
         Queries queries{QSqlQuery(m_db)};
         queries.forgetMissingReplays(paths);
-        const QList<Replay> replays = queries.selectReplays();
+        QList<Replay> replays = queries.selectReplays();
+
+        for (Replay& replay : replays) {
+            replay.players = queries.selectReplayPlayers(replay.checksum);
+        }
+
         emit replaysLoaded(replays);
     } catch (StorageException& ex) {
         qCritical(logStore) << "Unable to access the replays " << ex.what();
@@ -172,7 +177,9 @@ void ReplayStore::forwardChangedReplays(const QList<QByteArray>& checksums) {
                 << "Replay with checksum: " << checksum.toHex()
                 << " disappeared before it could be emitted as updated";
         } else {
-            replays.append(replay.value());
+            Replay r = replay.value();
+            r.players = queries.selectReplayPlayers(r.checksum);
+            replays.append(r);
         }
     }
     emit replaysChanged(replays);

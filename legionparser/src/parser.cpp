@@ -106,7 +106,7 @@ void Parser::parseHeader() {
 void Parser::parseGameType() {
     // Immediately following the magic is a header that appears to signify
     // skirmish (0x04) or multiplayer (0x05)
-    m_metadata.gameType = gameTypeFromUint8(m_reader->readByte<std::uint8_t>());
+    m_metadata.gameType = gameTypeFromUInt8(m_reader->readByte<std::uint8_t>());
 }
 
 void Parser::parseVersions() {
@@ -293,7 +293,7 @@ void Parser::parsePlayerSlots(const QStringView header) {
                          factionOrdinal,
                          static_cast<std::uint8_t>(Faction::Unknown))
                  ? Faction::Unknown
-                 : factionFromUint8(static_cast<std::uint8_t>(factionOrdinal)));
+                 : factionFromUInt8(static_cast<std::uint8_t>(factionOrdinal)));
 
         // At the end, prepare for the next path
         slotStart = slotEnd + 1;

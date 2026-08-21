@@ -67,6 +67,8 @@ class Queries final {
 
     std::optional<Replay> selectReplay(const QByteArray& checksum);
 
+    QList<Player> selectReplayPlayers(const QByteArray& checksum);
+
    private:
     void prepare(const QString& sql);
 

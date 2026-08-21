@@ -19,6 +19,8 @@ TeamModel::TeamModel(std::uint32_t number, QObject* parent)
           {static_cast<int>(Roles::FactionRole), "faction"},
       } {}
 
+QHash<int, QByteArray> TeamModel::roleNames() const { return m_roleNames; }
+
 int TeamModel::rowCount(const QModelIndex& parent) const {
     if (parent.isValid()) {
         return 0;

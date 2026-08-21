@@ -11,7 +11,6 @@
 
 #include "replayproxy.h"
 
-
 namespace KWLegionCore {
 
 // The model of a team. A team is a list of players and their factions
@@ -28,6 +27,8 @@ class TeamModel : public QAbstractListModel {
     [[nodiscard]] std::uint32_t number() const { return m_number; }
 
     void addPlayer(const Player& player);
+
+    [[nodiscard]] QHash<int, QByteArray> roleNames() const override;
 
     [[nodiscard]] int rowCount(
         const QModelIndex& parent = QModelIndex()) const override;

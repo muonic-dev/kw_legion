@@ -134,7 +134,7 @@ void Queries::insertReplay(const LegionParser::ReplayMetadata& metadata) {
     m_query.bindValue(":match_description", metadata.matchDescription);
     m_query.bindValue(":map_name", metadata.mapName);
     m_query.bindValue(":map_id", metadata.mapId);
-    m_query.bindValue(":game_type", LegionParser::toUint8(metadata.gameType));
+    m_query.bindValue(":game_type", LegionParser::toUInt8(metadata.gameType));
     m_query.bindValue(":timestamp", metadata.timestamp.toSecsSinceEpoch());
     m_query.bindValue(":has_commentary", metadata.hasCommentary);
     m_query.bindValue(":filename", metadata.filename);
@@ -169,7 +169,7 @@ void Queries::insertReplayPlayers(const QByteArray& checksum,
         m_query.bindValue(":player_id", player.id);
         m_query.bindValue(":player_name", player.name);
         m_query.bindValue(":team_number", player.teamNumber);
-        m_query.bindValue(":faction", LegionParser::toUint8(player.faction));
+        m_query.bindValue(":faction", LegionParser::toUInt8(player.faction));
         m_query.bindValue(":is_computer", player.isComputer ? 1 : 0);
         m_query.bindValue(":is_replay_saver", player.isReplaySaver ? 1 : 0);
         exec();
@@ -308,6 +308,37 @@ std::optional<Replay> Queries::selectReplay(const QByteArray& checksum) {
     throwLastIfFailed();
 
     return std::nullopt;
+}
+
+QList<Player> Queries::selectReplayPlayers(const QByteArray& checksum) {
+    prepare(R"(SELECT player_id
+                    , player_name
+                    , team_number
+                    , faction
+                    , is_computer
+                    , is_replay_saver
+                    
+               FROM replay_players
+               WHERE replay_checksum = :checksum)");
+    m_query.bindValue(":checksum", checksum);
+
+    exec();
+
+    QList<Player> players;
+    while (m_query.next()) {
+        Player player;
+        player.id = m_query.value(0).toInt();
+        player.name = m_query.value(1).toString();
+        player.teamNumber = m_query.value(2).toInt();
+        player.faction =
+            LegionParser::factionFromUInt8(m_query.value(3).toUInt());
+        player.isComputer = m_query.value(4).toBool();
+        players.append(player);
+    }
+
+    throwLastIfFailed();
+
+    return players;
 }
 
 Replay Queries::readReplay() const {

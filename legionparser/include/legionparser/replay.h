@@ -17,15 +17,15 @@ enum class GameType : std::uint8_t {
     Multiplayer = 0x05,
 };
 
-constexpr std::uint8_t toUint8(GameType type) {
+constexpr std::uint8_t toUInt8(GameType type) {
     return static_cast<std::uint8_t>(type);
 }
 
-constexpr GameType gameTypeFromUint8(std::uint8_t raw) {
+constexpr GameType gameTypeFromUInt8(std::uint8_t raw) {
     switch (raw) {
-        case toUint8(GameType::Skirmish):
+        case toUInt8(GameType::Skirmish):
             return GameType::Skirmish;
-        case toUint8(GameType::Multiplayer):
+        case toUInt8(GameType::Multiplayer):
             return GameType::Multiplayer;
         default:
             return GameType::Unknown;
@@ -48,12 +48,12 @@ enum class Faction : std::uint8_t {
     Unknown
 };
 
-constexpr std::uint8_t toUint8(Faction faction) {
+constexpr std::uint8_t toUInt8(Faction faction) {
     return static_cast<std::uint8_t>(faction);
 }
 
-constexpr Faction factionFromUint8(std::uint8_t raw) {
-    if (raw < toUint8(Faction::GDI) || toUint8(Faction::Traveler) < raw) {
+constexpr Faction factionFromUInt8(std::uint8_t raw) {
+    if (raw < toUInt8(Faction::GDI) || toUInt8(Faction::Traveler) < raw) {
         return Faction::Unknown;
     }
     return static_cast<Faction>(raw);
