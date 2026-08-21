@@ -40,7 +40,8 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
         // What replays did we know about but seem to no longer exist.
         Queries queries{QSqlQuery(m_db)};
         queries.forgetMissingReplays(paths);
-        emit replaysLoaded(queries.selectReplays());
+        const QList<Replay> replays = queries.selectReplays();
+        emit replaysLoaded(replays);
     } catch (StorageException& ex) {
         qCritical(logStore) << "Unable to access the replays " << ex.what();
     }

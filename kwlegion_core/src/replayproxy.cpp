@@ -42,7 +42,7 @@ ReplayProxy::ReplayProxy(const Replay& replay, QObject* parent)
 }
 
 void ReplayProxy::updateFromReplay(const Replay& replay) {
-    // Replays are immutable, nothing else should change
+    // Most things are immutable but we may in the future change properties
     m_hasExternalPath = replay.hasExternalPath;
 }
 

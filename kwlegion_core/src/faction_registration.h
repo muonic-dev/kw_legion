@@ -12,6 +12,6 @@ namespace KWLegionCore {
 Q_NAMESPACE
 using Faction = LegionParser::Faction;
 Q_ENUM_NS(Faction)
-QML_NAMED_ELEMENT("Faction")
+QML_NAMED_ELEMENT(Faction)
 
 }  // namespace KWLegionCore
