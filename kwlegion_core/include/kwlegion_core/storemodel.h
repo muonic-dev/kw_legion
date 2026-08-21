@@ -5,12 +5,14 @@
 
 #pragma once
 
-#include <kwlegion_core/replay.h>
-
 #include <QAbstractListModel>
 #include <QQmlEngine>
 
+#include "replay.h"
+
 namespace KWLegionCore {
+
+class ReplayProxy;
 
 class StoreModel : public QAbstractListModel {
     Q_OBJECT
@@ -23,6 +25,7 @@ class StoreModel : public QAbstractListModel {
         TimestampRole,
         MapNameRole,
         HasExternalPathRole,
+        TeamsRole,
     };
 
     Q_ENUM(Roles);
@@ -54,6 +57,6 @@ class StoreModel : public QAbstractListModel {
    private:
     QHash<int, QByteArray> m_roleNames;
 
-    QList<Replay> m_replays;
+    QList<ReplayProxy*> m_replays;
 };
 }  // namespace KWLegionCore

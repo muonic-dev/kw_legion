@@ -6,6 +6,8 @@ add_library(kwlegion_core STATIC
     include/kwlegion_core/store.h
     include/kwlegion_core/storemodel.h
     src/teammodel.h
+    src/replayproxy.h
+    src/faction_registration.h
     # Main src
     src/prospector.cpp
     src/store.cpp
@@ -14,6 +16,7 @@ add_library(kwlegion_core STATIC
     src/replay.cpp
     src/storemodel.cpp
     src/teammodel.cpp
+    src/replayproxy.cpp
 )
 add_library(kwlegion::core ALIAS kwlegion_core)
 
@@ -29,6 +32,8 @@ target_include_directories(kwlegion_core
         # qmltyperegistrar's generated #include guess for the QML type
         # registration TU needs the header's own directory on the path too.
         ${CMAKE_CURRENT_SOURCE_DIR}/include/kwlegion_core
+        # Implementation only QML registrations are in src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 # QML_ELEMENT/QML_SINGLETON types (currently just StoreModel) are registered

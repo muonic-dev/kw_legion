@@ -8,17 +8,21 @@
 #include <algorithm>
 #include <utility>
 
+#include "replayproxy.h"
+
 namespace KWLegionCore {
-StoreModel::StoreModel(QObject* parent) : QAbstractListModel(parent) {
-    m_roleNames.insert(static_cast<int>(Roles::ChecksumRole),
-                       QByteArrayLiteral("checksum"));
-    m_roleNames.insert(static_cast<int>(Roles::TimestampRole),
-                       QByteArrayLiteral("timestamp"));
-    m_roleNames.insert(static_cast<int>(Roles::MapNameRole),
-                       QByteArrayLiteral("mapName"));
-    m_roleNames.insert(static_cast<int>(Roles::HasExternalPathRole),
-                       QByteArrayLiteral("hasExternalPath"));
-}
+StoreModel::StoreModel(QObject* parent)
+    : QAbstractListModel(parent),
+      m_roleNames{
+          {static_cast<int>(Roles::ChecksumRole),
+           QByteArrayLiteral("checksum")},
+          {static_cast<int>(Roles::TimestampRole),
+           QByteArrayLiteral("timestamp")},
+          {static_cast<int>(Roles::MapNameRole), QByteArrayLiteral("mapName")},
+          {static_cast<int>(Roles::HasExternalPathRole),
+           QByteArrayLiteral("hasExternalPath")},
+          {static_cast<int>(Roles::TeamsRole), QByteArrayLiteral("teams")},
+      } {}
 
 StoreModel::~StoreModel() = default;
 
@@ -31,22 +35,33 @@ StoreModel* StoreModel::create(QQmlEngine* /*qmlEngine*/,
 
 void StoreModel::replaysLoaded(const QList<Replay>& replays) {
     beginResetModel();
-    m_replays = replays;
+    m_replays.clear();
+    for (const auto& replay : replays) {
+        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+        m_replays.append(new ReplayProxy(replay, this));
+    }
     endResetModel();
 }
 
 void StoreModel::replaysChanged(const QList<Replay>& replays) {
     for (const auto& replay : replays) {
-        auto it = std::ranges::find_if(m_replays, [&replay](const Replay& r) {
-            return r.checksum == replay.checksum;
-        });
+        auto it =
+            std::ranges::find_if(m_replays, [&replay](const ReplayProxy* r) {
+                return r->checksum() == replay.checksum;
+            });
 
         if (it != m_replays.end()) {
-            *it = replay;
-            const int row = static_cast<int>(it - m_replays.begin());
-            const QModelIndex idx = index(row);
-            emit dataChanged(idx, idx);
+            // The only thing that should change is the hasExternalPath
+            // otherwise we have some craziness
+            (*it)->updateFromReplay(replay);
+        } else {
+            // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+            m_replays.append(new ReplayProxy(replay, this));
+            it = m_replays.end() - 1;
         }
+        const int row = static_cast<int>(m_replays.size() - 1);
+        const QModelIndex idx = index(row);
+        emit dataChanged(idx, idx);
     }
 }
 
@@ -60,20 +75,24 @@ int StoreModel::rowCount(const QModelIndex& parent) const {
 }
 
 QVariant StoreModel::data(const QModelIndex& index, int role) const {
-    if (!index.isValid() || index.row() >= m_replays.size()) {
+    if (!index.isValid() ||
+        std::cmp_greater_equal(index.row(), m_replays.size())) {
         return {};
     }
-    const Replay& replay = m_replays.at(index.row());
+    const ReplayProxy* replay = m_replays.at(index.row());
     switch (static_cast<Roles>(role)) {
         case Roles::ChecksumRole:
-            return replay.checksum;
+            return replay->checksum();
         case Roles::TimestampRole:
-            return replay.timestamp;
+            return replay->timestamp();
         case Roles::MapNameRole:
-            return replay.mapName;
+            return replay->mapName();
         case Roles::HasExternalPathRole:
-            return replay.hasExternalPath;
+            return replay->hasExternalPath();
+        case Roles::TeamsRole:
+            return QVariant::fromValue(replay->teams());
+        default:
+            return {};
     }
-    return {};
 }
 }  // namespace KWLegionCore
