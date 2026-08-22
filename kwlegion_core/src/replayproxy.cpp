@@ -22,6 +22,11 @@ ReplayProxy::ReplayProxy(const Replay& replay, QObject* parent)
     QList<TeamModel*> teams;
 
     for (const auto& player : replay.players) {
+        // We get empty player names for what is described as the commentary
+        // player in replay metadata. We don't want to show this in the ui.
+        if (player.name.isEmpty()) {
+            continue;
+        }
         auto it = std::ranges::find_if(teams, [&player](TeamModel* team) {
             return team->number() == player.teamNumber;
         });

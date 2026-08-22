@@ -38,7 +38,7 @@ Page {
         case Faction.Traveler:
             return "qrc:/qt/qml/KWLegionUI/ico/CNCKW_Traveler-59_Logo.png";
         default:
-            return "qrc:/qt/qml/KWLegionUI/ico/question-mark.png";
+            return "qrc:/qt/qml/KWLegionUI/ico/dice-24-svgrepo-com.png";
         }
     }
 
@@ -121,20 +121,21 @@ Page {
                                         model: teamColumn.modelData
 
                                         delegate: Row {
+                                            id: playerDelegate
                                             required property string name
                                             required property int faction
 
                                             spacing: 6
 
                                             Image {
-                                                source: page.factionIcon(faction)
+                                                source: page.factionIcon(playerDelegate.faction)
                                                 width: 20
                                                 height: 20
                                                 fillMode: Image.PreserveAspectFit
                                             }
 
                                             Label {
-                                                text: name
+                                                text: playerDelegate.name
                                                 color: Theme.lightMode ? Theme.dark : Theme.light
                                             }
                                         }
