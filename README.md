@@ -1,12 +1,23 @@
 
 # LEGION Replay Manager
 
-Organize Kane's Wrath replays.
+Organize your replays because Kane's Wrath built-in replay doesn't support filtering.
 
-## Documentation
+LEGION will gather every replay in your replay folder (including the rolling Last Replay)
+and track it in a local database. You can then filter by player, map, faction, time and more
+and toggle which replays are placed in the replay folder.
 
-- [Architecture](docs/ARCHITECTURE.md) — how the components (parser, core, UI) fit together and interact.
+## ☢️ _*UNDER DEVELOPMENT/UNSTABLE*_ ☢️
+
+This software is under active developmet and may be unstable. You should definitely back up any replays that you consider important. If you do encounter problems feel free to open an issue.
 
 ## License
 
 This project is licensed under the GNU General Public License v3.0 or later - see the [LICENSE](LICENSE) file for details.
+
+## Development
+
+⚠️ This project is open source because I believe in it. However, as I have limited time if you drive by PR it is very unlikely that I will review and/or merge.
+
+- [Architecture](docs/ARCHITECTURE.md) — how the components (parser, core, UI) fit together and interact.
+
