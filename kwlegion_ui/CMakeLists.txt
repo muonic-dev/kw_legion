@@ -82,9 +82,20 @@ install(TARGETS kw_legion
 # We need the rest of the magic that supports the Qml runtime
 # That script only runs as an install-time
 
+set(kw_legion_deploy_tool_options)
+if(WIN32)
+    # Trim installer payload to what this app actually needs at runtime.
+    list(APPEND kw_legion_deploy_tool_options
+        --skip-plugin-types qmltooling
+        --include-plugins qsqlite
+        --exclude-plugins qsqlibase,qsqlmimer,qsqloci,qsqlodbc,qsqlpsql
+    )
+endif()
+
 qt_generate_deploy_qml_app_script(
     TARGET kw_legion
     OUTPUT_SCRIPT deploy_script
     NO_TRANSLATIONS
+    DEPLOY_TOOL_OPTIONS ${kw_legion_deploy_tool_options}
 )
 install(SCRIPT ${deploy_script})
