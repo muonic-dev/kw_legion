@@ -1,9 +1,16 @@
 cmake_minimum_required(VERSION 3.23)
 
 project(kw_legion
-    VERSION 0.1
+    VERSION "0.1"
     DESCRIPTION "A C&C 3: Kane's Wrath replay manager"
     LANGUAGES CXX)
+
+# CMake's project(VERSION) accepts only numeric components, so keep it numeric
+# and derive a SemVer pre-release label separately for packaging/display.
+set(KW_LEGION_VERSION_PRERELEASE "alpha.1")
+set(KW_LEGION_VERSION_SEMVER "${PROJECT_VERSION}-${KW_LEGION_VERSION_PRERELEASE}")
+
+include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -47,3 +54,27 @@ if(BUILD_TESTING)
     add_subdirectory(legionparser_test)
     add_subdirectory(kwlegion_core_test)
 endif()
+
+install(FILES
+    ${CMAKE_SOURCE_DIR}/LICENSE
+    ${CMAKE_SOURCE_DIR}/README.md
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}
+)
+
+set(CPACK_PACKAGE_NAME "KW Legion")
+set(CPACK_PACKAGE_VENDOR "KW Legion")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A C&C 3: Kane's Wrath replay manager")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_FILE_NAME "kw-legion-${KW_LEGION_VERSION_SEMVER}")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "KW Legion")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_SOURCE_DIR}/README.md")
+
+if(WIN32)
+    set(CPACK_GENERATOR "NSIS;ZIP")
+    set(CPACK_NSIS_DISPLAY_NAME "KW Legion")
+else()
+    set(CPACK_GENERATOR "TGZ")
+endif()
+
+include(CPack)

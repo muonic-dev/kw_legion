@@ -58,8 +58,7 @@ void StoreModel::replaysChanged(const QList<Replay>& replays) {
             });
 
         if (it != m_replays.end()) {
-            // The only thing that should change is the hasExternalPath
-            // otherwise we have some craziness
+            // Update the existing replay proxy with the new data
             (*it)->updateFromReplay(replay);
         } else {
             // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
