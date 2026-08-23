@@ -266,7 +266,10 @@ void Queries::forgetMissingReplays(const QList<QString>& knownPaths) {
 QList<Replay> Queries::selectReplays() {
     prepare(R"(SELECT checksum
                     , timestamp
+                    , match_title
+                    , match_description
                     , map_name
+                    , map_reference
                     , EXISTS (
                         SELECT 1 FROM replay_external_paths
                         WHERE replay_checksum = replays.checksum
@@ -288,7 +291,10 @@ QList<Replay> Queries::selectReplays() {
 std::optional<Replay> Queries::selectReplay(const QByteArray& checksum) {
     prepare(R"(SELECT checksum
                     , timestamp
+                    , match_title
+                    , match_description
                     , map_name
+                    , map_reference
                     , EXISTS (
                         SELECT 1 FROM replay_external_paths
                         WHERE replay_checksum = replays.checksum
@@ -345,8 +351,11 @@ Replay Queries::readReplay() const {
     return Replay{.checksum = m_query.value(0).toByteArray(),
                   .timestamp = QDateTime::fromSecsSinceEpoch(
                       m_query.value(1).toLongLong(), QTimeZone(QTimeZone::UTC)),
-                  .mapName = m_query.value(2).toString(),
-                  .hasExternalPath = m_query.value(3).toBool()};
+                  .matchTitle = m_query.value(2).toString(),
+                  .matchDescription = m_query.value(3).toString(),
+                  .mapName = m_query.value(4).toString(),
+                  .mapReference = m_query.value(5).toString(),
+                  .hasExternalPath = m_query.value(6).toBool()};
 }
 
 void Queries::prepare(const QString& sql) {

@@ -31,7 +31,10 @@ struct Player {
 struct Replay {
     QByteArray checksum;
     QDateTime timestamp;
+    QString matchTitle;
+    QString matchDescription;
     QString mapName;
+    QString mapReference;
     // Does this replay have a version that is stored in the replay directory
     bool hasExternalPath = false;
 

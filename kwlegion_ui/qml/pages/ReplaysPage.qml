@@ -37,6 +37,7 @@ Page {
             return "qrc:/qt/qml/KWLegionUI/ico/CNCKW_Reaper-17_Logo.png";
         case Faction.Traveler:
             return "qrc:/qt/qml/KWLegionUI/ico/CNCKW_Traveler-59_Logo.png";
+        // Unknown. We treat unknown as synonymous with Random
         default:
             return "qrc:/qt/qml/KWLegionUI/ico/dice-24-svgrepo-com.png";
         }

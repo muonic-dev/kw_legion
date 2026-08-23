@@ -20,7 +20,10 @@ Replay Replay::fromReplay(const LegionParser::ReplayMetadata& replay,
     }
     return Replay{.checksum = replay.checksum,
                   .timestamp = replay.timestamp,
+                  .matchTitle = replay.matchTitle,
+                  .matchDescription = replay.matchDescription,
                   .mapName = replay.mapName,
+                  .mapReference = replay.mapReference,
                   .hasExternalPath = hasExternalPath};
 }
 }  // namespace KWLegionCore

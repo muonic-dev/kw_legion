@@ -53,7 +53,10 @@ class ReplayProxy : public QObject {
    private:
     QByteArray m_checksum;
     QDateTime m_timestamp;
+    QString m_matchTitle;
+    QString m_matchDescription;
     QString m_mapName;
+    QString m_mapReference;
     bool m_hasExternalPath;
     QList<QObject*> m_teams;
 };

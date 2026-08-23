@@ -23,9 +23,14 @@ class StoreModel : public QAbstractListModel {
     enum class Roles : std::uint16_t {
         ChecksumRole = Qt::UserRole + 1,
         TimestampRole,
+        MatchTitleRole,
+        MatchDescriptionRole,
         MapNameRole,
+        MapReferenceRole,
         HasExternalPathRole,
         TeamsRole,
+        PatchRole,  // We guess the patch based on the suffix of the
+                    // map_reference
     };
 
     Q_ENUM(Roles);

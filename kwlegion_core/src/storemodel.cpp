@@ -18,10 +18,17 @@ StoreModel::StoreModel(QObject* parent)
            QByteArrayLiteral("checksum")},
           {static_cast<int>(Roles::TimestampRole),
            QByteArrayLiteral("timestamp")},
+          {static_cast<int>(Roles::MatchTitleRole),
+           QByteArrayLiteral("matchTitle")},
+          {static_cast<int>(Roles::MatchDescriptionRole),
+           QByteArrayLiteral("matchDescription")},
           {static_cast<int>(Roles::MapNameRole), QByteArrayLiteral("mapName")},
+          {static_cast<int>(Roles::MapReferenceRole),
+           QByteArrayLiteral("mapReference")},
           {static_cast<int>(Roles::HasExternalPathRole),
            QByteArrayLiteral("hasExternalPath")},
           {static_cast<int>(Roles::TeamsRole), QByteArrayLiteral("teams")},
+          {static_cast<int>(Roles::PatchRole), QByteArrayLiteral("patch")},
       } {}
 
 StoreModel::~StoreModel() = default;

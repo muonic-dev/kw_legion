@@ -131,12 +131,18 @@ TEST_CASE("Queries selectReplay returns the stored fields") {
     LegionParser::ReplayMetadata metadata =
         makeMetadata(checksum, "Sample Map");
     metadata.timestamp = timestamp;
+    metadata.matchTitle = "Stored Match Title";
+    metadata.matchDescription = "Stored match description";
+    metadata.mapReference = "data/maps/stored-reference";
     queries.insertReplay(metadata);
 
     const std::optional<Replay> replay = queries.selectReplay(checksum);
     REQUIRE(replay.has_value());
     CHECK(replay->checksum == checksum);
+    CHECK(replay->matchTitle == "Stored Match Title");
+    CHECK(replay->matchDescription == "Stored match description");
     CHECK(replay->mapName == "Sample Map");
+    CHECK(replay->mapReference == "data/maps/stored-reference");
     // Timestamps are stored/read as UTC end to end (see legionparser's
     // parseHeaderTail()), so this should be exact equality - not just the
     // same instant under different time specs.
@@ -417,8 +423,19 @@ TEST_CASE("Queries selectReplays reports hasExternalPath per replay") {
 
     const QByteArray withPath = "checksum-with-path";
     const QByteArray withoutPath = "checksum-without-path";
-    queries.insertReplay(makeMetadata(withPath, "Map A"));
-    queries.insertReplay(makeMetadata(withoutPath, "Map B"));
+    LegionParser::ReplayMetadata withPathMetadata =
+        makeMetadata(withPath, "Map A");
+    withPathMetadata.matchTitle = "Match A";
+    withPathMetadata.matchDescription = "Description A";
+    withPathMetadata.mapReference = "Reference A";
+    queries.insertReplay(withPathMetadata);
+
+    LegionParser::ReplayMetadata withoutPathMetadata =
+        makeMetadata(withoutPath, "Map B");
+    withoutPathMetadata.matchTitle = "Match B";
+    withoutPathMetadata.matchDescription = "Description B";
+    withoutPathMetadata.mapReference = "Reference B";
+    queries.insertReplay(withoutPathMetadata);
     queries.insertExternalFilename(withPath, "C:/replays/a.KWReplay");
 
     const QList<Replay> replays = queries.selectReplays();
@@ -433,8 +450,14 @@ TEST_CASE("Queries selectReplays reports hasExternalPath per replay") {
     REQUIRE(byChecksum.contains(withoutPath));
     CHECK(byChecksum.value(withPath).hasExternalPath);
     CHECK_FALSE(byChecksum.value(withoutPath).hasExternalPath);
+    CHECK(byChecksum.value(withPath).matchTitle == "Match A");
+    CHECK(byChecksum.value(withPath).matchDescription == "Description A");
     CHECK(byChecksum.value(withPath).mapName == "Map A");
+    CHECK(byChecksum.value(withPath).mapReference == "Reference A");
+    CHECK(byChecksum.value(withoutPath).matchTitle == "Match B");
+    CHECK(byChecksum.value(withoutPath).matchDescription == "Description B");
     CHECK(byChecksum.value(withoutPath).mapName == "Map B");
+    CHECK(byChecksum.value(withoutPath).mapReference == "Reference B");
 
     db = QSqlDatabase();
     QSqlDatabase::removeDatabase("queries_select_replays");

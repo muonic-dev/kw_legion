@@ -16,7 +16,10 @@ ReplayProxy::ReplayProxy(const Replay& replay, QObject* parent)
     : QObject(parent),
       m_checksum(replay.checksum),
       m_timestamp(replay.timestamp),
+      m_matchTitle(replay.matchTitle),
+      m_matchDescription(replay.matchDescription),
       m_mapName(replay.mapName),
+      m_mapReference(replay.mapReference),
       m_hasExternalPath(replay.hasExternalPath) {
     // Build the teams by scanning for players
     QList<TeamModel*> teams;
