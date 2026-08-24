@@ -51,95 +51,134 @@ Page {
         delegate: Rectangle {
             id: delegateRoot
 
+            required property var checksum
+            required property string matchTitle
             required property string mapName
+            required property bool hasExternalPath
             required property var timestamp
             required property var teams
 
+            readonly property int fieldColumnWidth: 220
+
             width: ListView.view.width
-            height: content.height + 16
+            height: Math.max(fieldColumn.height, teamsFlow.height) + 16
             color: "transparent"
 
-            Column {
-                id: content
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.margins: 8
-                spacing: 8
+            Item {
+                id: fieldColumn
+                x: 8
+                y: 8
+                width: delegateRoot.fieldColumnWidth
+                height: Math.max(textColumn.height + 4 + controlRow.height, teamsFlow.height)
 
-                Row {
-                    spacing: 16
+                Column {
+                    id: textColumn
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    spacing: 4
 
                     Label {
-                        text: delegateRoot.mapName
+                        width: parent.width
+                        text: delegateRoot.matchTitle
+                        font.bold: true
+                        elide: Text.ElideRight
                         color: Theme.lightMode ? Theme.dark : Theme.light
                     }
 
                     Label {
+                        width: parent.width
                         text: delegateRoot.timestamp.toLocaleString(Qt.locale())
+                        elide: Text.ElideRight
+                        color: Theme.lightMode ? Theme.dark : Theme.light
+                    }
+
+                    Label {
+                        width: parent.width
+                        text: delegateRoot.mapName
+                        elide: Text.ElideRight
                         color: Theme.lightMode ? Theme.dark : Theme.light
                     }
                 }
 
-                Rectangle {
-                    width: parent.width
-                    height: teamsColumn.height + 16
-                    color: "transparent"
-                    border.color: Theme.lightMode ? Theme.dark : Theme.light
-                    radius: 4
+                Row {
+                    id: controlRow
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    spacing: 8
 
-                    Column {
-                        id: teamsColumn
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.margins: 8
-                        spacing: 8
+                    Button {
+                        icon.source: delegateRoot.hasExternalPath ? "qrc:/qt/qml/KWLegionUI/ico/eye-svgrepo-com.png" : "qrc:/qt/qml/KWLegionUI/ico/eye-closed-svgrepo-com.png"
+                        icon.width: 16
+                        icon.height: 16
 
-                        Label {
-                            text: qsTr("Teams")
-                            font.bold: true
-                            color: Theme.lightMode ? Theme.dark : Theme.light
-                        }
+                        onClicked: StoreModel.toggleReplayExposed(delegateRoot.checksum)
+                        padding: 10
+                        implicitWidth: implicitContentWidth + leftPadding + rightPadding
+                        implicitHeight: implicitContentHeight + topPadding + bottomPadding
+                    }
 
-                        Row {
-                            spacing: 24
+                    Button {
+                        icon.source: "qrc:/qt/qml/KWLegionUI/ico/save-floppy-svgrepo-com.png"
+                        icon.width: 16
+                        icon.height: 16
 
-                            // delegateRoot.teams is a QList<TeamModel*>; Repeater
-                            // treats it as a JS array, one modelData per team.
+                        padding: 10
+                        implicitWidth: implicitContentWidth + leftPadding + rightPadding
+                        implicitHeight: implicitContentHeight + topPadding + bottomPadding
+                    }
+                }
+            }
+
+            Flow {
+                id: teamsFlow
+                x: fieldColumn.x + fieldColumn.width + 16
+                y: 8
+                width: delegateRoot.width - x - 8
+                spacing: 12
+
+                // delegateRoot.teams is a QList<TeamModel*>; Repeater
+                // treats it as a JS array, one modelData per team.
+                Repeater {
+                    model: delegateRoot.teams
+
+                    delegate: Rectangle {
+                        id: teamBox
+
+                        required property QtObject modelData
+
+                        width: teamColumn.width + 16
+                        height: teamColumn.height + 16
+                        color: "transparent"
+                        border.color: Theme.lightMode ? Theme.dark : Theme.light
+                        radius: 4
+
+                        Column {
+                            id: teamColumn
+                            anchors.centerIn: parent
+                            spacing: 4
+
+                            // Each team is itself a model of players.
                             Repeater {
-                                model: delegateRoot.teams
+                                model: teamBox.modelData
 
-                                delegate: Column {
-                                    id: teamColumn
+                                delegate: Row {
+                                    id: playerDelegate
+                                    required property string name
+                                    required property int faction
 
-                                    required property QtObject modelData
+                                    spacing: 6
 
-                                    spacing: 4
+                                    Image {
+                                        source: page.factionIcon(playerDelegate.faction)
+                                        width: 20
+                                        height: 20
+                                        fillMode: Image.PreserveAspectFit
+                                    }
 
-                                    // Each team is itself a model of players.
-                                    Repeater {
-                                        model: teamColumn.modelData
-
-                                        delegate: Row {
-                                            id: playerDelegate
-                                            required property string name
-                                            required property int faction
-
-                                            spacing: 6
-
-                                            Image {
-                                                source: page.factionIcon(playerDelegate.faction)
-                                                width: 20
-                                                height: 20
-                                                fillMode: Image.PreserveAspectFit
-                                            }
-
-                                            Label {
-                                                text: playerDelegate.name
-                                                color: Theme.lightMode ? Theme.dark : Theme.light
-                                            }
-                                        }
+                                    Label {
+                                        text: playerDelegate.name
+                                        color: Theme.lightMode ? Theme.dark : Theme.light
                                     }
                                 }
                             }

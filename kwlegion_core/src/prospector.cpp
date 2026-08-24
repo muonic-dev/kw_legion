@@ -84,14 +84,21 @@ void ReplayProspector::initialSweep() {
                          QDir::AllEntries | QDir::NoDotAndDotDot,
                          QDirIterator::Subdirectories);
 
-    m_watcher.addPath(m_replayDirectory);
+    if (!m_watcher.addPath(m_replayDirectory)) {
+        qCWarning(logProspector)
+            << "Failed to watch replay directory: " << m_replayDirectory;
+    }
 
     while (dirIter.hasNext()) {
         const QFileInfo nextInfo = dirIter.nextFileInfo();
         // For the initial sweep we specifically need to continue recursing
         // if its a directory
         if (nextInfo.isDir()) {
-            m_watcher.addPath(nextInfo.canonicalFilePath());
+            if (!m_watcher.addPath(nextInfo.canonicalFilePath())) {
+                qCWarning(logProspector)
+                    << "Failed to watch directory: "
+                    << nextInfo.canonicalFilePath();
+            }
         } else if (nextInfo.isFile() && nextInfo.fileName().endsWith(
                                             ".KWReplay", Qt::CaseInsensitive)) {
             // This call to canonicalFilePath is load bearing to ensure we
@@ -179,14 +186,20 @@ void ReplayProspector::watchedDirectoryChanged(const QString& path) {
 }
 
 void ReplayProspector::watchDirectoryTree(const QString& path) {
-    m_watcher.addPath(path);
+    if (!m_watcher.addPath(path)) {
+        qCWarning(logProspector) << "Failed to watch directory: " << path;
+    }
 
     QDirIterator dirIter(path, QDir::AllEntries | QDir::NoDotAndDotDot,
                          QDirIterator::Subdirectories);
     while (dirIter.hasNext()) {
         const QFileInfo nextInfo = dirIter.nextFileInfo();
         if (nextInfo.isDir()) {
-            m_watcher.addPath(nextInfo.canonicalFilePath());
+            if (!m_watcher.addPath(nextInfo.canonicalFilePath())) {
+                qCWarning(logProspector)
+                    << "Failed to watch directory: "
+                    << nextInfo.canonicalFilePath();
+            }
         } else if (nextInfo.isFile() && nextInfo.fileName().endsWith(
                                             ".KWReplay", Qt::CaseInsensitive)) {
             const QString canonicalFilePath = nextInfo.canonicalFilePath();

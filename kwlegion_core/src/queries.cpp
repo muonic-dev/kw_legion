@@ -345,6 +345,22 @@ QList<Player> Queries::selectReplayPlayers(const QByteArray& checksum) {
     return players;
 }
 
+QList<QString> Queries::selectExternalPaths(const QByteArray& checksum) {
+    prepare(
+        "SELECT external_path FROM replay_external_paths WHERE replay_checksum "
+        "= :checksum");
+    m_query.bindValue(":checksum", checksum);
+
+    exec();
+
+    QList<QString> paths;
+    while (m_query.next()) {
+        paths.append(m_query.value(0).toString());
+    }
+    throwLastIfFailed();
+    return paths;
+}
+
 Replay Queries::readReplay() const {
     return Replay{.checksum = m_query.value(0).toByteArray(),
                   .timestamp = QDateTime::fromSecsSinceEpoch(

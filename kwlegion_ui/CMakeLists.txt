@@ -33,6 +33,9 @@ qt_add_qml_module(kw_legion
         ico/CNCKW_Reaper-17_Logo.png
         ico/question-mark.png
         ico/dice-24-svgrepo-com.png
+        ico/eye-closed-svgrepo-com.png
+        ico/eye-svgrepo-com.png
+        ico/save-floppy-svgrepo-com.png
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

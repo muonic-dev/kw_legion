@@ -108,7 +108,61 @@ void ReplayStore::removeReplayFile(const QString& path) {
     }
 }
 
-void ReplayStore::exposeReplay(const QByteArray& checksum) {}
+void ReplayStore::toggleReplayExposed(const QByteArray& checksum) {
+    qInfo(logStore) << "toggleReplayExposed "
+                    << QLatin1String(checksum.toHex());
+    // We are toggling, so we need to determine whether or not the replay has
+    // external paths We are going to do this whole thing in a transaction so
+    // nothing else changes underneath us
+    try {
+        SqlTransactionGuard tx(m_db);
+        Queries queries{QSqlQuery(m_db)};
+
+        const std::optional<Replay> replay = queries.selectReplay(checksum);
+        if (!replay.has_value()) {
+            qWarning(logStore) << "cannot toggle exposed for unknown replay "
+                               << QLatin1String(checksum.toHex());
+            return;
+        }
+        if (replay->hasExternalPath) {
+            hideReplay(queries, checksum);
+        } else {
+            exposeReplay(checksum);
+        }
+
+        // We just want to make sure nothing is changing underneath, we allow
+        // updates to flow in via signals
+        tx.rollback();
+
+    } catch (std::runtime_error& ex) {
+        qCritical(logStore) << "failed to toggle: " << ex.what();
+    }
+}
+
+void ReplayStore::exposeReplay(const QByteArray& checksum) {
+    if (!QDir(m_replayDir).mkpath("managed")) {
+        throw StorageException("failed to create managed/ replay folder");
+    }
+    const QString ingestedPath = computeIngestionPath(checksum);
+    const QString targetPath = QString("%1/managed/%2.KWReplay")
+                                   .arg(m_replayDir, QString(checksum.toHex()));
+    // Assume this exists
+    if (!QFile::copy(ingestedPath, targetPath)) {
+        throw StorageException("failed to copy into managed/ folder");
+    }
+}
+
+void ReplayStore::hideReplay(Queries& queries, const QByteArray& checksum) {
+    // Delete everything that we load as external
+    auto paths = queries.selectExternalPaths(checksum);
+    for (const auto& path : paths) {
+        QFile file(path);
+        if (!file.remove()) {
+            qCritical(logStore)
+                << "Failed to remove file: " << file.errorString();
+        }
+    }
+}
 
 QList<QByteArray> ReplayStore::ingestReplay(
     QFile& file, const LegionParser::ReplayMetadata& metadata) {

@@ -69,6 +69,8 @@ class Queries final {
 
     QList<Player> selectReplayPlayers(const QByteArray& checksum);
 
+    QList<QString> selectExternalPaths(const QByteArray& checksum);
+
    private:
     void prepare(const QString& sql);
 

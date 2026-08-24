@@ -53,11 +53,17 @@ class StoreModel : public QAbstractListModel {
     void replaysLoaded(const QList<Replay>&);
     void replaysChanged(const QList<Replay>&);
 
+    Q_INVOKABLE void toggleReplayExposed(const QByteArray& checksum);
+
     [[nodiscard]] QHash<int, QByteArray> roleNames() const override;
     [[nodiscard]] QVariant data(const QModelIndex& index,
                                 int role = Qt::DisplayRole) const override;
     [[nodiscard]] int rowCount(
         const QModelIndex& parent = QModelIndex()) const override;
+
+   signals:
+    // The proxy signal going to store
+    void shouldToggleReplayExposed(const QByteArray& checksum);
 
    private:
     QHash<int, QByteArray> m_roleNames;

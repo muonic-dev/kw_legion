@@ -13,5 +13,5 @@ QtObject {
     readonly property color reallyLight: "#e7e7e7"
     readonly property color light: "#e0e0e0"
 
-    readonly property url appIcon: "qrc:/qt/qml/KWLegionUI/qml/CNCKW_Marked_of_Kane_logo.png"
+    readonly property url appIcon: "qrc:/qt/qml/KWLegionUI/qml/CNCKW_Marked_of_Kane_Logo.png"
 }

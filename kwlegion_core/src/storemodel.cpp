@@ -65,10 +65,14 @@ void StoreModel::replaysChanged(const QList<Replay>& replays) {
             m_replays.append(new ReplayModel(replay, this));
             it = m_replays.end() - 1;
         }
-        const int row = static_cast<int>(m_replays.size() - 1);
+        const int row = static_cast<int>(it - m_replays.begin());
         const QModelIndex idx = index(row);
         emit dataChanged(idx, idx);
     }
+}
+
+void StoreModel::toggleReplayExposed(const QByteArray& checksum) {
+    emit shouldToggleReplayExposed(checksum);
 }
 
 QHash<int, QByteArray> StoreModel::roleNames() const { return m_roleNames; }
@@ -91,6 +95,8 @@ QVariant StoreModel::data(const QModelIndex& index, int role) const {
             return replay->checksum();
         case Roles::TimestampRole:
             return replay->timestamp();
+        case Roles::MatchTitleRole:
+            return replay->matchTitle();
         case Roles::MapNameRole:
             return replay->mapName();
         case Roles::HasExternalPathRole:

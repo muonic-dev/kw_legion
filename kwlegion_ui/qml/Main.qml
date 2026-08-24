@@ -10,8 +10,8 @@ import "pages"
 
 ApplicationWindow {
     id: appWindow
-    width: 640
-    height: 480
+    width: 1100
+    height: 700
     minimumWidth: 200
     minimumHeight: 250
     visible: true

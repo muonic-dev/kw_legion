@@ -54,7 +54,7 @@ class ReplayStore : public QObject {
      *
      * As a side efect this will trigger a replaysChanged
      */
-    void exposeReplay(const QByteArray& checksum);
+    void toggleReplayExposed(const QByteArray& checksum);
 
    signals:
     void replaysLoaded(const QList<Replay>&);
@@ -87,6 +87,9 @@ class ReplayStore : public QObject {
 
     [[nodiscard]] QString computeIngestionPath(
         const QByteArray& checksum) const;
+
+    void exposeReplay(const QByteArray& checksum);
+    void hideReplay(Queries& queries, const QByteArray& checksum);
 
     QSqlDatabase m_db;
     // Path of the sqlite database
