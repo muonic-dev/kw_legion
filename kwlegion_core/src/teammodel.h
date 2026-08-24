@@ -9,7 +9,7 @@
 #include <QList>
 #include <QObject>
 
-#include "replayproxy.h"
+#include "replaymodel.h"
 
 namespace KWLegionCore {
 

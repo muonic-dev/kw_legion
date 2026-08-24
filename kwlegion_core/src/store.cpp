@@ -18,10 +18,12 @@ Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
 
 namespace KWLegionCore {
 
-ReplayStore::ReplayStore(const QString& statePath, QObject* parent)
+ReplayStore::ReplayStore(QString replayDir, const QString& statePath,
+                         QObject* parent)
     : QObject(parent),
       m_dbPath(statePath + "/replays.db"),
-      m_replayDir(statePath + "/replays") {}
+      m_storageDir(statePath + "/replays"),
+      m_replayDir(std::move(replayDir)) {}
 
 void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     // Perform initial setup operation on the startup signal
@@ -106,6 +108,8 @@ void ReplayStore::removeReplayFile(const QString& path) {
     }
 }
 
+void ReplayStore::exposeReplay(const QByteArray& checksum) {}
+
 QList<QByteArray> ReplayStore::ingestReplay(
     QFile& file, const LegionParser::ReplayMetadata& metadata) {
     SqlTransactionGuard tx(m_db);
@@ -188,7 +192,7 @@ void ReplayStore::forwardChangedReplays(const QList<QByteArray>& checksums) {
 QString ReplayStore::computeIngestionPath(const QByteArray& checksum) const {
     const QString filename =
         QString::fromLatin1(checksum.toHex()) + ".KWReplay";
-    return QDir(m_replayDir).filePath(filename);
+    return QDir(m_storageDir).filePath(filename);
 }
 
 std::optional<QByteArray> ReplayStore::removeReplayAtPath(const QString& path) {
@@ -230,16 +234,16 @@ void ReplayStore::ensureDb() {
 }
 
 void ReplayStore::ensureDirectories() {
-    if (!QDir().mkpath(m_replayDir)) {
-        if (QDir().exists(m_replayDir)) {
+    if (!QDir().mkpath(m_storageDir)) {
+        if (QDir().exists(m_storageDir)) {
             qDebug(logStore)
-                << "Replay directory already exists: " << m_replayDir;
+                << "Replay directory already exists: " << m_storageDir;
         } else {
-            qCritical(logStore)
-                << "Unable to create replay storage directory: " << m_replayDir;
+            qCritical(logStore) << "Unable to create replay storage directory: "
+                                << m_storageDir;
         }
     } else {
-        qDebug(logStore) << "Replay directory created: " << m_replayDir;
+        qDebug(logStore) << "Replay directory created: " << m_storageDir;
     }
 }
 }  // namespace KWLegionCore

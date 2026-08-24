@@ -18,8 +18,8 @@ class Replay;
  *
  *
  */
-class ReplayProxy : public QObject {
-    // ReplayProxy is a QObject so that m_teams can participate in cleanup on
+class ReplayModel : public QObject {
+    // ReplayModel is a QObject so that m_teams can participate in cleanup on
     // deletion We need to return a QList<QObject*> for the nice binding
     // properties of the view Its easier to just QList<Qobject *> here so it can
     // be returned and then allow the teams to be deleted
@@ -27,15 +27,15 @@ class ReplayProxy : public QObject {
 
    public:
     // No default argument because we want to force parent to be the storemodel
-    ReplayProxy(const Replay& replay, QObject* parent);
+    ReplayModel(const Replay& replay, QObject* parent);
 
-    ~ReplayProxy() override = default;
+    ~ReplayModel() override = default;
 
-    ReplayProxy(const ReplayProxy&) = delete;
-    ReplayProxy(ReplayProxy&&) = delete;
+    ReplayModel(const ReplayModel&) = delete;
+    ReplayModel(ReplayModel&&) = delete;
 
-    ReplayProxy& operator=(const ReplayProxy&) = delete;
-    ReplayProxy& operator=(ReplayProxy&&) = delete;
+    ReplayModel& operator=(const ReplayModel&) = delete;
+    ReplayModel& operator=(ReplayModel&&) = delete;
 
     void updateFromReplay(const Replay& replay);
 

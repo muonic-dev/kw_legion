@@ -6,7 +6,7 @@ add_library(kwlegion_core STATIC
     include/kwlegion_core/store.h
     include/kwlegion_core/storemodel.h
     src/teammodel.h
-    src/replayproxy.h
+    src/replaymodel.h
     src/faction_registration.h
     # Main src
     src/prospector.cpp
@@ -16,7 +16,7 @@ add_library(kwlegion_core STATIC
     src/replay.cpp
     src/storemodel.cpp
     src/teammodel.cpp
-    src/replayproxy.cpp
+    src/replaymodel.cpp
 )
 add_library(kwlegion::core ALIAS kwlegion_core)
 

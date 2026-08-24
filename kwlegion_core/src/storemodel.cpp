@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <utility>
 
-#include "replayproxy.h"
+#include "replaymodel.h"
 
 namespace KWLegionCore {
 StoreModel::StoreModel(QObject* parent)
@@ -45,7 +45,7 @@ void StoreModel::replaysLoaded(const QList<Replay>& replays) {
     m_replays.clear();
     for (const auto& replay : replays) {
         // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-        m_replays.append(new ReplayProxy(replay, this));
+        m_replays.append(new ReplayModel(replay, this));
     }
     endResetModel();
 }
@@ -53,7 +53,7 @@ void StoreModel::replaysLoaded(const QList<Replay>& replays) {
 void StoreModel::replaysChanged(const QList<Replay>& replays) {
     for (const auto& replay : replays) {
         auto it =
-            std::ranges::find_if(m_replays, [&replay](const ReplayProxy* r) {
+            std::ranges::find_if(m_replays, [&replay](const ReplayModel* r) {
                 return r->checksum() == replay.checksum;
             });
 
@@ -62,7 +62,7 @@ void StoreModel::replaysChanged(const QList<Replay>& replays) {
             (*it)->updateFromReplay(replay);
         } else {
             // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-            m_replays.append(new ReplayProxy(replay, this));
+            m_replays.append(new ReplayModel(replay, this));
             it = m_replays.end() - 1;
         }
         const int row = static_cast<int>(m_replays.size() - 1);
@@ -85,7 +85,7 @@ QVariant StoreModel::data(const QModelIndex& index, int role) const {
         std::cmp_greater_equal(index.row(), m_replays.size())) {
         return {};
     }
-    const ReplayProxy* replay = m_replays.at(index.row());
+    const ReplayModel* replay = m_replays.at(index.row());
     switch (static_cast<Roles>(role)) {
         case Roles::ChecksumRole:
             return replay->checksum();

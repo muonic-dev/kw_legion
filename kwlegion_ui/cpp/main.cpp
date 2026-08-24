@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
 
     ReplayProspector replayProspector;
     replayProspector.moveToThread(&ioThread);
-    ReplayStore replayStore;
+    ReplayStore replayStore(ReplayProspector::defaultReplayDirectory());
     replayStore.moveToThread(&ioThread);
 
     QObject::connect(&ioThread, &QThread::started, &replayProspector,

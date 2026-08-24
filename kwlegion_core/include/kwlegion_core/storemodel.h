@@ -12,7 +12,7 @@
 
 namespace KWLegionCore {
 
-class ReplayProxy;
+class ReplayModel;
 
 class StoreModel : public QAbstractListModel {
     Q_OBJECT
@@ -62,6 +62,6 @@ class StoreModel : public QAbstractListModel {
    private:
     QHash<int, QByteArray> m_roleNames;
 
-    QList<ReplayProxy*> m_replays;
+    QList<ReplayModel*> m_replays;
 };
 }  // namespace KWLegionCore

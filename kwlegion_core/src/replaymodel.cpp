@@ -3,7 +3,7 @@
  * Copyright (C) 2026 Muonic
  */
 
-#include "replayproxy.h"
+#include "replaymodel.h"
 
 #include <replay.h>
 
@@ -12,7 +12,7 @@
 #include "teammodel.h"
 
 namespace KWLegionCore {
-ReplayProxy::ReplayProxy(const Replay& replay, QObject* parent)
+ReplayModel::ReplayModel(const Replay& replay, QObject* parent)
     : QObject(parent),
       m_checksum(replay.checksum),
       m_timestamp(replay.timestamp),
@@ -49,7 +49,7 @@ ReplayProxy::ReplayProxy(const Replay& replay, QObject* parent)
     }
 }
 
-void ReplayProxy::updateFromReplay(const Replay& replay) {
+void ReplayModel::updateFromReplay(const Replay& replay) {
     // Most things are immutable but we may in the future change properties
     m_hasExternalPath = replay.hasExternalPath;
 }

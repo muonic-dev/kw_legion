@@ -22,7 +22,8 @@ class ReplayStore : public QObject {
     Q_OBJECT
 
    public:
-    ReplayStore(const QString& statePath = QStandardPaths::writableLocation(
+    ReplayStore(QString replayDir,
+                const QString& statePath = QStandardPaths::writableLocation(
                     QStandardPaths::StateLocation),
                 QObject* parent = nullptr);
 
@@ -47,6 +48,13 @@ class ReplayStore : public QObject {
      * A replay file has disappeared
      */
     void removeReplayFile(const QString& path);
+
+    /**
+     * Expose a replay to the Kane's Wrath replay folder by checksum
+     *
+     * As a side efect this will trigger a replaysChanged
+     */
+    void exposeReplay(const QByteArray& checksum);
 
    signals:
     void replaysLoaded(const QList<Replay>&);
@@ -81,7 +89,11 @@ class ReplayStore : public QObject {
         const QByteArray& checksum) const;
 
     QSqlDatabase m_db;
+    // Path of the sqlite database
     QString m_dbPath;
+    // Path of the internal replay storage
+    QString m_storageDir;
+    // Path to the Documents\Command &...\Replays dir
     QString m_replayDir;
 };
 }  // namespace KWLegionCore
