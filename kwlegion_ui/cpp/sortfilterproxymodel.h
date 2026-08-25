@@ -10,18 +10,14 @@
 // sortOrder property so QML can bind/set it directly.
 class SortFilterProxyModel : public QSortFilterProxyModel {
     Q_OBJECT
-    Q_PROPERTY(Qt::SortOrder sortOrder READ sortOrder WRITE setSortOrder
-                   NOTIFY sortOrderChanged)
+    Q_PROPERTY(Qt::SortOrder sortOrder READ sortOrder WRITE setSortOrder NOTIFY
+                   sortOrderChanged)
 
    public:
     using QSortFilterProxyModel::QSortFilterProxyModel;
 
-    [[nodiscard]] Qt::SortOrder sortOrder() const { return m_sortOrder; }
     void setSortOrder(Qt::SortOrder order);
 
    signals:
     void sortOrderChanged();
-
-   private:
-    Qt::SortOrder m_sortOrder = Qt::AscendingOrder;
 };

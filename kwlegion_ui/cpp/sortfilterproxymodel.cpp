@@ -4,10 +4,9 @@
 #include "sortfilterproxymodel.h"
 
 void SortFilterProxyModel::setSortOrder(Qt::SortOrder order) {
-    if (order == m_sortOrder) {
+    if (order == sortOrder()) {
         return;
     }
-    m_sortOrder = order;
     sort(0, order);
     emit sortOrderChanged();
 }
