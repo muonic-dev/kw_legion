@@ -126,6 +126,8 @@ QVariant StoreModel::data(const QModelIndex& index, int role) const {
             return replay->timestamp();
         case Roles::MatchTitleRole:
             return replay->matchTitle();
+        case Roles::MatchDescriptionRole:
+            return replay->matchDescription();
         case Roles::MapNameRole:
             return replay->mapName();
         case Roles::HasExternalPathRole:
