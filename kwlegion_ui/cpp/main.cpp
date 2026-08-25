@@ -18,6 +18,8 @@
 #include <QThread>
 #include <cstdio>
 
+#include "sortfilterproxymodel.h"
+
 namespace {
 
 inline constexpr bool DEBUG_BUILD =
@@ -105,6 +107,24 @@ int main(int argc, char* argv[]) {
 
     qRegisterMetaType<KWLegionCore::Replay>();
 
+    qmlRegisterType<SortFilterProxyModel>("KWLegionUI", 1, 0,
+                                          "SortFilterProxyModel");
+
+    QQmlApplicationEngine engine;
+    QObject::connect(
+        &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
+        [](const QUrl& url) {
+            qCritical() << "Failed to create QML object from" << url;
+            QCoreApplication::exit(-1);
+        },
+        Qt::QueuedConnection);
+    QObject::connect(&engine, &QQmlEngine::warnings, &app,
+                     [](const QList<QQmlError>& errors) {
+                         for (const auto& error : errors) {
+                             qWarning() << error.toString();
+                         }
+                     });
+
     // Background thread to run i/o jobs on
     // Currently, the only requirement is to move the I/O processing
     // off the GUI thread. We aren't trying to farm out to parse all the
@@ -125,21 +145,6 @@ int main(int argc, char* argv[]) {
                      &replayStore, &ReplayStore::analyzeReplayFile);
     QObject::connect(&replayProspector, &ReplayProspector::replayFileRemoved,
                      &replayStore, &ReplayStore::removeReplayFile);
-
-    QQmlApplicationEngine engine;
-    QObject::connect(
-        &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
-        [](const QUrl& url) {
-            qCritical() << "Failed to create QML object from" << url;
-            QCoreApplication::exit(-1);
-        },
-        Qt::QueuedConnection);
-    QObject::connect(&engine, &QQmlEngine::warnings, &app,
-                     [](const QList<QQmlError>& errors) {
-                         for (const auto& error : errors) {
-                             qWarning() << error.toString();
-                         }
-                     });
 
     engine.loadFromModule("KWLegionUI", "Main");
 

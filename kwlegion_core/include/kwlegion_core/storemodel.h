@@ -7,6 +7,7 @@
 
 #include <QAbstractListModel>
 #include <QQmlEngine>
+#include <QSet>
 
 #include "replay.h"
 
@@ -31,6 +32,7 @@ class StoreModel : public QAbstractListModel {
         TeamsRole,
         PatchRole,  // We guess the patch based on the suffix of the
                     // map_reference
+        SelectedRole
     };
 
     Q_ENUM(Roles);
@@ -55,6 +57,9 @@ class StoreModel : public QAbstractListModel {
 
     Q_INVOKABLE void toggleReplayExposed(const QByteArray& checksum);
 
+    Q_INVOKABLE void setReplaySelected(const QByteArray& checksum);
+    Q_INVOKABLE void clearSelected();
+
     [[nodiscard]] QHash<int, QByteArray> roleNames() const override;
     [[nodiscard]] QVariant data(const QModelIndex& index,
                                 int role = Qt::DisplayRole) const override;
@@ -69,5 +74,6 @@ class StoreModel : public QAbstractListModel {
     QHash<int, QByteArray> m_roleNames;
 
     QList<ReplayModel*> m_replays;
+    QSet<QByteArray> m_selections;
 };
 }  // namespace KWLegionCore

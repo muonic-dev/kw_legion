@@ -29,6 +29,8 @@ StoreModel::StoreModel(QObject* parent)
            QByteArrayLiteral("hasExternalPath")},
           {static_cast<int>(Roles::TeamsRole), QByteArrayLiteral("teams")},
           {static_cast<int>(Roles::PatchRole), QByteArrayLiteral("patch")},
+          {static_cast<int>(Roles::SelectedRole),
+           QByteArrayLiteral("selected")},
       } {}
 
 StoreModel::~StoreModel() = default;
@@ -75,6 +77,33 @@ void StoreModel::toggleReplayExposed(const QByteArray& checksum) {
     emit shouldToggleReplayExposed(checksum);
 }
 
+void StoreModel::setReplaySelected(const QByteArray& checksum) {
+    auto it = std::ranges::find_if(m_replays, [&checksum](ReplayModel* replay) {
+        return replay->checksum() == checksum;
+    });
+    if (it != m_replays.end()) {
+        if (m_selections.contains(checksum)) {
+            m_selections.remove(checksum);
+        } else {
+            m_selections.insert(checksum);
+        }
+        const int row = static_cast<int>(it - m_replays.begin());
+        const QModelIndex idx = index(row);
+        emit dataChanged(idx, idx);
+    }
+}
+
+void StoreModel::clearSelected() {
+    const QSet<QByteArray> checksums = std::move(m_selections);
+    for (auto it = m_replays.cbegin(); it < m_replays.cend(); ++it) {
+        if (checksums.contains((*it)->checksum())) {
+            const QModelIndex idx =
+                index(static_cast<int>(it - m_replays.cbegin()));
+            emit dataChanged(idx, idx);
+        }
+    }
+}
+
 QHash<int, QByteArray> StoreModel::roleNames() const { return m_roleNames; }
 
 int StoreModel::rowCount(const QModelIndex& parent) const {
@@ -103,6 +132,8 @@ QVariant StoreModel::data(const QModelIndex& index, int role) const {
             return replay->hasExternalPath();
         case Roles::TeamsRole:
             return QVariant::fromValue(replay->teams());
+        case Roles::SelectedRole:
+            return m_selections.contains(replay->checksum());
         default:
             return {};
     }

@@ -43,10 +43,17 @@ Page {
         }
     }
 
+    SortFilterProxyModel {
+        id: sortedStoreModel
+        sourceModel: StoreModel
+        sortRole: StoreModel.TimestampRole
+        sortOrder: Qt.DescendingOrder
+    }
+
     ListView {
         anchors.fill: parent
         clip: true
-        model: StoreModel
+        model: sortedStoreModel
 
         delegate: Rectangle {
             id: delegateRoot
@@ -55,6 +62,7 @@ Page {
             required property string matchTitle
             required property string mapName
             required property bool hasExternalPath
+            required property bool selected
             required property var timestamp
             required property var teams
 
@@ -63,6 +71,20 @@ Page {
             width: ListView.view.width
             height: Math.max(fieldColumn.height, teamsFlow.height) + 16
             color: "transparent"
+
+            Rectangle {
+                anchors.fill: parent
+                color: Theme.selectionTint
+                visible: delegateRoot.selected
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: mouse => {
+                    StoreModel.clearSelected();
+                    StoreModel.setReplaySelected(delegateRoot.checksum);
+                }
+            }
 
             Item {
                 id: fieldColumn
@@ -112,7 +134,9 @@ Page {
                         icon.width: 16
                         icon.height: 16
 
-                        onClicked: StoreModel.toggleReplayExposed(delegateRoot.checksum)
+                        onClicked: {
+                            StoreModel.toggleReplayExposed(delegateRoot.checksum);
+                        }
                         padding: 10
                         implicitWidth: implicitContentWidth + leftPadding + rightPadding
                         implicitHeight: implicitContentHeight + topPadding + bottomPadding

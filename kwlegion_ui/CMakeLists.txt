@@ -2,6 +2,8 @@ find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform Sql)
 
 qt_add_executable(kw_legion
     cpp/main.cpp
+    cpp/sortfilterproxymodel.h
+    cpp/sortfilterproxymodel.cpp
 )
 
 # qt_add_qml_module() doesn't parse QML_FILES contents for `pragma Singleton`
