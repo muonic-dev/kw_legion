@@ -167,26 +167,59 @@ Page {
                     spacing: 8
 
                     Button {
-                        icon.source: delegateRoot.hasExternalPath ? "qrc:/qt/qml/KWLegionUI/ico/eye-svgrepo-com.png" : "qrc:/qt/qml/KWLegionUI/ico/eye-closed-svgrepo-com.png"
-                        icon.width: 16
-                        icon.height: 16
+                        id: exposeButton
+
+                        contentItem: Item {
+                            implicitHeight: 16
+                            implicitWidth: 16
+
+                            Image {
+                                id: eyeOpen
+                                anchors.fill: parent
+                                source: "qrc:/qt/qml/KWLegionUI/ico/eye-show-svgrepo-com.svg"
+                                // Fix for blurry
+                                sourceSize: Qt.size(width, height)
+                                opacity: delegateRoot.hasExternalPath ? 1 : 0
+                                Behavior on opacity {
+                                    NumberAnimation {
+                                        duration: 120
+                                    }
+                                }
+                            }
+                            Image {
+                                id: eyeClosed
+                                anchors.fill: parent
+                                source: "qrc:/qt/qml/KWLegionUI/ico/eye-hide-svgrepo-com.svg"
+                                // Fix for blurry
+                                sourceSize: Qt.size(width, height)
+                                opacity: delegateRoot.hasExternalPath ? 0 : 1
+                                Behavior on opacity {
+                                    NumberAnimation {
+                                        duration: 120
+                                    }
+                                }
+                            }
+                        }
 
                         onClicked: {
                             StoreModel.toggleReplayExposed(delegateRoot.checksum);
                         }
+
                         padding: 10
                         implicitWidth: implicitContentWidth + leftPadding + rightPadding
                         implicitHeight: implicitContentHeight + topPadding + bottomPadding
                     }
 
                     Button {
-                        icon.source: "qrc:/qt/qml/KWLegionUI/ico/save-floppy-svgrepo-com.png"
-                        icon.width: 16
-                        icon.height: 16
+                        contentItem: Image {
+                            source: "qrc:/qt/qml/KWLegionUI/ico/save-floppy-svgrepo-com.svg"
+                            sourceSize: Qt.size(16, 16)
+                            fillMode: Image.PreserveAspectFit
+                        }
 
                         padding: 10
-                        implicitWidth: implicitContentWidth + leftPadding + rightPadding
-                        implicitHeight: implicitContentHeight + topPadding + bottomPadding
+                        implicitWidth: 16 + leftPadding + rightPadding
+                        implicitHeight: 16 + topPadding + bottomPadding
                     }
                 }
             }

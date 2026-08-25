@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform Sql)
+find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform Sql Svg)
 
 qt_add_executable(kw_legion
     cpp/main.cpp
@@ -35,9 +35,9 @@ qt_add_qml_module(kw_legion
         ico/CNCKW_Reaper-17_Logo.png
         ico/question-mark.png
         ico/dice-24-svgrepo-com.png
-        ico/eye-closed-svgrepo-com.png
-        ico/eye-svgrepo-com.png
-        ico/save-floppy-svgrepo-com.png
+        ico/eye-hide-svgrepo-com.svg
+        ico/eye-show-svgrepo-com.svg
+        ico/save-floppy-svgrepo-com.svg
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
@@ -56,6 +56,7 @@ target_link_libraries(kw_legion
     Qt6::Quick
     Qt6::LabsPlatform
     Qt6::Sql
+    Qt6::Svg
     legionparser::legionparser
     kwlegion::core
     kwlegion::coreplugin
@@ -77,6 +78,19 @@ add_custom_command(TARGET kw_legion POST_BUILD
         $<TARGET_FILE_DIR:kw_legion>/sqldrivers
 )
 
+# Same reasoning as the sqldrivers copy above: QML's Image type loads SVG
+# sources through the qsvg imageformats plugin, which is discovered by
+# QImageReader at runtime rather than linked directly - the dev-build exe's
+# QT_QPA_PLATFORM_PLUGIN_PATH/QML_IMPORT_PATH env vars (see launch.json) don't
+# cover the imageformats plugin category, so it needs to sit next to the exe.
+add_custom_command(TARGET kw_legion POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        $<TARGET_FILE_DIR:kw_legion>/imageformats
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:Qt6::QSvgPlugin>
+        $<TARGET_FILE_DIR:kw_legion>/imageformats
+)
+
 install(TARGETS kw_legion
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -92,7 +106,7 @@ if(WIN32)
     # Trim installer payload to what this app actually needs at runtime.
     list(APPEND kw_legion_deploy_tool_options
         --skip-plugin-types qmltooling
-        --include-plugins qsqlite
+        --include-plugins qsqlite,qsvg
         --exclude-plugins qsqlibase,qsqlmimer,qsqloci,qsqlodbc,qsqlpsql
     )
 endif()
