@@ -7,6 +7,7 @@
 
 #include <replay.h>
 
+#include <QRegularExpression>
 #include <algorithm>
 
 #include "teammodel.h"
@@ -52,6 +53,21 @@ ReplayModel::ReplayModel(const Replay& replay, QObject* parent)
 void ReplayModel::updateFromReplay(const Replay& replay) {
     // Most things are immutable but we may in the future change properties
     m_hasExternalPath = replay.hasExternalPath;
+}
+
+QString ReplayModel::inferPatch() const {
+    return ReplayModel::inferPatch(m_mapReference);
+}
+
+// It might through, but I should just not have a bad RE
+static const QRegularExpression PATCH_RE(".*__([0-9]+[a-z]+)$");
+
+QString ReplayModel::inferPatch(QStringView mapPath) {
+    const auto match = PATCH_RE.matchView(mapPath);
+    if (!match.hasMatch()) {
+        return "";
+    }
+    return match.captured(1);
 }
 
 }  // namespace KWLegionCore

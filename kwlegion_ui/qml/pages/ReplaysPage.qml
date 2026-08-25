@@ -61,6 +61,7 @@ Page {
             required property var checksum
             required property string matchTitle
             required property string mapName
+            required property string patch
             required property bool hasExternalPath
             required property bool selected
             required property var timestamp
@@ -102,7 +103,7 @@ Page {
 
                     Label {
                         width: parent.width
-                        text: delegateRoot.matchTitle
+                        text: delegateRoot.patch.toUpperCase() + " " + delegateRoot.matchTitle
                         font.bold: true
                         elide: Text.ElideRight
                         color: Theme.lightMode ? Theme.dark : Theme.light

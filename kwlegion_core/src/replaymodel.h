@@ -43,6 +43,7 @@ class ReplayModel : public QObject {
     [[nodiscard]] QDateTime timestamp() const { return m_timestamp; }
     [[nodiscard]] QString matchTitle() const { return m_matchTitle; }
     [[nodiscard]] QString mapName() const { return m_mapName; }
+    [[nodiscard]] QString mapReference() const { return m_mapReference; }
     [[nodiscard]] bool hasExternalPath() const { return m_hasExternalPath; }
 
     [[nodiscard]] int teamCount() const {
@@ -50,6 +51,10 @@ class ReplayModel : public QObject {
     }
 
     [[nodiscard]] QList<QObject*> teams() const { return m_teams; }
+
+    [[nodiscard]] QString inferPatch() const;
+
+    static QString inferPatch(QStringView);
 
    private:
     QByteArray m_checksum;

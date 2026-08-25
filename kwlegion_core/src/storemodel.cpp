@@ -134,6 +134,8 @@ QVariant StoreModel::data(const QModelIndex& index, int role) const {
             return QVariant::fromValue(replay->teams());
         case Roles::SelectedRole:
             return m_selections.contains(replay->checksum());
+        case Roles::PatchRole:
+            return replay->inferPatch();
         default:
             return {};
     }
