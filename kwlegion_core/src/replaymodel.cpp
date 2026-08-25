@@ -59,10 +59,13 @@ QString ReplayModel::inferPatch() const {
     return ReplayModel::inferPatch(m_mapReference);
 }
 
-// It might through, but I should just not have a bad RE
+// QRegularExpression's ctor only stores the pattern (compilation is lazy on
+// first match); the only throw path is std::bad_alloc
+// NOLINTNEXTLINE(bugprone-throwing-static-initialization)
 static const QRegularExpression PATCH_RE(".*__([0-9]+[a-z]+)$");
 
 QString ReplayModel::inferPatch(QStringView mapPath) {
+    Q_ASSERT(PATCH_RE.isValid());
     const auto match = PATCH_RE.matchView(mapPath);
     if (!match.hasMatch()) {
         return "";

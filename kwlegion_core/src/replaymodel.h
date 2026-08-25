@@ -42,6 +42,9 @@ class ReplayModel : public QObject {
     [[nodiscard]] QByteArray checksum() const { return m_checksum; }
     [[nodiscard]] QDateTime timestamp() const { return m_timestamp; }
     [[nodiscard]] QString matchTitle() const { return m_matchTitle; }
+    [[nodiscard]] QString matchDescription() const {
+        return m_matchDescription;
+    }
     [[nodiscard]] QString mapName() const { return m_mapName; }
     [[nodiscard]] QString mapReference() const { return m_mapReference; }
     [[nodiscard]] bool hasExternalPath() const { return m_hasExternalPath; }
