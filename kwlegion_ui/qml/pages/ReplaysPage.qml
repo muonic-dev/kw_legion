@@ -50,6 +50,8 @@ Page {
         sortOrder: Qt.DescendingOrder
     }
 
+    property int lastSelectedIndex: -1
+
     ListView {
         anchors.fill: parent
         clip: true
@@ -58,6 +60,7 @@ Page {
         delegate: Rectangle {
             id: delegateRoot
 
+            required property int index
             required property var checksum
             required property string matchTitle
             required property string mapName
@@ -67,6 +70,7 @@ Page {
             required property var timestamp
             required property var teams
 
+            // The width of the left zone containing textual data
             readonly property int fieldColumnWidth: 220
 
             width: ListView.view.width
@@ -82,8 +86,40 @@ Page {
             MouseArea {
                 anchors.fill: parent
                 onClicked: mouse => {
-                    StoreModel.clearSelected();
-                    StoreModel.setReplaySelected(delegateRoot.checksum);
+                    // TODO: Revisit selection behavior
+                    // Known issues:
+                    // * no way of deselecting with shift
+                    // * the selected range is always extended
+                    //
+                    // Should revise before we start going public
+                    if (mouse.modifiers & Qt.ControlModifier) {
+                        if (StoreModel.toggleReplaySelected(delegateRoot.checksum)) {
+                            page.lastSelectedIndex = delegateRoot.index;
+                        } else {
+                            page.lastSelectedIndex = -1;
+                        }
+                    } else if (mouse.modifiers & Qt.ShiftModifier) {
+                        // Nothing has been selected yet do do the direct selection path
+                        // Maybe this should do nothing
+                        if (page.lastSelectedIndex < 0) {
+                            StoreModel.clearSelected();
+                            StoreModel.setReplaySelected(delegateRoot.checksum);
+                            page.lastSelectedIndex = delegateRoot.index;
+                        } else {
+                            const low = Math.min(delegateRoot.index, page.lastSelectedIndex);
+                            const high = Math.max(delegateRoot.index, page.lastSelectedIndex);
+                            const checkums = [];
+                            for (let row = low; row <= high; row++) {
+                                checkums.push(sortedStoreModel.data(sortedStoreModel.index(row, 0), StoreModel.ChecksumRole));
+                            }
+                            page.lastSelectedIndex = delegateRoot.index;
+                            StoreModel.extendReplaySelection(checkums);
+                        }
+                    } else {
+                        page.lastSelectedIndex = delegateRoot.index;
+                        StoreModel.clearSelected();
+                        StoreModel.setReplaySelected(delegateRoot.checksum);
+                    }
                 }
             }
 
@@ -155,7 +191,7 @@ Page {
                 }
             }
 
-            Flow {
+            Column {
                 id: teamsFlow
                 x: fieldColumn.x + fieldColumn.width + 16
                 y: 8
@@ -172,15 +208,18 @@ Page {
 
                         required property QtObject modelData
 
-                        width: teamColumn.width + 16
+                        width: parent.width
                         height: teamColumn.height + 16
                         color: "transparent"
                         border.color: Theme.lightMode ? Theme.dark : Theme.light
                         radius: 4
 
-                        Column {
+                        Flow {
                             id: teamColumn
-                            anchors.centerIn: parent
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 8
                             spacing: 4
 
                             // Each team is itself a model of players.
@@ -202,7 +241,13 @@ Page {
                                     }
 
                                     Label {
+                                        // Natural width up to a cap, so short
+                                        // names pack tightly and only long
+                                        // ones elide instead of every name
+                                        // claiming the same fixed width.
+                                        width: Math.min(120, teamColumn.width)
                                         text: playerDelegate.name
+                                        elide: Text.ElideRight
                                         color: Theme.lightMode ? Theme.dark : Theme.light
                                     }
                                 }

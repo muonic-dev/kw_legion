@@ -67,9 +67,7 @@ void StoreModel::replaysChanged(const QList<Replay>& replays) {
             m_replays.append(new ReplayModel(replay, this));
             it = m_replays.end() - 1;
         }
-        const int row = static_cast<int>(it - m_replays.begin());
-        const QModelIndex idx = index(row);
-        emit dataChanged(idx, idx);
+        dataChangedByIter(it);
     }
 }
 
@@ -82,24 +80,46 @@ void StoreModel::setReplaySelected(const QByteArray& checksum) {
         return replay->checksum() == checksum;
     });
     if (it != m_replays.end()) {
+        m_selections.insert(checksum);
+        dataChangedByIter(it);
+    }
+}
+
+void StoreModel::extendReplaySelection(const QList<QByteArray>& checksums) {
+    for (const auto& checksum : checksums) {
+        auto it =
+            std::ranges::find_if(m_replays, [&checksum](ReplayModel* replay) {
+                return replay->checksum() == checksum;
+            });
+        if (it != m_replays.end()) {
+            m_selections.insert(checksum);
+            dataChangedByIter(it);
+        }
+    }
+}
+
+bool StoreModel::toggleReplaySelected(const QByteArray& checksum) {
+    auto it = std::ranges::find_if(m_replays, [&checksum](ReplayModel* replay) {
+        return replay->checksum() == checksum;
+    });
+    bool active{false};
+    if (it != m_replays.end()) {
         if (m_selections.contains(checksum)) {
             m_selections.remove(checksum);
         } else {
             m_selections.insert(checksum);
+            active = true;
         }
-        const int row = static_cast<int>(it - m_replays.begin());
-        const QModelIndex idx = index(row);
-        emit dataChanged(idx, idx);
+        dataChangedByIter(it);
     }
+    return active;
 }
 
 void StoreModel::clearSelected() {
     const QSet<QByteArray> checksums = std::move(m_selections);
     for (auto it = m_replays.cbegin(); it < m_replays.cend(); ++it) {
         if (checksums.contains((*it)->checksum())) {
-            const QModelIndex idx =
-                index(static_cast<int>(it - m_replays.cbegin()));
-            emit dataChanged(idx, idx);
+            dataChangedByIter(it);
         }
     }
 }
@@ -142,4 +162,5 @@ QVariant StoreModel::data(const QModelIndex& index, int role) const {
             return {};
     }
 }
+
 }  // namespace KWLegionCore
