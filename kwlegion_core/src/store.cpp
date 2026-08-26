@@ -31,6 +31,12 @@ ReplayStore::ReplayStore(QString replayDir, const QString& statePath,
     m_deferredTrigger->callOnTimeout(this, &ReplayStore::processDeferred);
 }
 
+void ReplayStore::stop() {
+    // Silence a warning about stopping the time
+    // Trigger from stopping on the thread
+    m_deferredTrigger->stop();
+}
+
 void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     // Perform initial setup operation on the startup signal
     ensureDirectories();

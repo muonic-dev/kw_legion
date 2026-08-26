@@ -37,7 +37,9 @@ class ReplayModel : public QObject {
     ReplayModel& operator=(const ReplayModel&) = delete;
     ReplayModel& operator=(ReplayModel&&) = delete;
 
-    void updateFromReplay(const Replay& replay);
+    // Update the replay from a given different input
+    // Writes the roles that changes for emission
+    QList<int> updateFromReplay(const Replay& replay);
 
     [[nodiscard]] QByteArray checksum() const { return m_checksum; }
     [[nodiscard]] QDateTime timestamp() const { return m_timestamp; }

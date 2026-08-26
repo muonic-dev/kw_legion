@@ -10,6 +10,7 @@
 #include <QRegularExpression>
 #include <algorithm>
 
+#include "storemodel.h"
 #include "teammodel.h"
 
 namespace KWLegionCore {
@@ -50,9 +51,10 @@ ReplayModel::ReplayModel(const Replay& replay, QObject* parent)
     }
 }
 
-void ReplayModel::updateFromReplay(const Replay& replay) {
+QList<int> ReplayModel::updateFromReplay(const Replay& replay) {
     // Most things are immutable but we may in the future change properties
     m_hasExternalPath = replay.hasExternalPath;
+    return QList{static_cast<int>(StoreModel::Roles::HasExternalPathRole)};
 }
 
 QString ReplayModel::inferPatch() const {

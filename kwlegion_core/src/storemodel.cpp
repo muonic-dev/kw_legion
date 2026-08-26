@@ -11,6 +11,8 @@
 #include "replaymodel.h"
 
 namespace KWLegionCore {
+const QList SELECTED_ROLE{static_cast<int>(StoreModel::Roles::SelectedRole)};
+
 StoreModel::StoreModel(QObject* parent)
     : QAbstractListModel(parent),
       m_roleNames{
@@ -61,8 +63,8 @@ void StoreModel::replaysChanged(const QList<Replay>& replays) {
 
         if (it != m_replays.end()) {
             // Update the existing replay proxy with the new data
-            (*it)->updateFromReplay(replay);
-            dataChangedByIter(it);
+            auto roles = (*it)->updateFromReplay(replay);
+            dataChangedByIter(it, roles);
         } else {
             const int row = static_cast<int>(m_replays.size());
             beginInsertRows(QModelIndex(), row, row);
@@ -83,7 +85,7 @@ void StoreModel::setReplaySelected(const QByteArray& checksum) {
     });
     if (it != m_replays.end()) {
         m_selections.insert(checksum);
-        dataChangedByIter(it);
+        dataChangedByIter(it, SELECTED_ROLE);
     }
 }
 
@@ -95,7 +97,7 @@ void StoreModel::extendReplaySelection(const QList<QByteArray>& checksums) {
             });
         if (it != m_replays.end()) {
             m_selections.insert(checksum);
-            dataChangedByIter(it);
+            dataChangedByIter(it, SELECTED_ROLE);
         }
     }
 }
@@ -112,7 +114,7 @@ bool StoreModel::toggleReplaySelected(const QByteArray& checksum) {
             m_selections.insert(checksum);
             active = true;
         }
-        dataChangedByIter(it);
+        dataChangedByIter(it, SELECTED_ROLE);
     }
     return active;
 }
@@ -121,7 +123,7 @@ void StoreModel::clearSelected() {
     const QSet<QByteArray> checksums = std::move(m_selections);
     for (auto it = m_replays.cbegin(); it < m_replays.cend(); ++it) {
         if (checksums.contains((*it)->checksum())) {
-            dataChangedByIter(it);
+            dataChangedByIter(it, SELECTED_ROLE);
         }
     }
 }

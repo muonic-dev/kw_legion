@@ -68,6 +68,8 @@ class ReplayStore : public QObject {
     // A replay that did exist disappeared
     void replayRemoved(const QByteArray&);
 
+    void stop();
+
    private:
     void ensureDb();
     void ensureDirectories();

@@ -82,11 +82,11 @@ class StoreModel : public QAbstractListModel {
 
    private:
     template <typename Iter>
-    void dataChangedByIter(Iter it) {
+    void dataChangedByIter(Iter it, const QList<int>& roles) {
         const QList<ReplayModel*>::const_iterator cit(it);
         const int row = static_cast<int>(cit - m_replays.cbegin());
         const QModelIndex idx = index(row);
-        emit dataChanged(idx, idx);
+        emit dataChanged(idx, idx, roles);
     }
 
     QHash<int, QByteArray> m_roleNames;

@@ -160,6 +160,9 @@ int main(int argc, char* argv[]) {
     QObject::connect(storeModel, &StoreModel::shouldToggleReplayExposed,
                      &replayStore, &ReplayStore::toggleReplayExposed);
 
+    QObject::connect(&ioThread, &QThread::finished, &replayStore,
+                     &ReplayStore::stop);
+
     ioThread.start();
 
     const auto result = QGuiApplication::exec();
