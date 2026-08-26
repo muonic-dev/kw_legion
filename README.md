@@ -21,3 +21,7 @@ This project is licensed under the GNU General Public License v3.0 or later - se
 
 - [Architecture](docs/ARCHITECTURE.md) — how the components (parser, core, UI) fit together and interact.
 
+## AI Disclosure
+
+This program has been developed with the assistance of AI. The primary contribution has been implementing/debugging the build system, the UI,
+and generating tests. I believe I have a firm understanding of all the code currently in program.

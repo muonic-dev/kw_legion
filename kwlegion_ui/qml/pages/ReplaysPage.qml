@@ -71,6 +71,15 @@ Page {
         clip: true
         model: sortedStoreModel
 
+        ScrollBar.vertical: ScrollBar {
+            policy: ScrollBar.AsNeeded
+            contentItem: Rectangle {
+                implicitWidth: 6
+                radius: width / 2
+                color: Theme.lightMode ? Theme.dark : Theme.light
+            }
+        }
+
         delegate: Rectangle {
             id: delegateRoot
 
@@ -87,7 +96,7 @@ Page {
             // The width of the left zone containing textual data
             readonly property int fieldColumnWidth: 220
 
-            width: ListView.view.width
+            width: ListView.view.width - 6 // some slight padding for the scrollbar
             height: Math.max(fieldColumn.height, teamsFlow.height) + 16
             color: "transparent"
 
