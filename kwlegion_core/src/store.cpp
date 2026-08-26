@@ -167,8 +167,8 @@ void ReplayStore::performReplayAnalysis(const QString& path) {
     qDebug(logStore) << "Analyzing replay: " << path;
     QFile replayFile(path);
     if (!replayFile.open(QIODevice::ReadOnly)) {
-        // TODO: Look at what the failure causes are and see how we can
-        // mitigate
+        // We may need to figure out how to recover from this such as by locked
+        // files
         qWarning(logStore) << "Unable to open " << path << " for reading";
         return;
     }

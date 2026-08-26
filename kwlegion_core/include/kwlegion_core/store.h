@@ -16,7 +16,6 @@
 #include <QTimer>
 #include <tuple>
 
-
 Q_DECLARE_LOGGING_CATEGORY(logStore);
 
 namespace KWLegionCore {
@@ -104,7 +103,7 @@ class ReplayStore : public QObject {
         const QByteArray& checksum) const;
 
     void exposeReplay(const QByteArray& checksum);
-    void hideReplay(Queries& queries, const QByteArray& checksum);
+    static void hideReplay(Queries& queries, const QByteArray& checksum);
 
     void processDeferred();
 
