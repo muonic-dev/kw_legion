@@ -66,14 +66,18 @@ struct Player {
     // The behavior in network is always zero
     std::uint32_t id = std::numeric_limits<std::uint32_t>::max();
     QString name = QLatin1String("");
-    // In multiplayer this comes straight from the binary team_number field
-    // and is 1-based. Skirmish replays have no such field, so it's inferred
-    // from the S= slot text instead (see Parser::parsePlayerSlots) using
-    // the same 1-based numbering; a player with no team explicitly assigned
-    // in the lobby gets a unique placeholder value instead of a shared one,
-    // so it never compares equal to another unallied player's teamNumber.
-    // The default (also larger than any real or placeholder value) means
-    // parsing hasn't reached this player yet.
+    // Sourced entirely from the S= slot text (see
+    // Parser::parsePlayerSlots), for both skirmish and multiplayer
+    // replays, using 1-based numbering matching the lobby UI. Multiplayer
+    // replays also carry a binary team_number byte, but real network
+    // matches confirmed so far are all 1v1, where that byte's behavior
+    // can't be distinguished from the slot text's; the slot text is used
+    // uniformly rather than trusting the byte for the untested case of a
+    // real online team match. A player with no team explicitly assigned
+    // gets a unique placeholder value instead of a shared one, so it never
+    // compares equal to another unallied player's teamNumber. The default
+    // (also larger than any real or placeholder value) means parsing
+    // hasn't reached this player yet.
     std::uint32_t teamNumber = std::numeric_limits<std::uint32_t>::max();
     Faction faction = Faction::Unknown;
     bool isComputer = false;

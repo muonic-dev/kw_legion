@@ -41,6 +41,9 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     // Perform initial setup operation on the startup signal
     ensureDirectories();
     ensureDb();
+    // Bracket analyzeReplayFile so that we don't constantly emit the individual
+    // load action
+    const auto guard = m_initialSweep.enter();
     // Ingest every path that we have
     for (const auto& path : paths) {
         // TODO: Maybe we can avoid making this a ton of transactions
@@ -248,6 +251,11 @@ void ReplayStore::handleExistingReplayAtPath(Queries& queries,
 }
 
 void ReplayStore::forwardChangedReplays(const QList<QByteArray>& checksums) {
+    // Block emission here since the initial sweep does one large thing at the
+    // end
+    if (m_initialSweep.isActive()) {
+        return;
+    }
     Queries queries{QSqlQuery(m_db)};
 
     QList<Replay> replays;

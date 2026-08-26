@@ -33,15 +33,15 @@ constexpr std::size_t REPL_MAGIC_SIZE = 8;
 constexpr qsizetype HUMAN_FACTION_SLOT_FIELD = 5;
 constexpr qsizetype COMP_FACTION_SLOT_FIELD = 2;
 
-// Skirmish replays carry no binary team_number field at all (see
-// parseOnePlayer), so team membership there can only come from the S= slot
-// text. The team value lives at a different position depending on slot
-// type field 8 for a human slot, field 5 for a computer slot and is
-// encoded as (UI team number - 1), or -1 if no team was ever assigned.
-// Skirmish replays with a known, deliberately
-// configured team split (including explicit numeric team assignment via
-// the lobby UI, and an all-FFA replay to check the -1 case) were diffed
-// against replays with no allies to isolate these fields.
+// Team membership is sourced entirely from the S= slot text - see
+// parseOnePlayer for why the binary team_number field (present only in
+// multiplayer replays) is read past but not used. The team value lives at
+// a different position depending on slot type field 8 for a human slot,
+// field 5 for a computer slot and is encoded as (UI team number - 1), or
+// -1 if no team was ever assigned. Skirmish replays with a known,
+// deliberately configured team split (including explicit numeric team
+// assignment via the lobby UI, and an all-FFA replay to check the -1 case)
+// were diffed against replays with no allies to isolate these fields.
 constexpr qsizetype HUMAN_TEAM_SLOT_FIELD = 7;
 constexpr qsizetype COMP_TEAM_SLOT_FIELD = 4;
 
@@ -194,14 +194,20 @@ void Parser::parsePlayers() {
 
 Player Parser::parseOnePlayer() {
     const auto id = m_reader->readIntegral<std::uint32_t>();
-
     const QString name = m_reader->readUtf16String();
-    uint32_t teamNumber = std::numeric_limits<std::uint32_t>::max();
     if (m_metadata.gameType == GameType::Multiplayer) {
-        teamNumber =
-            static_cast<std::uint32_t>(m_reader->readByte<std::uint8_t>());
+        // This byte exists here in multiplayer replays, but team is sourced
+        // entirely from the S= slot text instead (see parsePlayerSlots): the
+        // only replays that let us confirm real team semantics are 1v1
+        // skirmishes, where slot text is unambiguous, while every real
+        // multiplayer replay seen so far is also 1v1 and always carries -1
+        // (not applicable) in the analogous slot field, leaving this byte's
+        // behavior for an actual online team match unconfirmed. Still needs
+        // to be consumed so the header's byte offset accounting stays
+        // correct.
+        m_reader->readByte<std::uint8_t>();
     }
-    return Player{.id = id, .name = name, .teamNumber = teamNumber};
+    return Player{.id = id, .name = name};
 }
 
 void Parser::parseMapReference(const QStringView header) {
@@ -316,32 +322,26 @@ void Parser::parsePlayerSlots(const QStringView header) {
                  ? Faction::Unknown
                  : factionFromUInt8(static_cast<std::uint8_t>(factionOrdinal)));
 
-        // Only skirmish players reach here still holding the "no data"
-        // sentinel: multiplayer players already got a real value straight
-        // from the binary team_number field in parseOnePlayer, and that is
-        // authoritative, so leave it untouched.
-        if (player->teamNumber == std::numeric_limits<std::uint32_t>::max()) {
-            const qsizetype teamField = slotType == QLatin1Char('H')
-                                            ? HUMAN_TEAM_SLOT_FIELD
-                                            : COMP_TEAM_SLOT_FIELD;
-            if (std::cmp_less_equal(fields.size(), teamField)) {
-                throw CorruptDataException(
-                    QString("player %1 slot missing expected fields")
-                        .arg(playerIdx),
-                    m_reader->lastOffset());
-            }
-            bool teamOk = false;
-            const int rawTeam = fields.at(teamField).toInt(&teamOk);
-            if (!teamOk) {
-                throw CorruptDataException(
-                    QString("player %1 team value non-numeric").arg(playerIdx),
-                    m_reader->lastOffset());
-            }
-            player->teamNumber =
-                rawTeam >= 0 ? static_cast<std::uint32_t>(rawTeam) + 1
-                             : UNALLIED_TEAM_BASE +
-                                   static_cast<std::uint32_t>(playerIdx);
+        const qsizetype teamField = slotType == QLatin1Char('H')
+                                        ? HUMAN_TEAM_SLOT_FIELD
+                                        : COMP_TEAM_SLOT_FIELD;
+        if (std::cmp_less_equal(fields.size(), teamField)) {
+            throw CorruptDataException(
+                QString("player %1 slot missing expected fields")
+                    .arg(playerIdx),
+                m_reader->lastOffset());
         }
+        bool teamOk = false;
+        const int rawTeam = fields.at(teamField).toInt(&teamOk);
+        if (!teamOk) {
+            throw CorruptDataException(
+                QString("player %1 team value non-numeric").arg(playerIdx),
+                m_reader->lastOffset());
+        }
+        player->teamNumber =
+            rawTeam >= 0
+                ? static_cast<std::uint32_t>(rawTeam) + 1
+                : UNALLIED_TEAM_BASE + static_cast<std::uint32_t>(playerIdx);
 
         // At the end, prepare for the next path
         slotStart = slotEnd + 1;

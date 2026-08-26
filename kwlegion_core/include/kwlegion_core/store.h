@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <kwlegion_core/actionscope.h>
 #include <kwlegion_core/replay.h>
 #include <legionparser/replay.h>
 
@@ -15,6 +16,7 @@
 #include <QString>
 #include <QTimer>
 #include <tuple>
+
 
 Q_DECLARE_LOGGING_CATEGORY(logStore);
 
@@ -61,14 +63,14 @@ class ReplayStore : public QObject {
      */
     void toggleReplayExposed(const QByteArray& checksum);
 
+    void stop();
+
    signals:
     void replaysLoaded(const QList<Replay>&);
     // A replay was was discovered or updated
     void replaysChanged(const QList<Replay>&);
     // A replay that did exist disappeared
     void replayRemoved(const QByteArray&);
-
-    void stop();
 
    private:
     void ensureDb();
@@ -108,6 +110,11 @@ class ReplayStore : public QObject {
     static void hideReplay(Queries& queries, const QByteArray& checksum);
 
     void processDeferred();
+
+    // We want to wait until full analysis is done on all replays before we
+    // emit the first event instead of trickling them in with analyze
+    // Allow suppressing the emission on the initial sweeep
+    ActionScope m_initialSweep;
 
     QSqlDatabase m_db;
     // Path of the sqlite database
