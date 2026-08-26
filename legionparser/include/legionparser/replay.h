@@ -45,7 +45,7 @@ enum class Faction : std::uint8_t {
     Scrin,
     Reaper,
     Traveler,
-    Unknown
+    Unknown  // also random
 };
 
 constexpr std::uint8_t toUInt8(Faction faction) {
@@ -63,11 +63,17 @@ struct Player {
     // In a parsed online replay the player id seems to be consistent
     // likely a unique id assigned by the server for login.
     // In skirmish, the player id appears to always be zero.
-    // The behavior in network is currently unclear.
+    // The behavior in network is always zero
     std::uint32_t id = std::numeric_limits<std::uint32_t>::max();
     QString name = QLatin1String("");
-    // Only relevant for multiplayer
-    // The default will also be larger than the input
+    // In multiplayer this comes straight from the binary team_number field
+    // and is 1-based. Skirmish replays have no such field, so it's inferred
+    // from the S= slot text instead (see Parser::parsePlayerSlots) using
+    // the same 1-based numbering; a player with no team explicitly assigned
+    // in the lobby gets a unique placeholder value instead of a shared one,
+    // so it never compares equal to another unallied player's teamNumber.
+    // The default (also larger than any real or placeholder value) means
+    // parsing hasn't reached this player yet.
     std::uint32_t teamNumber = std::numeric_limits<std::uint32_t>::max();
     Faction faction = Faction::Unknown;
     bool isComputer = false;

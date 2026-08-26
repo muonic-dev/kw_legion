@@ -33,6 +33,27 @@ constexpr std::size_t REPL_MAGIC_SIZE = 8;
 constexpr qsizetype HUMAN_FACTION_SLOT_FIELD = 5;
 constexpr qsizetype COMP_FACTION_SLOT_FIELD = 2;
 
+// Skirmish replays carry no binary team_number field at all (see
+// parseOnePlayer), so team membership there can only come from the S= slot
+// text. The team value lives at a different position depending on slot
+// type field 8 for a human slot, field 5 for a computer slot and is
+// encoded as (UI team number - 1), or -1 if no team was ever assigned.
+// Skirmish replays with a known, deliberately
+// configured team split (including explicit numeric team assignment via
+// the lobby UI, and an all-FFA replay to check the -1 case) were diffed
+// against replays with no allies to isolate these fields.
+constexpr qsizetype HUMAN_TEAM_SLOT_FIELD = 7;
+constexpr qsizetype COMP_TEAM_SLOT_FIELD = 4;
+
+// -1 means "no team assigned" (FFA), not "team 0" - and every FFA slot
+// shares this same raw -1, even though those slots are not allied with one
+// another. ReplayModel groups players into teams by exact teamNumber
+// equality, so mapping every FFA slot to one shared value would wrongly
+// merge unrelated FFA players into a single team. Each FFA slot instead
+// gets its own placeholder, offset comfortably above any real team number
+// (MAX_PLAYERS caps how large a real one can be).
+constexpr std::uint32_t UNALLIED_TEAM_BASE = 100;
+
 // The largest valid replay is a few MB at most; this bounds how much of a
 // corrupt/malicious file we'll read while fingerprinting the payload,
 // rather than trusting the device to eventually hit a real EOF.
@@ -294,6 +315,33 @@ void Parser::parsePlayerSlots(const QStringView header) {
                          static_cast<std::uint8_t>(Faction::Unknown))
                  ? Faction::Unknown
                  : factionFromUInt8(static_cast<std::uint8_t>(factionOrdinal)));
+
+        // Only skirmish players reach here still holding the "no data"
+        // sentinel: multiplayer players already got a real value straight
+        // from the binary team_number field in parseOnePlayer, and that is
+        // authoritative, so leave it untouched.
+        if (player->teamNumber == std::numeric_limits<std::uint32_t>::max()) {
+            const qsizetype teamField = slotType == QLatin1Char('H')
+                                            ? HUMAN_TEAM_SLOT_FIELD
+                                            : COMP_TEAM_SLOT_FIELD;
+            if (std::cmp_less_equal(fields.size(), teamField)) {
+                throw CorruptDataException(
+                    QString("player %1 slot missing expected fields")
+                        .arg(playerIdx),
+                    m_reader->lastOffset());
+            }
+            bool teamOk = false;
+            const int rawTeam = fields.at(teamField).toInt(&teamOk);
+            if (!teamOk) {
+                throw CorruptDataException(
+                    QString("player %1 team value non-numeric").arg(playerIdx),
+                    m_reader->lastOffset());
+            }
+            player->teamNumber =
+                rawTeam >= 0 ? static_cast<std::uint32_t>(rawTeam) + 1
+                             : UNALLIED_TEAM_BASE +
+                                   static_cast<std::uint32_t>(playerIdx);
+        }
 
         // At the end, prepare for the next path
         slotStart = slotEnd + 1;

@@ -35,7 +35,7 @@ TEST_CASE(
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
 
-    ReplayStore store(tempDir.path());
+    ReplayStore store(tempDir.path(), tempDir.path());
     QSignalSpy loadedSpy(&store, &ReplayStore::replaysLoaded);
 
     // Nothing is on disk yet
@@ -58,7 +58,7 @@ TEST_CASE(
     const QString replayPath =
         copyFixtureReplay(root, "Source/replay.KWReplay");
 
-    ReplayStore store(tempDir.path());
+    ReplayStore store(tempDir.path(), tempDir.path());
     QSignalSpy loadedSpy(&store, &ReplayStore::replaysLoaded);
 
     // replayPath truthfully exists on disk at this point, so it belongs in
@@ -90,7 +90,7 @@ TEST_CASE(
 
     QByteArray checksum;
     {
-        ReplayStore store(tempDir.path());
+        ReplayStore store(tempDir.path(), tempDir.path());
         QSignalSpy loadedSpy(&store, &ReplayStore::replaysLoaded);
         store.receiveInitialReplayPaths({replayPath});
 
@@ -105,7 +105,7 @@ TEST_CASE(
     // restarted with the replay file still present on disk - the same
     // "currently on disk" listing must be reported, since that's the source
     // of truth receiveInitialReplayPaths uses to prune anything gone.
-    ReplayStore store(tempDir.path());
+    ReplayStore store(tempDir.path(), tempDir.path());
     QSignalSpy loadedSpy(&store, &ReplayStore::replaysLoaded);
     store.receiveInitialReplayPaths({replayPath});
 
@@ -121,7 +121,7 @@ TEST_CASE("ReplayStore ingests a replay reported live via analyzeReplayFile") {
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
 
-    ReplayStore store(tempDir.path());
+    ReplayStore store(tempDir.path(), tempDir.path());
     // Nothing is on disk yet at startup - the replay "arrives" afterward.
     store.receiveInitialReplayPaths({});
 
@@ -146,7 +146,7 @@ TEST_CASE("ReplayStore ignores a corrupt file that was never tracked") {
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
 
-    ReplayStore store(tempDir.path());
+    ReplayStore store(tempDir.path(), tempDir.path());
     store.receiveInitialReplayPaths({});
 
     const QString corruptPath = root.filePath("garbage.KWReplay");
@@ -168,7 +168,7 @@ TEST_CASE(
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
 
-    ReplayStore store(tempDir.path());
+    ReplayStore store(tempDir.path(), tempDir.path());
     store.receiveInitialReplayPaths({});
 
     const QString replayPath =
@@ -190,7 +190,7 @@ TEST_CASE(
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
 
-    ReplayStore store(tempDir.path());
+    ReplayStore store(tempDir.path(), tempDir.path());
     store.receiveInitialReplayPaths({});
 
     QSignalSpy changedSpy(&store, &ReplayStore::replaysChanged);

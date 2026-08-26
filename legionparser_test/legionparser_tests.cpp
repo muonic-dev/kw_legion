@@ -6,6 +6,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QSet>
 #include <QTimeZone>
 #include <catch2/catch_test_macros.hpp>
 
@@ -120,4 +121,94 @@ TEST_CASE("faction: Reaper mirror match", "[legionparser][faction]") {
 TEST_CASE("faction: Traveler mirror match", "[legionparser][faction]") {
     checkMirrorMatchFaction(QString::fromUtf8("test_travelers.KWReplay"),
                             Faction::Traveler);
+}
+
+// Skirmish replays carry no binary team_number field, so team membership is
+// inferred from the S= slot text instead (see Parser::parsePlayerSlots).
+// These replays were purpose-built to pin that inference down: each sets up
+// a known, deliberately configured team split so the inferred grouping can
+// be checked against ground truth.
+
+TEST_CASE("team inference: implicit skirmish alliance",
+          "[legionparser][team]") {
+    // 4-player skirmish.KWReplay: 1 human + 3 Brutal AI, allied via the
+    // in-game diplomacy UI (no explicit numeric team chosen). Muonic and the
+    // second bot are on one side; the first and third bots are on the other.
+    const ReplayMetadata metadata =
+        parseReplay(QString::fromUtf8("4-player skirmish.KWReplay"));
+
+    REQUIRE(metadata.players.size() == 5);
+    CHECK(metadata.players.at(0).name == QLatin1String("Muonic"));
+    CHECK(metadata.players.at(0).teamNumber ==
+          metadata.players.at(2).teamNumber);
+    CHECK(metadata.players.at(1).teamNumber ==
+          metadata.players.at(3).teamNumber);
+    CHECK(metadata.players.at(0).teamNumber !=
+          metadata.players.at(1).teamNumber);
+}
+
+TEST_CASE("team inference: alliance across different AI difficulties",
+          "[legionparser][team]") {
+    // 4-player different versions.KWReplay: Easy/Medium/Hard AI bots give
+    // each slot an unambiguous identity independent of S= ordering. Muonic
+    // is allied with the Easy bot; Medium and Hard are allied with each
+    // other.
+    const ReplayMetadata metadata =
+        parseReplay(QString::fromUtf8("4-player different versions.KWReplay"));
+
+    REQUIRE(metadata.players.size() == 5);
+    CHECK(metadata.players.at(0).name == QLatin1String("Muonic"));
+    CHECK(metadata.players.at(1).name == QLatin1String("Easy AI"));
+    CHECK(metadata.players.at(2).name == QLatin1String("Medium AI"));
+    CHECK(metadata.players.at(3).name == QLatin1String("Hard AI"));
+
+    CHECK(metadata.players.at(0).teamNumber ==
+          metadata.players.at(1).teamNumber);
+    CHECK(metadata.players.at(2).teamNumber ==
+          metadata.players.at(3).teamNumber);
+    CHECK(metadata.players.at(0).teamNumber !=
+          metadata.players.at(2).teamNumber);
+}
+
+TEST_CASE("team inference: explicit numeric team assignment",
+          "[legionparser][team]") {
+    // 4-player team 4.KWReplay: same lineup as above, but Muonic and the
+    // Easy bot were explicitly put on lobby "team 4", and Medium/Hard on
+    // lobby "team 2". The S= value is 0-based (UI team - 1), so this also
+    // pins down that +1 conversion back to the number shown in the UI.
+    const ReplayMetadata metadata =
+        parseReplay(QString::fromUtf8("4-player team 4.KWReplay"));
+
+    REQUIRE(metadata.players.size() == 5);
+    CHECK(metadata.players.at(0).name == QLatin1String("Muonic"));
+    CHECK(metadata.players.at(1).name == QLatin1String("Easy AI"));
+    CHECK(metadata.players.at(2).name == QLatin1String("Medium AI"));
+    CHECK(metadata.players.at(3).name == QLatin1String("Hard AI"));
+
+    CHECK(metadata.players.at(0).teamNumber == 4);
+    CHECK(metadata.players.at(1).teamNumber == 4);
+    CHECK(metadata.players.at(2).teamNumber == 2);
+    CHECK(metadata.players.at(3).teamNumber == 2);
+}
+
+TEST_CASE("team inference: FFA slots are never treated as allied",
+          "[legionparser][team]") {
+    // 4-player ffa.KWReplay: same lineup again, but nobody was assigned a
+    // team - every slot's S= value is the -1 "no team" sentinel. Naively
+    // grouping by equal teamNumber would wrongly merge all four into one
+    // team, since they'd all share that -1; each must instead get a
+    // distinct placeholder so ReplayModel's equality-based grouping doesn't
+    // merge unrelated FFA players.
+    const ReplayMetadata metadata =
+        parseReplay(QString::fromUtf8("4-player ffa.KWReplay"));
+
+    REQUIRE(metadata.players.size() == 5);
+    QSet<std::uint32_t> teamNumbers;
+    // Excludes the trailing commentator slot, which is a distinct real
+    // player as far as this invariant is concerned, but is not a
+    // participant we're asserting names/positions for here.
+    for (qsizetype i = 0; i < 4; i++) {
+        teamNumbers.insert(metadata.players.at(i).teamNumber);
+    }
+    CHECK(teamNumbers.size() == 4);
 }
