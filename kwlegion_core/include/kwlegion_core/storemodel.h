@@ -67,6 +67,9 @@ class StoreModel : public QAbstractListModel {
     Q_INVOKABLE void extendReplaySelection(const QList<QByteArray>& checksums);
     Q_INVOKABLE void clearSelected();
 
+    Q_INVOKABLE void saveReplayAs(const QByteArray& checksum,
+                                  const QString& path);
+
     [[nodiscard]] QHash<int, QByteArray> roleNames() const override;
     [[nodiscard]] QVariant data(const QModelIndex& index,
                                 int role = Qt::DisplayRole) const override;

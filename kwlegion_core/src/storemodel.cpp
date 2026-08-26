@@ -62,12 +62,14 @@ void StoreModel::replaysChanged(const QList<Replay>& replays) {
         if (it != m_replays.end()) {
             // Update the existing replay proxy with the new data
             (*it)->updateFromReplay(replay);
+            dataChangedByIter(it);
         } else {
+            const int row = static_cast<int>(m_replays.size());
+            beginInsertRows(QModelIndex(), row, row);
             // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
             m_replays.append(new ReplayModel(replay, this));
-            it = m_replays.end() - 1;
+            endInsertRows();
         }
-        dataChangedByIter(it);
     }
 }
 
@@ -122,6 +124,10 @@ void StoreModel::clearSelected() {
             dataChangedByIter(it);
         }
     }
+}
+
+void StoreModel::saveReplayAs(const QByteArray& checksum, const QString& path) {
+
 }
 
 QHash<int, QByteArray> StoreModel::roleNames() const { return m_roleNames; }

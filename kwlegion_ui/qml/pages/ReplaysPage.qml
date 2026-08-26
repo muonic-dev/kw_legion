@@ -5,6 +5,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls.Basic
+import QtQuick.Dialogs
 import KWLegionUI
 import KWLegionCore
 
@@ -43,6 +44,17 @@ Page {
         }
     }
 
+    FileDialog {
+        id: fileDialog
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["C&C Kane's Wrath Replays (*.KWReplay)"]
+        defaultSuffix: "KWReplay"
+        onAccepted: {
+            StoreModel.saveReplayAs(page.currentlySavingChecksum, selectedFile);
+            page.currentlySavingChecksum = null;
+        }
+    }
+
     SortFilterProxyModel {
         id: sortedStoreModel
         sourceModel: StoreModel
@@ -51,6 +63,8 @@ Page {
     }
 
     property int lastSelectedIndex: -1
+
+    property var currentlySavingChecksum
 
     ListView {
         anchors.fill: parent
@@ -217,6 +231,12 @@ Page {
                             fillMode: Image.PreserveAspectFit
                         }
 
+                        onClicked: {
+                            page.currentlySavingChecksum = delegateRoot.checksum;
+                            fileDialog.selectedFile = `${fileDialog.currentFolder}/${delegateRoot.matchTitle}`;
+                            fileDialog.open();
+                        }
+
                         padding: 10
                         implicitWidth: 16 + leftPadding + rightPadding
                         implicitHeight: 16 + topPadding + bottomPadding
@@ -240,8 +260,8 @@ Page {
                         id: teamBox
 
                         required property QtObject modelData
-
-                        width: parent.width
+                        // TODO: There is some kind of rebuild/teardown that causes warnings unless this is guarded
+                        width: parent ? parent.width : 0
                         height: teamColumn.height + 16
                         color: "transparent"
                         border.color: Theme.lightMode ? Theme.dark : Theme.light
@@ -268,18 +288,16 @@ Page {
 
                                     Image {
                                         source: page.factionIcon(playerDelegate.faction)
-                                        width: 20
-                                        height: 20
+                                        sourceSize: Qt.size(32, 32)
+                                        width: 24
+                                        height: 24
                                         fillMode: Image.PreserveAspectFit
                                     }
 
                                     Label {
-                                        // Natural width up to a cap, so short
-                                        // names pack tightly and only long
-                                        // ones elide instead of every name
-                                        // claiming the same fixed width.
                                         width: Math.min(120, teamColumn.width)
                                         text: playerDelegate.name
+                                        verticalAlignment: Text.AlignVCenter
                                         elide: Text.ElideRight
                                         color: Theme.lightMode ? Theme.dark : Theme.light
                                     }

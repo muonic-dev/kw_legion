@@ -108,8 +108,9 @@ class ReplayProspector : public QObject {
     QFileSystemWatcher m_watcher;
     QString m_replayDirectory;
 
-    // Store the known paths of
+    // Store the known paths and info of all files
+    // This should only contain files we've dispatched, files in deferred are
+    // separate
     QMap<QString, QFileInfo> m_knownFiles;
 };
-
 }  // namespace KWLegionCore

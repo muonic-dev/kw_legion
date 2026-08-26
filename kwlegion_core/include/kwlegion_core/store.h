@@ -9,14 +9,20 @@
 #include <QDir>
 #include <QLoggingCategory>
 #include <QObject>
+#include <QSet>
 #include <QSqlDatabase>
 #include <QStandardPaths>
 #include <QString>
+#include <QTimer>
+#include <tuple>
+
 
 Q_DECLARE_LOGGING_CATEGORY(logStore);
 
 namespace KWLegionCore {
 class Queries;
+
+using Retry = std::tuple<QString, uint>;
 
 class ReplayStore : public QObject {
     Q_OBJECT
@@ -67,6 +73,15 @@ class ReplayStore : public QObject {
     void ensureDb();
     void ensureDirectories();
 
+    // Perform the actual replay analysis
+    // This is the happy path for parsing and ingestion
+    // It can throw ReplayParseException or StorageException
+    // It is provided here because we want a slot entrypoint
+    // from the prospector (analyzeReplayFile)
+    // But we also want an entrypoint for the deferred retry logic
+    // that will share the logic
+    void performReplayAnalysis(const QString& path);
+
     // Perform all the steps to try and receive a replay
     // File should probably be an absolute path
     // Returns the checksums that were impacted by the ingestion
@@ -91,6 +106,8 @@ class ReplayStore : public QObject {
     void exposeReplay(const QByteArray& checksum);
     void hideReplay(Queries& queries, const QByteArray& checksum);
 
+    void processDeferred();
+
     QSqlDatabase m_db;
     // Path of the sqlite database
     QString m_dbPath;
@@ -98,5 +115,12 @@ class ReplayStore : public QObject {
     QString m_storageDir;
     // Path to the Documents\Command &...\Replays dir
     QString m_replayDir;
+
+    // KW seems to like to open the replay file and not write to it for a little
+    // while Store files that have very recent modification times
+    QSet<QString> m_deferredPaths;
+
+    // A ptr so it moves with the store
+    QTimer* m_deferredTrigger;
 };
 }  // namespace KWLegionCore

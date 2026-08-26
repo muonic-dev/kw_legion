@@ -18,12 +18,18 @@ Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
 
 namespace KWLegionCore {
 
+constexpr int FIVE_SECONDS = 5000;
+
 ReplayStore::ReplayStore(QString replayDir, const QString& statePath,
                          QObject* parent)
     : QObject(parent),
       m_dbPath(statePath + "/replays.db"),
       m_storageDir(statePath + "/replays"),
-      m_replayDir(std::move(replayDir)) {}
+      m_replayDir(std::move(replayDir)),
+      m_deferredTrigger(new QTimer(this)) {
+    m_deferredTrigger->start(FIVE_SECONDS);
+    m_deferredTrigger->callOnTimeout(this, &ReplayStore::processDeferred);
+}
 
 void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     // Perform initial setup operation on the startup signal
@@ -55,28 +61,21 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
 }
 
 void ReplayStore::analyzeReplayFile(const QString& path) {
-    qDebug(logStore) << "Analyzing replay: " << path;
-    // First thing we do is copy into the staging directory before we run it
-
     try {
-        QFile replayFile(path);
-        if (!replayFile.open(QIODevice::ReadOnly)) {
-            // TODO: Look at what the failure causes are and see how we can
-            // mitigate
-            qWarning(logStore) << "Unable to open " << path << " for reading";
-            return;
+        const QFileInfo pathInfo(path);
+        if (pathInfo.size() == 0 ||
+            QDateTime::currentDateTime().addMSecs(-FIVE_SECONDS) <
+                pathInfo.lastModified()) {
+            qDebug(logStore)
+                << "File was empty or very recently modified, deferring "
+                   "modified="
+                << pathInfo.lastModified() << " size=" << pathInfo.size();
+            m_deferredPaths.insert(path);
+        } else {
+            performReplayAnalysis(path);
         }
-        // TODO: In theory there is a short race condition here where the file
-        // is overwritten before we can analyze and copy it, but meh
-        const LegionParser::ReplayMetadata metadata =
-            LegionParser::Parser::parse(replayFile);
-
-        // Ingest the replay and determine all the checksums that changed
-        const QList<QByteArray> impacted = ingestReplay(replayFile, metadata);
-        forwardChangedReplays(impacted);
-
     } catch (LegionParser::ReplayParseException& ex) {
-        qWarning(logStore) << "Unable to parse " << path << " " << ex.what();
+        qDebug(logStore) << "Unable to parse " << path << " " << ex.what();
         // If there was a replay file at this path it should be removed because
         // it was overwritten with nonsense
         try {
@@ -86,7 +85,7 @@ void ReplayStore::analyzeReplayFile(const QString& path) {
             }
         } catch (StorageException& ex) {
             qCritical(logStore)
-                << "Unable to remove corrupt replay " << ex.what();
+                << "Unable to remove corrupt replay reference " << ex.what();
         }
     } catch (StorageException& ex) {
         // If it fails we should probably do something to mark the replay for
@@ -162,6 +161,25 @@ void ReplayStore::hideReplay(Queries& queries, const QByteArray& checksum) {
                 << "Failed to remove file: " << file.errorString();
         }
     }
+}
+
+void ReplayStore::performReplayAnalysis(const QString& path) {
+    qDebug(logStore) << "Analyzing replay: " << path;
+    QFile replayFile(path);
+    if (!replayFile.open(QIODevice::ReadOnly)) {
+        // TODO: Look at what the failure causes are and see how we can
+        // mitigate
+        qWarning(logStore) << "Unable to open " << path << " for reading";
+        return;
+    }
+    // TODO: In theory there is a short race condition here where the file
+    // is overwritten before we can analyze and copy it, but meh
+    const LegionParser::ReplayMetadata metadata =
+        LegionParser::Parser::parse(replayFile);
+
+    // Ingest the replay and determine all the checksums that changed
+    const QList<QByteArray> impacted = ingestReplay(replayFile, metadata);
+    forwardChangedReplays(impacted);
 }
 
 QList<QByteArray> ReplayStore::ingestReplay(
@@ -259,6 +277,21 @@ std::optional<QByteArray> ReplayStore::removeReplayAtPath(const QString& path) {
         throw StorageException("failed to commit: " + m_db.lastError().text());
     }
     return result;
+}
+
+void ReplayStore::processDeferred() {
+    // Move so when we call if it is goign to be deferred again it can just push
+    // back
+
+    const auto pending = std::move(m_deferredPaths);
+    if (!pending.isEmpty()) {
+        qDebug(logStore) << "Processing deferred paths: "
+                         << QDateTime::currentDateTime();
+    }
+    for (const auto& path : pending) {
+        qDebug(logStore) << "Considering deferred path " << path;
+        analyzeReplayFile(path);
+    }
 }
 
 void ReplayStore::ensureDb() {

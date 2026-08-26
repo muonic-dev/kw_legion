@@ -95,9 +95,8 @@ void ReplayProspector::initialSweep() {
         // if its a directory
         if (nextInfo.isDir()) {
             if (!m_watcher.addPath(nextInfo.canonicalFilePath())) {
-                qCWarning(logProspector)
-                    << "Failed to watch directory: "
-                    << nextInfo.canonicalFilePath();
+                qCWarning(logProspector) << "Failed to watch directory: "
+                                         << nextInfo.canonicalFilePath();
             }
         } else if (nextInfo.isFile() && nextInfo.fileName().endsWith(
                                             ".KWReplay", Qt::CaseInsensitive)) {
@@ -148,13 +147,6 @@ void ReplayProspector::watchedDirectoryChanged(const QString& path) {
             seenFilePaths.insert(canonicalFilePath);
 
             const auto it = m_knownFiles.find(canonicalFilePath);
-            // TODO: temporary diagnostic logging, remove once the
-            // modify-detection issue on some machines is root-caused.
-            qCDebug(logProspector)
-                << "Checked" << canonicalFilePath << "knownModified="
-                << (it != m_knownFiles.cend() ? it->lastModified()
-                                              : QDateTime())
-                << "diskModified=" << nextInfo.lastModified();
             // The file has never been seen before or the updated at time has
             // changed
             if (it == m_knownFiles.cend() ||
@@ -196,9 +188,8 @@ void ReplayProspector::watchDirectoryTree(const QString& path) {
         const QFileInfo nextInfo = dirIter.nextFileInfo();
         if (nextInfo.isDir()) {
             if (!m_watcher.addPath(nextInfo.canonicalFilePath())) {
-                qCWarning(logProspector)
-                    << "Failed to watch directory: "
-                    << nextInfo.canonicalFilePath();
+                qCWarning(logProspector) << "Failed to watch directory: "
+                                         << nextInfo.canonicalFilePath();
             }
         } else if (nextInfo.isFile() && nextInfo.fileName().endsWith(
                                             ".KWReplay", Qt::CaseInsensitive)) {
