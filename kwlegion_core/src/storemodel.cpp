@@ -128,6 +128,20 @@ void StoreModel::clearSelected() {
     }
 }
 
+void StoreModel::selectAllReplays() {
+    if (m_replays.isEmpty()) {
+        return;
+    }
+
+    for (const auto& replay : m_replays) {
+        m_selections.insert(replay->checksum());
+    }
+
+    QModelIndex start = index(0);
+    QModelIndex end = index(m_replays.size() - 1);
+    emit dataChanged(start, end, SELECTED_ROLE);
+}
+
 void StoreModel::saveReplayAs(const QByteArray& checksum, const QString& path) {
 
 }

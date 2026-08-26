@@ -62,8 +62,13 @@ Page {
         sortOrder: Qt.DescendingOrder
     }
 
-    property int lastSelectedIndex: -1
+    Shortcut {
+        sequence: StandardKey.SelectAll
+        onActivated: StoreModel.selectAllReplays()
+    }
 
+    // Utility property for tracking multi-step actions
+    property int lastSelectedIndex: -1
     property var currentlySavingChecksum
 
     ListView {

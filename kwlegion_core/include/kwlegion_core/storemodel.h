@@ -58,14 +58,12 @@ class StoreModel : public QAbstractListModel {
     // Toggle a replays exposed state. This proxies to shouldTottleReplayExposed
     Q_INVOKABLE void toggleReplayExposed(const QByteArray& checksum);
 
-    // Set a replay selected
+    // Selection manipulation
     Q_INVOKABLE void setReplaySelected(const QByteArray& checksum);
-    // Toggle a replays selection state.
-    // Returns whether the last selection activated or deactivated
     Q_INVOKABLE bool toggleReplaySelected(const QByteArray& checksum);
-    // Bulk add to the selection.
     Q_INVOKABLE void extendReplaySelection(const QList<QByteArray>& checksums);
     Q_INVOKABLE void clearSelected();
+    Q_INVOKABLE void selectAllReplays();
 
     Q_INVOKABLE void saveReplayAs(const QByteArray& checksum,
                                   const QString& path);
