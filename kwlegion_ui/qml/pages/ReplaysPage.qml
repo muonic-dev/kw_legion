@@ -68,11 +68,24 @@ Page {
         sourceModel: StoreModel
         sortRole: StoreModel.TimestampRole
         sortOrder: Qt.DescendingOrder
+        filterRoles: [StoreModel.MatchTitleRole, StoreModel.MapNameRole]
     }
 
     Shortcut {
         sequence: StandardKey.SelectAll
         onActivated: StoreModel.selectAllReplays()
+    }
+
+    header: ToolBar {
+        TextField {
+            id: filterField
+            anchors.fill: parent
+            anchors.margins: 8
+            placeholderText: qsTr("Filter replays…")
+
+            Keys.onEscapePressed: replaysListView.forceActiveFocus()
+            onTextChanged: sortedStoreModel.setFilterFixedString(text)
+        }
     }
 
     // Utility property for tracking multi-step actions
