@@ -11,6 +11,14 @@ import KWLegionCore
 
 Page {
     id: page
+    // Required for replaysListView.focus below to mean anything
+    focus: true
+
+    // StackLayout hides other pages by setting their visible to false rather
+    // than destroying them. We want the listview focus back on load
+    onVisibleChanged: if (visible) {
+        replaysListView.forceActiveFocus();
+    }
 
     background: Rectangle {
         color: Theme.lightMode ? Theme.reallyLight : Theme.reallyDark
@@ -72,9 +80,21 @@ Page {
     property var currentlySavingChecksum
 
     ListView {
+        id: replaysListView
+        model: sortedStoreModel
         anchors.fill: parent
         clip: true
-        model: sortedStoreModel
+        focus: true
+
+        Keys.onPressed: event => {
+            if (event.key === Qt.Key_PageDown) {
+                contentY = Math.min(contentY + height * 0.95, contentHeight - height);
+                event.accepted = true;
+            } else if (event.key === Qt.Key_PageUp) {
+                contentY = Math.max(contentY - height * 0.95, 0);
+                event.accepted = true;
+            }
+        }
 
         ScrollBar.vertical: ScrollBar {
             policy: ScrollBar.AsNeeded
