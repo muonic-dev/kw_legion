@@ -17,7 +17,6 @@
 #include <QTimer>
 #include <tuple>
 
-
 Q_DECLARE_LOGGING_CATEGORY(logStore);
 
 namespace KWLegionCore {
@@ -27,6 +26,21 @@ using Retry = std::tuple<QString, uint>;
 
 class ReplayStore : public QObject {
     Q_OBJECT
+
+    /* Replay store operation is as follows
+     * Initially (at startup time) the set of initial paths in the replay
+     * directory will be received from the prospector
+     *
+     * Subsequently, each new file will come in via an
+     * analyzeReplayFile/removeReplayFile
+     *
+     * Internally, performReplayAnalysis does the parsing
+     * This is used both on initial load and on periodic
+     * updates. The m_initialSweep is a gate to control
+     * whether periodic emission happens. This prevents
+     * view jitter since at the end of receiveInitialPaths
+     * there is a bulk emission of all replays anyway.
+     */
 
    public:
     ReplayStore(QString replayDir,
@@ -124,11 +138,11 @@ class ReplayStore : public QObject {
     // Path to the Documents\Command &...\Replays dir
     QString m_replayDir;
 
-    // KW seems to like to open the replay file and not write to it for a little
-    // while Store files that have very recent modification times
+    // We frequently have to wait for a replay file to settle (be fully written)
+    // when the game is saving. Track this here
     QSet<QString> m_deferredPaths;
 
-    // A ptr so it moves with the store
+    // A ptr so it thread moves with the store
     QTimer* m_deferredTrigger;
 };
 }  // namespace KWLegionCore
