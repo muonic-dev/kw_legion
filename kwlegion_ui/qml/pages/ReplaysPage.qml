@@ -6,6 +6,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Dialogs
+import QtQuick.Layouts
 import KWLegionUI
 import KWLegionCore
 
@@ -110,6 +111,7 @@ Page {
         }
 
         ScrollBar.vertical: ScrollBar {
+            id: replaysScrollBar
             policy: ScrollBar.AsNeeded
             contentItem: Rectangle {
                 implicitWidth: 6
@@ -353,6 +355,74 @@ Page {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    Rectangle {
+        id: selectionBar
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        anchors.rightMargin: replaysScrollBar.visible ? replaysScrollBar.width : 0
+        height: 48
+        color: Theme.lightMode ? Theme.reallyLight : Theme.reallyDark
+        z: 10
+
+        opacity: StoreModel.selectionCount > 1 ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 120
+            }
+        }
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: 8
+
+            Button {
+                contentItem: Image {
+                    source: "qrc:/qt/qml/KWLegionUI/ico/eye-show-svgrepo-com.svg"
+                    sourceSize: Qt.size(16, 16)
+                    fillMode: Image.PreserveAspectFit
+                }
+
+                onClicked: StoreModel.showSelectedReplays()
+
+                padding: 10
+                implicitWidth: 16 + leftPadding + rightPadding
+                implicitHeight: 16 + topPadding + bottomPadding
+            }
+
+            Button {
+                contentItem: Image {
+                    source: "qrc:/qt/qml/KWLegionUI/ico/eye-hide-svgrepo-com.svg"
+                    sourceSize: Qt.size(16, 16)
+                    fillMode: Image.PreserveAspectFit
+                }
+
+                onClicked: StoreModel.hideSelectedReplays()
+
+                padding: 10
+                implicitWidth: 16 + leftPadding + rightPadding
+                implicitHeight: 16 + topPadding + bottomPadding
+            }
+
+            Button {
+                contentItem: Image {
+                    source: "qrc:/qt/qml/KWLegionUI/ico/save-floppy-svgrepo-com.svg"
+                    sourceSize: Qt.size(16, 16)
+                    fillMode: Image.PreserveAspectFit
+                }
+
+                padding: 10
+                implicitWidth: 16 + leftPadding + rightPadding
+                implicitHeight: 16 + topPadding + bottomPadding
+            }
+
+            Item {
+                Layout.fillWidth: true
             }
         }
     }

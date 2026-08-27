@@ -19,6 +19,8 @@ class StoreModel : public QAbstractListModel {
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
+    Q_PROPERTY(int selectionCount READ selectionCount NOTIFY
+                   selectionCountChanged)
 
    public:
     enum class Roles : std::uint16_t {
@@ -58,6 +60,10 @@ class StoreModel : public QAbstractListModel {
     // Toggle a replays exposed state. This proxies to shouldTottleReplayExposed
     Q_INVOKABLE void toggleReplayExposed(const QByteArray& checksum);
 
+    // Explicit (non-toggling) bulk expose/hide over the current selection.
+    Q_INVOKABLE void showSelectedReplays();
+    Q_INVOKABLE void hideSelectedReplays();
+
     // Selection manipulation
     Q_INVOKABLE void setReplaySelected(const QByteArray& checksum);
     Q_INVOKABLE bool toggleReplaySelected(const QByteArray& checksum);
@@ -68,6 +74,10 @@ class StoreModel : public QAbstractListModel {
     Q_INVOKABLE void saveReplayAs(const QByteArray& checksum,
                                   const QString& path);
 
+    [[nodiscard]] int selectionCount() const {
+        return static_cast<int>(m_selections.size());
+    }
+
     [[nodiscard]] QHash<int, QByteArray> roleNames() const override;
     [[nodiscard]] QVariant data(const QModelIndex& index,
                                 int role = Qt::DisplayRole) const override;
@@ -77,6 +87,10 @@ class StoreModel : public QAbstractListModel {
    signals:
     // The proxy signal going to store
     void shouldToggleReplayExposed(const QByteArray& checksum);
+    void shouldExposeReplay(const QByteArray& checksum);
+    void shouldHideReplay(const QByteArray& checksum);
+
+    void selectionCountChanged();
 
    private:
     template <typename Iter>

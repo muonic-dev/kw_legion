@@ -147,6 +147,27 @@ void ReplayStore::toggleReplayExposed(const QByteArray& checksum) {
     }
 }
 
+void ReplayStore::ensureReplayExposed(const QByteArray& checksum) {
+    qInfo(logStore) << "ensureReplayExposed "
+                    << QLatin1String(checksum.toHex());
+    try {
+        exposeReplay(checksum);
+    } catch (std::runtime_error& ex) {
+        qCritical(logStore) << "failed to expose: " << ex.what();
+    }
+}
+
+void ReplayStore::ensureReplayHidden(const QByteArray& checksum) {
+    qInfo(logStore) << "ensureReplayHidden "
+                    << QLatin1String(checksum.toHex());
+    try {
+        Queries queries{QSqlQuery(m_db)};
+        hideReplay(queries, checksum);
+    } catch (std::runtime_error& ex) {
+        qCritical(logStore) << "failed to hide: " << ex.what();
+    }
+}
+
 void ReplayStore::exposeReplay(const QByteArray& checksum) {
     if (!QDir(m_replayDir).mkpath("managed")) {
         throw StorageException("failed to create managed/ replay folder");

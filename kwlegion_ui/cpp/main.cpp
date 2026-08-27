@@ -160,6 +160,12 @@ int main(int argc, char* argv[]) {
     QObject::connect(storeModel, &StoreModel::shouldToggleReplayExposed,
                      &replayStore, &ReplayStore::toggleReplayExposed);
 
+    QObject::connect(storeModel, &StoreModel::shouldExposeReplay, &replayStore,
+                     &ReplayStore::ensureReplayExposed);
+
+    QObject::connect(storeModel, &StoreModel::shouldHideReplay, &replayStore,
+                     &ReplayStore::ensureReplayHidden);
+
     QObject::connect(&ioThread, &QThread::finished, &replayStore,
                      &ReplayStore::stop);
 

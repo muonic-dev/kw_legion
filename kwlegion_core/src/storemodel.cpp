@@ -79,17 +79,34 @@ void StoreModel::toggleReplayExposed(const QByteArray& checksum) {
     emit shouldToggleReplayExposed(checksum);
 }
 
+void StoreModel::showSelectedReplays() {
+    for (const auto& checksum : m_selections) {
+        emit shouldExposeReplay(checksum);
+    }
+}
+
+void StoreModel::hideSelectedReplays() {
+    for (const auto& checksum : m_selections) {
+        emit shouldHideReplay(checksum);
+    }
+}
+
 void StoreModel::setReplaySelected(const QByteArray& checksum) {
     auto it = std::ranges::find_if(m_replays, [&checksum](ReplayModel* replay) {
         return replay->checksum() == checksum;
     });
     if (it != m_replays.end()) {
+        const qsizetype before = m_selections.size();
         m_selections.insert(checksum);
         dataChangedByIter(it, SELECTED_ROLE);
+        if (m_selections.size() != before) {
+            emit selectionCountChanged();
+        }
     }
 }
 
 void StoreModel::extendReplaySelection(const QList<QByteArray>& checksums) {
+    const qsizetype before = m_selections.size();
     for (const auto& checksum : checksums) {
         auto it =
             std::ranges::find_if(m_replays, [&checksum](ReplayModel* replay) {
@@ -99,6 +116,9 @@ void StoreModel::extendReplaySelection(const QList<QByteArray>& checksums) {
             m_selections.insert(checksum);
             dataChangedByIter(it, SELECTED_ROLE);
         }
+    }
+    if (m_selections.size() != before) {
+        emit selectionCountChanged();
     }
 }
 
@@ -115,6 +135,7 @@ bool StoreModel::toggleReplaySelected(const QByteArray& checksum) {
             active = true;
         }
         dataChangedByIter(it, SELECTED_ROLE);
+        emit selectionCountChanged();
     }
     return active;
 }
@@ -126,6 +147,9 @@ void StoreModel::clearSelected() {
             dataChangedByIter(it, SELECTED_ROLE);
         }
     }
+    if (!checksums.isEmpty()) {
+        emit selectionCountChanged();
+    }
 }
 
 void StoreModel::selectAllReplays() {
@@ -133,6 +157,7 @@ void StoreModel::selectAllReplays() {
         return;
     }
 
+    const qsizetype before = m_selections.size();
     for (const auto& replay : m_replays) {
         m_selections.insert(replay->checksum());
     }
@@ -140,6 +165,9 @@ void StoreModel::selectAllReplays() {
     QModelIndex start = index(0);
     QModelIndex end = index(m_replays.size() - 1);
     emit dataChanged(start, end, SELECTED_ROLE);
+    if (m_selections.size() != before) {
+        emit selectionCountChanged();
+    }
 }
 
 void StoreModel::saveReplayAs(const QByteArray& checksum, const QString& path) {

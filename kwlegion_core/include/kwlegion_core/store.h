@@ -77,6 +77,21 @@ class ReplayStore : public QObject {
      */
     void toggleReplayExposed(const QByteArray& checksum);
 
+    /**
+     * Ensure a replay is exposed regardless of its current state.
+     *
+     * Unlike toggleReplayExposed, this is idempotent, which matters for bulk
+     * actions: a selection can contain a mix of already-exposed and hidden
+     * replays, and toggling the already-exposed ones would hide them instead.
+     */
+    void ensureReplayExposed(const QByteArray& checksum);
+
+    /**
+     * Ensure a replay is hidden regardless of its current state. See
+     * ensureReplayExposed for why this needs to be distinct from toggling.
+     */
+    void ensureReplayHidden(const QByteArray& checksum);
+
     void stop();
 
    signals:
