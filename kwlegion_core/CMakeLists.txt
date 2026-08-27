@@ -1,13 +1,10 @@
 find_package(Qt6 REQUIRED COMPONENTS Core Qml Sql)
 
 add_library(kwlegion_core STATIC
-    # These sources trigger moc
+    # Public interface (and also MOC)
     include/kwlegion_core/prospector.h
     include/kwlegion_core/store.h
     include/kwlegion_core/storemodel.h
-    src/teammodel.h
-    src/replaymodel.h
-    src/faction_registration.h
     # Main src
     src/prospector.cpp
     src/store.cpp
@@ -16,7 +13,12 @@ add_library(kwlegion_core STATIC
     src/replay.cpp
     src/storemodel.cpp
     src/teammodel.cpp
+    src/teammodel.h #MOC
     src/replaymodel.cpp
+    src/replaymodel.h # MOC
+    src/deferred.cpp
+    src/deferred.h #MOC
+    src/faction_registration.h #MOC
 )
 add_library(kwlegion::core ALIAS kwlegion_core)
 
