@@ -37,6 +37,52 @@ void ReplayStore::stop() {
     m_deferredTrigger->stop();
 }
 
+void ReplayStore::saveReplayAs(const QByteArray& checksum, const QUrl& path) {
+    // TODO: There is no i/o failure diagnostic here. We need some way of
+    // propogating the result back to the ui thread...
+    Queries queries{QSqlQuery(m_db)};
+    if (!queries.selectReplay(checksum)) {
+        qWarning(logStore) << "Replay " << QLatin1String(checksum.toHex())
+                           << " doesn't exist";
+    }
+    const QString expectedLocation = computeIngestionPath(checksum);
+    const QString outputPath = path.toLocalFile();
+    if (!QFile::copy(expectedLocation, outputPath)) {
+        qCritical(logStore)
+            << "Failed to copy " << expectedLocation << " to " << outputPath;
+    } else {
+        qInfo(logStore) << "Copied " << expectedLocation << " to "
+                        << outputPath;
+    }
+}
+
+void ReplayStore::exportReplaysAs(const QList<QByteArray>& checksums,
+                                  const QUrl& folderPath) {
+    Queries queries{QSqlQuery(m_db)};
+    for (const auto& checksum : checksums) {
+        const auto replay = queries.selectReplay(checksum);
+        if (!replay.has_value()) {
+            qWarning(logStore) << "Replay " << QLatin1String(checksum.toHex())
+                               << " doesn't exist";
+            continue;
+        }
+
+        const QString name =
+            QString("%1 - %2.KWReplay")
+                .arg(replay->matchTitle, QString(checksum.toHex()).slice(0, 8));
+        const QString outputPath = folderPath.toLocalFile() + "/" + name;
+
+        const QString expectedLocation = computeIngestionPath(checksum);
+        if (!QFile::copy(expectedLocation, outputPath)) {
+            qCritical(logStore) << "Failed to copy " << expectedLocation
+                                << " to " << outputPath;
+        } else {
+            qInfo(logStore)
+                << "Copied " << expectedLocation << " to " << outputPath;
+        }
+    }
+}
+
 void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     // Perform initial setup operation on the startup signal
     ensureDirectories();
@@ -158,8 +204,7 @@ void ReplayStore::ensureReplayExposed(const QByteArray& checksum) {
 }
 
 void ReplayStore::ensureReplayHidden(const QByteArray& checksum) {
-    qInfo(logStore) << "ensureReplayHidden "
-                    << QLatin1String(checksum.toHex());
+    qInfo(logStore) << "ensureReplayHidden " << QLatin1String(checksum.toHex());
     try {
         Queries queries{QSqlQuery(m_db)};
         hideReplay(queries, checksum);

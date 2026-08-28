@@ -27,6 +27,14 @@ ApplicationWindow {
         appWindow.hide();
     }
 
+    Shortcut {
+        sequence: "CTRL+Q" // TODO: Crossplatform
+        onActivated: {
+            appWindow.quitting = true;
+            Qt.quit();
+        }
+    }
+
     SystemTrayIcon {
         visible: true
         icon.source: Theme.appIcon

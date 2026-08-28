@@ -131,6 +131,9 @@ int main(int argc, char* argv[]) {
     ReplayStore replayStore(ReplayProspector::defaultReplayDirectory());
     replayStore.moveToThread(&ioThread);
 
+    QObject::connect(&ioThread, &QThread::finished, &replayStore,
+                     &ReplayStore::stop);
+
     QObject::connect(&ioThread, &QThread::started, &replayProspector,
                      &ReplayProspector::initialSweep);
     QObject::connect(&replayProspector,
@@ -161,8 +164,11 @@ int main(int argc, char* argv[]) {
     QObject::connect(storeModel, &StoreModel::shouldHideReplay, &replayStore,
                      &ReplayStore::ensureReplayHidden);
 
-    QObject::connect(&ioThread, &QThread::finished, &replayStore,
-                     &ReplayStore::stop);
+    QObject::connect(storeModel, &StoreModel::shouldSaveReplay, &replayStore,
+                     &ReplayStore::saveReplayAs);
+
+    QObject::connect(storeModel, &StoreModel::shouldExportReplays, &replayStore,
+                     &ReplayStore::exportReplaysAs);
 
     ioThread.start();
 

@@ -8,6 +8,7 @@
 #include <QAbstractListModel>
 #include <QQmlEngine>
 #include <QSet>
+#include <QUrl>
 
 #include "replay.h"
 
@@ -19,8 +20,8 @@ class StoreModel : public QAbstractListModel {
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
-    Q_PROPERTY(int selectionCount READ selectionCount NOTIFY
-                   selectionCountChanged)
+    Q_PROPERTY(
+        int selectionCount READ selectionCount NOTIFY selectionCountChanged)
 
    public:
     enum class Roles : std::uint16_t {
@@ -71,8 +72,11 @@ class StoreModel : public QAbstractListModel {
     Q_INVOKABLE void clearSelected();
     Q_INVOKABLE void selectAllReplays();
 
-    Q_INVOKABLE void saveReplayAs(const QByteArray& checksum,
-                                  const QString& path);
+    Q_INVOKABLE void saveReplayAs(const QByteArray& checksum, const QUrl& path);
+    // Export currently selected replays to the given path
+    Q_INVOKABLE void exportSelectedReplaysTo(const QUrl& path);
+
+    Q_INVOKABLE QString friendlySaveName(const QByteArray& checksum);
 
     [[nodiscard]] int selectionCount() const {
         return static_cast<int>(m_selections.size());
@@ -89,6 +93,9 @@ class StoreModel : public QAbstractListModel {
     void shouldToggleReplayExposed(const QByteArray& checksum);
     void shouldExposeReplay(const QByteArray& checksum);
     void shouldHideReplay(const QByteArray& checksum);
+    void shouldSaveReplay(const QByteArray& checksum, const QUrl& path);
+    void shouldExportReplays(const QList<QByteArray>& checksums,
+                             const QUrl& path);
 
     void selectionCountChanged();
 

@@ -15,6 +15,7 @@
 #include <QStandardPaths>
 #include <QString>
 #include <QTimer>
+#include <QUrl>
 #include <tuple>
 
 Q_DECLARE_LOGGING_CATEGORY(logStore);
@@ -91,6 +92,10 @@ class ReplayStore : public QObject {
      * ensureReplayExposed for why this needs to be distinct from toggling.
      */
     void ensureReplayHidden(const QByteArray& checksum);
+
+    void saveReplayAs(const QByteArray& checksum, const QUrl& path);
+    void exportReplaysAs(const QList<QByteArray>& checksums,
+                         const QUrl& folderPath);
 
     void stop();
 

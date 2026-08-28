@@ -59,8 +59,19 @@ Page {
         nameFilters: ["C&C Kane's Wrath Replays (*.KWReplay)"]
         defaultSuffix: "KWReplay"
         onAccepted: {
+            if (page.currentlySavingChecksum) {
+                console.error("tried to save nothing");
+                return;
+            }
             StoreModel.saveReplayAs(page.currentlySavingChecksum, selectedFile);
             page.currentlySavingChecksum = null;
+        }
+    }
+
+    FolderDialog {
+        id: folderDialog
+        onAccepted: {
+            StoreModel.exportSelectedReplaysTo(folderDialog.selectedFolder);
         }
     }
 
@@ -283,7 +294,7 @@ Page {
 
                         onClicked: {
                             page.currentlySavingChecksum = delegateRoot.checksum;
-                            fileDialog.selectedFile = `${fileDialog.currentFolder}/${delegateRoot.matchTitle}`;
+                            fileDialog.selectedFile = `${fileDialog.currentFolder}/${StoreModel.friendlySaveName(delegateRoot.checksum)}`;
                             fileDialog.open();
                         }
 
@@ -415,6 +426,10 @@ Page {
                     source: "qrc:/qt/qml/KWLegionUI/ico/save-floppy-svgrepo-com.svg"
                     sourceSize: Qt.size(16, 16)
                     fillMode: Image.PreserveAspectFit
+                }
+
+                onClicked: {
+                    folderDialog.open();
                 }
 
                 padding: 10

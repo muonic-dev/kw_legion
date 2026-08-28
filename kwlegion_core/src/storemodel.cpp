@@ -11,6 +11,7 @@
 #include "replaymodel.h"
 
 namespace KWLegionCore {
+
 const QList SELECTED_ROLE{static_cast<int>(StoreModel::Roles::SelectedRole)};
 
 StoreModel::StoreModel(QObject* parent)
@@ -73,6 +74,17 @@ void StoreModel::replaysChanged(const QList<Replay>& replays) {
             endInsertRows();
         }
     }
+}
+
+QString StoreModel::friendlySaveName(const QByteArray& checksum) {
+    auto it = std::ranges::find_if(m_replays, [&checksum](const auto& replay) {
+        return replay->checksum() == checksum;
+    });
+    if (it == std::ranges::end(m_replays)) {
+        return {};
+    }
+    return QString("%1 - %2").arg((*it)->matchTitle(),
+                                  QString(checksum.toHex()).slice(0, 8));
 }
 
 void StoreModel::toggleReplayExposed(const QByteArray& checksum) {
@@ -162,16 +174,21 @@ void StoreModel::selectAllReplays() {
         m_selections.insert(replay->checksum());
     }
 
-    QModelIndex start = index(0);
-    QModelIndex end = index(m_replays.size() - 1);
+    const QModelIndex start = index(0);
+    const QModelIndex end = index(static_cast<int>(m_replays.size() - 1));
     emit dataChanged(start, end, SELECTED_ROLE);
     if (m_selections.size() != before) {
         emit selectionCountChanged();
     }
 }
 
-void StoreModel::saveReplayAs(const QByteArray& checksum, const QString& path) {
+void StoreModel::saveReplayAs(const QByteArray& checksum, const QUrl& path) {
+    emit shouldSaveReplay(checksum, path);
+}
 
+void StoreModel::exportSelectedReplaysTo(const QUrl& path) {
+    const QList<QByteArray> checksums{m_selections.begin(), m_selections.end()};
+    emit shouldExportReplays(checksums, path);
 }
 
 QHash<int, QByteArray> StoreModel::roleNames() const { return m_roleNames; }
