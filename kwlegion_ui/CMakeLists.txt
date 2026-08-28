@@ -40,6 +40,15 @@ qt_add_qml_module(kw_legion
         ico/save-floppy-svgrepo-com.svg
 )
 
+target_include_directories(kw_legion
+    PRIVATE
+        # AUTOMOC records QML_ELEMENT headers here by bare filename only, so
+        # qmltyperegistrar's generated #include guess for the QML type
+        # registration TU needs the header's own directory on the path too.
+        # See the matching comment in kwlegion_core/CMakeLists.txt.
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpp
+)
+
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
 # explicit, fixed bundle identifier manually though.

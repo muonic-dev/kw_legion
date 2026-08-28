@@ -16,6 +16,7 @@ namespace KWLegionCore {
 // The model of a team. A team is a list of players and their factions
 class TeamModel : public QAbstractListModel {
     Q_OBJECT
+    Q_PROPERTY(QStringList playerNames READ playerNames)
    public:
     enum class Roles : std::uint16_t {
         NameRole = Qt::UserRole + 1,
@@ -27,6 +28,10 @@ class TeamModel : public QAbstractListModel {
     [[nodiscard]] std::uint32_t number() const { return m_number; }
 
     void addPlayer(const Player& player);
+
+    // Flat player-name list for JS-side searching (e.g. SortFilterProxyModel's
+    // filterPredicate).
+    [[nodiscard]] QStringList playerNames() const;
 
     [[nodiscard]] QHash<int, QByteArray> roleNames() const override;
 

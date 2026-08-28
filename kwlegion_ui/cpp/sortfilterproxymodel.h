@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <QtQmlIntegration/qqmlintegration.h>
+
 #include <QJSValue>
 #include <QSortFilterProxyModel>
 
@@ -16,6 +18,7 @@ class SortFilterProxyModel : public QSortFilterProxyModel {
     Q_PROPERTY(QJSValue filterPredicate READ filterPredicate WRITE
                    setFilterPredicate NOTIFY filterPredicateChanged)
 
+    QML_ELEMENT
    public:
     using QSortFilterProxyModel::QSortFilterProxyModel;
 

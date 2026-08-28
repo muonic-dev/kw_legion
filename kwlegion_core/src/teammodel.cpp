@@ -45,4 +45,13 @@ QVariant TeamModel::data(const QModelIndex& index, int role) const {
 }
 
 void TeamModel::addPlayer(const Player& player) { m_players.append(player); }
+
+QStringList TeamModel::playerNames() const {
+    QStringList names;
+    names.reserve(m_players.size());
+    for (const auto& player : m_players) {
+        names.append(player.name);
+    }
+    return names;
+}
 }  // namespace KWLegionCore

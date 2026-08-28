@@ -67,9 +67,8 @@ Page {
     SortFilterProxyModel {
         id: sortedStoreModel
         sourceModel: StoreModel
-        sortRole: StoreModel.TimestampRole
         sortOrder: Qt.DescendingOrder
-        filterPredicate: row => filterField.text.length == 0 || row.matchTitle.includes(filterField.text)
+        filterPredicate: row => filterField.text.length == 0 || row.matchTitle.includes(filterField.text) || row.teams.some(team => team.playerNames.some(name => name.includes(filterField.text)))
     }
 
     Shortcut {

@@ -46,14 +46,15 @@ bool SortFilterProxyModel::filterAcceptsRow(
 
     const QModelIndex idx = sourceModel()->index(sourceRow, 0, sourceParent);
 
+    // Make a js map
     QVariantMap rowData;
     for (auto [role, name] : sourceModel()->roleNames().asKeyValueRange()) {
-        rowData.insert(name, sourceModel()->data(idx, role));
+        const QVariant data = sourceModel()->data(idx, role);
+        rowData.insert(name, data);
     }
 
-    QJSValue arg = engine->toScriptValue(rowData);
-
-    QJSValue result = m_filterPredicate.call({arg});
+    const QJSValue arg = engine->toScriptValue(rowData);
+    const QJSValue result = m_filterPredicate.call({arg});
     if (result.isError()) {
         qWarning() << "predicate failed" << result.toString();
     }

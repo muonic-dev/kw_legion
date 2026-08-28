@@ -18,8 +18,6 @@
 #include <QThread>
 #include <cstdio>
 
-#include "sortfilterproxymodel.h"
-
 namespace {
 
 inline constexpr bool DEBUG_BUILD =
@@ -106,9 +104,6 @@ int main(int argc, char* argv[]) {
         QIcon(":/qt/qml/KWLegionUI/ico/CNCKW_Marked_of_Kane_Logo.png"));
 
     qRegisterMetaType<KWLegionCore::Replay>();
-
-    qmlRegisterType<SortFilterProxyModel>("KWLegionUI", 1, 0,
-                                          "SortFilterProxyModel");
 
     QQmlApplicationEngine engine;
     QObject::connect(
