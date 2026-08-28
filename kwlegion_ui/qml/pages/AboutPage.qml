@@ -93,6 +93,21 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
             }
         }
 
+        Label {
+            Layout.fillWidth: true
+            Layout.maximumWidth: 480
+            Layout.alignment: Qt.AlignHCenter
+            wrapMode: Text.WordWrap
+            color: Theme.lightMode ? Theme.dark : Theme.light
+            textFormat: Text.StyledText
+            linkColor: Theme.lightMode ? Theme.dark : Theme.light
+            onLinkActivated: link => Qt.openUrlExternally(link)
+            text: qsTr(`Found a bug? Please <a href="https://github.com/muonic-dev/kw_legion">report it on GitHub</a>, and consider attaching the log file from your <a href="%1">local log folder</a>.`).arg(AppInfo.logDirectoryUrl)
+            HoverHandler {
+                cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+            }
+        }
+
         Item {
             Layout.fillHeight: true
         }
