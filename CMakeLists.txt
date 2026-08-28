@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.23)
 
 project(kw_legion
-    VERSION "0.0.1"
+    VERSION "0.1.0"
     DESCRIPTION "A C&C 3: Kane's Wrath replay manager"
     LANGUAGES CXX)
 
@@ -9,6 +9,37 @@ project(kw_legion
 # and derive a SemVer pre-release label separately for packaging/display.
 set(KW_LEGION_VERSION_PRERELEASE "alpha.1")
 set(KW_LEGION_VERSION_SEMVER "${PROJECT_VERSION}-${KW_LEGION_VERSION_PRERELEASE}")
+
+# Short commit hash for the About page's build field, kept separate from
+# KW_LEGION_VERSION_SEMVER so a rebuild of the same release tag is still
+# distinguishable. This only refreshes when CMake reconfigures, not on every
+# rebuild - acceptable for a value that's purely informational.
+find_package(Git QUIET)
+set(KW_LEGION_GIT_HASH "unknown")
+if(Git_FOUND)
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} rev-parse --short=8 HEAD
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE KW_LEGION_GIT_HASH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE KW_LEGION_GIT_HASH_RESULT
+    )
+    if(NOT KW_LEGION_GIT_HASH_RESULT EQUAL 0 OR KW_LEGION_GIT_HASH STREQUAL "")
+        set(KW_LEGION_GIT_HASH "unknown")
+    else()
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} status --porcelain
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            OUTPUT_VARIABLE KW_LEGION_GIT_DIRTY
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        if(NOT KW_LEGION_GIT_DIRTY STREQUAL "")
+            string(APPEND KW_LEGION_GIT_HASH "-dirty")
+        endif()
+    endif()
+endif()
 
 include(GNUInstallDirs)
 

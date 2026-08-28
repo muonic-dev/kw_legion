@@ -4,6 +4,7 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import KWLegionCore
 import KWLegionUI
 
 Page {
@@ -30,6 +31,19 @@ Page {
             color: Theme.lightMode ? Theme.dark : Theme.light
             font.pixelSize: 24
             font.bold: true
+        }
+
+        Label {
+            Layout.alignment: Qt.AlignHCenter
+            text: qsTr("Version %1").arg(AppInfo.version)
+            color: Theme.lightMode ? Theme.dark : Theme.light
+        }
+
+        Label {
+            Layout.alignment: Qt.AlignHCenter
+            text: qsTr("Build %1").arg(AppInfo.buildHash)
+            color: Theme.lightMode ? Theme.dark : Theme.light
+            font.pixelSize: 12
         }
 
         Label {

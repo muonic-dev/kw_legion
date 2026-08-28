@@ -1,11 +1,21 @@
 find_package(Qt6 REQUIRED COMPONENTS Core Qml Sql)
 
+# Bakes KW_LEGION_VERSION_SEMVER/KW_LEGION_GIT_HASH (set in the root
+# CMakeLists.txt) into a header consumed only by appinfo.cpp.
+configure_file(
+    src/version.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/version.h
+    @ONLY
+)
+
 add_library(kwlegion_core STATIC
     # Public interface (and also MOC)
+    include/kwlegion_core/appinfo.h
     include/kwlegion_core/prospector.h
     include/kwlegion_core/store.h
     include/kwlegion_core/storemodel.h
     # Main src
+    src/appinfo.cpp
     src/prospector.cpp
     src/store.cpp
     src/transaction.cpp
@@ -36,6 +46,8 @@ target_include_directories(kwlegion_core
         ${CMAKE_CURRENT_SOURCE_DIR}/include/kwlegion_core
         # Implementation only QML registrations are in src
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        # Generated version.h (see configure_file() above)
+        ${CMAKE_CURRENT_BINARY_DIR}
 )
 
 # QML_ELEMENT/QML_SINGLETON types (currently just StoreModel) are registered
