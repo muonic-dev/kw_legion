@@ -31,7 +31,9 @@ ApplicationWindow {
             id: navRail
             Layout.fillHeight: true
             Layout.preferredWidth: 160
-            sections: ["Replays", "Statistics", "Settings", "About"]
+            sections: ["Replays",
+                // "Statistics",
+                "Settings", "About"]
         }
 
         StackLayout {
@@ -40,7 +42,7 @@ ApplicationWindow {
             currentIndex: navRail.currentIndex
 
             ReplaysPage {}
-            StatisticsPage {}
+            // StatisticsPage {}
             SettingsPage {}
             AboutPage {}
         }
