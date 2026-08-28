@@ -16,7 +16,11 @@
 #include <QQmlApplicationEngine>
 #include <QTextStream>
 #include <QThread>
+#include <QWindow>
 #include <cstdio>
+
+#include "singleinstanceguard.h"
+
 
 namespace {
 
@@ -89,6 +93,15 @@ int main(int argc, char* argv[]) {
     qInstallMessageHandler(logMessageHandler);
 
     QGuiApplication app(argc, argv);
+
+    SingleInstanceGuard singleInstanceGuard(
+        QCoreApplication::applicationName());
+    if (!singleInstanceGuard.isPrimaryInstance()) {
+        qInfo() << "Another instance of kw_legion is already running - "
+                   "exiting.";
+        return 0;
+    }
+
     QGuiApplication::setWindowIcon(
         QIcon(":/qt/qml/KWLegionUI/ico/CNCKW_Marked_of_Kane_Logo.png"));
 
@@ -134,6 +147,19 @@ int main(int argc, char* argv[]) {
                      &replayStore, &ReplayStore::removeReplayFile);
 
     engine.loadFromModule("KWLegionUI", "Main");
+
+    QObject::connect(
+        &singleInstanceGuard, &SingleInstanceGuard::activationRequested, &app,
+        [&engine] {
+            auto* rootWindow =
+                qobject_cast<QWindow*>(engine.rootObjects().constFirst());
+            if (rootWindow == nullptr) {
+                return;
+            }
+            rootWindow->show();
+            rootWindow->raise();
+            rootWindow->requestActivate();
+        });
 
     auto* storeModel =
         engine.singletonInstance<StoreModel*>("KWLegionCore", "StoreModel");

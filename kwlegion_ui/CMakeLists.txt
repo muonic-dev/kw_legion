@@ -1,9 +1,11 @@
-find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform Sql Svg)
+find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform Network Sql Svg)
 
 qt_add_executable(kw_legion
     cpp/main.cpp
     cpp/sortfilterproxymodel.h
     cpp/sortfilterproxymodel.cpp
+    cpp/singleinstanceguard.h
+    cpp/singleinstanceguard.cpp
 )
 
 # qt_add_qml_module() doesn't parse QML_FILES contents for `pragma Singleton`
@@ -64,6 +66,7 @@ target_link_libraries(kw_legion
     PRIVATE
     Qt6::Quick
     Qt6::LabsPlatform
+    Qt6::Network
     Qt6::Sql
     Qt6::Svg
     legionparser::legionparser
