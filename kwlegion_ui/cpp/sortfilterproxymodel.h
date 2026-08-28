@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <QList>
+#include <QJSValue>
 #include <QSortFilterProxyModel>
 
 // QSortFilterProxyModel only exposes sort order through the sort(column,
@@ -13,29 +13,27 @@ class SortFilterProxyModel : public QSortFilterProxyModel {
     Q_OBJECT
     Q_PROPERTY(Qt::SortOrder sortOrder READ sortOrder WRITE setSortOrder NOTIFY
                    sortOrderChanged)
-    // Roles to test filterRegularExpression against, e.g. [StoreModel.MatchTitleRole,
-    // StoreModel.MapNameRole]. QML sets this using whatever roles its source model
-    // exposes, so this class never needs to know about them itself. Falls back to
-    // the base class's single-filterRole behavior when left empty.
-    Q_PROPERTY(QList<int> filterRoles READ filterRoles WRITE setFilterRoles NOTIFY
-                   filterRolesChanged)
+    Q_PROPERTY(QJSValue filterPredicate READ filterPredicate WRITE
+                   setFilterPredicate NOTIFY filterPredicateChanged)
 
    public:
     using QSortFilterProxyModel::QSortFilterProxyModel;
 
+    Q_INVOKABLE void refilter();
+
     void setSortOrder(Qt::SortOrder order);
 
-    [[nodiscard]] QList<int> filterRoles() const { return m_filterRoles; }
-    void setFilterRoles(const QList<int>& roles);
+    [[nodiscard]] QJSValue filterPredicate() const;
+    void setFilterPredicate(QJSValue filterPredicate);
 
    signals:
     void sortOrderChanged();
-    void filterRolesChanged();
+    void filterPredicateChanged();
 
    protected:
     [[nodiscard]] bool filterAcceptsRow(
         int sourceRow, const QModelIndex& sourceParent) const override;
 
    private:
-    QList<int> m_filterRoles;
+    QJSValue m_filterPredicate;
 };

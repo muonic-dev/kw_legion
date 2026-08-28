@@ -3,6 +3,8 @@
 
 #include "sortfilterproxymodel.h"
 
+#include <QJSEngine>
+
 void SortFilterProxyModel::setSortOrder(Qt::SortOrder order) {
     if (order == sortOrder()) {
         return;
@@ -11,32 +13,49 @@ void SortFilterProxyModel::setSortOrder(Qt::SortOrder order) {
     emit sortOrderChanged();
 }
 
-void SortFilterProxyModel::setFilterRoles(const QList<int>& roles) {
-    if (roles == m_filterRoles) {
-        return;
-    }
-    m_filterRoles = roles;
-    emit filterRolesChanged();
+QJSValue SortFilterProxyModel::filterPredicate() const {
+    return m_filterPredicate;
+}
+
+void SortFilterProxyModel::setFilterPredicate(QJSValue value) {
+    m_filterPredicate = std::move(value);
+    emit filterPredicateChanged();
+    beginFilterChange();
+    endFilterChange();
+}
+
+void SortFilterProxyModel::refilter() {
     beginFilterChange();
     endFilterChange();
 }
 
 bool SortFilterProxyModel::filterAcceptsRow(
     int sourceRow, const QModelIndex& sourceParent) const {
-    if (m_filterRoles.isEmpty()) {
-        return QSortFilterProxyModel::filterAcceptsRow(sourceRow, sourceParent);
+    QJSEngine* engine = qjsEngine(this);
+    if (engine == nullptr) {
+        qWarning("SortFilterProxyModel is not a QML owned value");
+        return QSortFilterProxyModel::filterAcceptsColumn(sourceRow,
+                                                          sourceParent);
     }
 
-    const QRegularExpression re = filterRegularExpression();
-    if (re.pattern().isEmpty()) {
-        return true;
+    if (!m_filterPredicate.isCallable()) {
+        qWarning("filterPredict is not a callable");
+        return QSortFilterProxyModel::filterAcceptsColumn(sourceRow,
+                                                          sourceParent);
     }
 
     const QModelIndex idx = sourceModel()->index(sourceRow, 0, sourceParent);
-    for (int role : m_filterRoles) {
-        if (re.match(sourceModel()->data(idx, role).toString()).hasMatch()) {
-            return true;
-        }
+
+    QVariantMap rowData;
+    for (auto [role, name] : sourceModel()->roleNames().asKeyValueRange()) {
+        rowData.insert(name, sourceModel()->data(idx, role));
     }
-    return false;
+
+    QJSValue arg = engine->toScriptValue(rowData);
+
+    QJSValue result = m_filterPredicate.call({arg});
+    if (result.isError()) {
+        qWarning() << "predicate failed" << result.toString();
+    }
+    return result.toBool();
 }

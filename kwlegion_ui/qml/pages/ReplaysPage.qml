@@ -69,7 +69,7 @@ Page {
         sourceModel: StoreModel
         sortRole: StoreModel.TimestampRole
         sortOrder: Qt.DescendingOrder
-        filterRoles: [StoreModel.MatchTitleRole, StoreModel.MapNameRole]
+        filterPredicate: row => filterField.text.length == 0 || row.matchTitle.includes(filterField.text)
     }
 
     Shortcut {
@@ -85,7 +85,7 @@ Page {
             placeholderText: qsTr("Filter replays…")
 
             Keys.onEscapePressed: replaysListView.forceActiveFocus()
-            onTextChanged: sortedStoreModel.setFilterFixedString(text)
+            onTextChanged: sortedStoreModel.refilter()
         }
     }
 
