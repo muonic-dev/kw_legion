@@ -99,6 +99,8 @@ Page {
         clip: true
         focus: true
 
+        Keys.onEscapePressed: StoreModel.clearSelected()
+
         Keys.onPressed: event => {
             if (event.key === Qt.Key_PageDown) {
                 contentY = Math.min(contentY + height * 0.95, contentHeight - height);
