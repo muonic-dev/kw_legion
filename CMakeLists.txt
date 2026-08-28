@@ -105,9 +105,14 @@ set(CPACK_PACKAGE_INSTALL_DIRECTORY "KW Legion")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_SOURCE_DIR}/README.md")
 
+# Without this, CPack's NSIS generator installs the files but skips creating
+# any Start Menu shortcut - it only builds one per entry listed here.
+set(CPACK_PACKAGE_EXECUTABLES "kw_legion" "KW Legion")
+
 if(WIN32)
     set(CPACK_GENERATOR "NSIS;ZIP")
     set(CPACK_NSIS_DISPLAY_NAME "KW Legion")
+    set(CPACK_CREATE_DESKTOP_LINKS "kw_legion")
 else()
     set(CPACK_GENERATOR "TGZ")
 endif()
