@@ -17,10 +17,50 @@ ApplicationWindow {
     visible: true
     title: qsTr("LEGION Replay Manager")
 
+    property bool quitting: false
+
+    onClosing: close => {
+        if (quitting) {
+            return;
+        }
+        close.accepted = false;
+        appWindow.hide();
+    }
+
     SystemTrayIcon {
         visible: true
         icon.source: Theme.appIcon
         tooltip: appWindow.title
+
+        onActivated: reason => {
+            if (reason === SystemTrayIcon.Trigger || reason === SystemTrayIcon.DoubleClick) {
+                if (appWindow.visible) {
+                    appWindow.hide();
+                } else {
+                    appWindow.show();
+                    appWindow.raise();
+                    appWindow.requestActivate();
+                }
+            }
+        }
+
+        menu: Menu {
+            MenuItem {
+                text: qsTr("Show")
+                onTriggered: {
+                    appWindow.show();
+                    appWindow.raise();
+                    appWindow.requestActivate();
+                }
+            }
+            MenuItem {
+                text: qsTr("Quit")
+                onTriggered: {
+                    appWindow.quitting = true;
+                    Qt.quit();
+                }
+            }
+        }
     }
 
     RowLayout {
