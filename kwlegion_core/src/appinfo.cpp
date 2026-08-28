@@ -11,12 +11,12 @@ namespace KWLegionCore {
 
 AppInfo::AppInfo(QObject* parent) : QObject(parent) {}
 
-QString AppInfo::version() const {
-    return QStringLiteral(KW_LEGION_VERSION_SEMVER);
-}
+// Q_PROPERTY READ accessors must be non-static for Qt's meta-object system to
+// invoke them, even though these don't touch instance state.
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+QString AppInfo::version() const { return {KW_LEGION_VERSION_SEMVER}; }
 
-QString AppInfo::buildHash() const {
-    return QStringLiteral(KW_LEGION_GIT_HASH);
-}
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+QString AppInfo::buildHash() const { return {KW_LEGION_GIT_HASH}; }
 
 }  // namespace KWLegionCore

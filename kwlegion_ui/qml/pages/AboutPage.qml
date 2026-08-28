@@ -48,21 +48,49 @@ Page {
 
         Label {
             Layout.fillWidth: true
+            Layout.maximumWidth: 480
+            Layout.alignment: Qt.AlignHCenter
             wrapMode: Text.WordWrap
             color: Theme.lightMode ? Theme.dark : Theme.light
+            textFormat: Text.StyledText
+            linkColor: Theme.lightMode ? Theme.dark : Theme.light
+            onLinkActivated: link => Qt.openUrlExternally(link)
             text: qsTr(`Copyright © 2026 Muonic
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.`)
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the <a href="https://www.gnu.org/licenses/gpl-3.0.en.html#license-text">GNU General Public License version 3</a> for more details.`)
         }
 
         Label {
             Layout.fillWidth: true
+            Layout.maximumWidth: 480
+            Layout.alignment: Qt.AlignHCenter
             wrapMode: Text.WordWrap
             font.italic: true
             color: Theme.lightMode ? Theme.dark : Theme.light
-            text: qsTr(`This application is built with Qt 6, © The Qt Company Ltd. and other contributors, used here under the GNU Lesser General Public License version 3 (LGPLv3); Qt is linked dynamically so its shared libraries may be replaced or relinked as the LGPL permits. See https://www.qt.io/licensing/ for details.`)
+            textFormat: Text.StyledText
+            linkColor: Theme.lightMode ? Theme.dark : Theme.light
+            onLinkActivated: link => Qt.openUrlExternally(link)
+            text: qsTr(`This application is built with Qt 6, © The Qt Company Ltd. and other contributors, used here under the <a href="https://www.gnu.org/licenses/lgpl-3.0.en.html#license-text">GNU Lesser General Public License version 3 (LGPLv3)</a>`)
+            HoverHandler {
+                cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+            }
+        }
+
+        Label {
+            Layout.fillWidth: true
+            Layout.maximumWidth: 480
+            Layout.alignment: Qt.AlignHCenter
+            wrapMode: Text.WordWrap
+            color: Theme.lightMode ? Theme.dark : Theme.light
+            textFormat: Text.StyledText
+            linkColor: Theme.lightMode ? Theme.dark : Theme.light
+            onLinkActivated: link => Qt.openUrlExternally(link)
+            text: qsTr(`Vectors and icons by <a href="https://www.svgrepo.com">SVG Repo</a>`)
+            HoverHandler {
+                cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+            }
         }
 
         Item {

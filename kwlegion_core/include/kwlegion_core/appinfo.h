@@ -23,7 +23,9 @@ class AppInfo : public QObject {
    public:
     explicit AppInfo(QObject* parent = nullptr);
 
+    // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
     [[nodiscard]] QString version() const;
+    // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
     [[nodiscard]] QString buildHash() const;
 };
 
