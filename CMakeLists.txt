@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.23)
 
 project(kw_legion
-    VERSION "0.1.0"
+    VERSION "0.1.1"
     DESCRIPTION "A C&C 3: Kane's Wrath replay manager"
     LANGUAGES CXX)
 
