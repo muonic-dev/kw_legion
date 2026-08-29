@@ -21,7 +21,6 @@
 
 #include "singleinstanceguard.h"
 
-
 namespace {
 
 void logMessageHandler(QtMsgType type, const QMessageLogContext& context,
@@ -94,7 +93,7 @@ int main(int argc, char* argv[]) {
 
     QGuiApplication app(argc, argv);
 
-    SingleInstanceGuard singleInstanceGuard(
+    const SingleInstanceGuard singleInstanceGuard(
         QCoreApplication::applicationName());
     if (!singleInstanceGuard.isPrimaryInstance()) {
         qInfo() << "Another instance of kw_legion is already running - "
