@@ -6,6 +6,7 @@ qt_add_executable(kw_legion
     cpp/sortfilterproxymodel.cpp
     cpp/singleinstanceguard.h
     cpp/singleinstanceguard.cpp
+    $<$<PLATFORM_ID:Windows>:cpp/kw_legion.rc>
 )
 
 # qt_add_qml_module() doesn't parse QML_FILES contents for `pragma Singleton`

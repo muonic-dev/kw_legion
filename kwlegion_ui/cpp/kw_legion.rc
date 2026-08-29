@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Muonic
+
+// Native Win32 icon resource for kw_legion.exe. QGuiApplication::setWindowIcon()
+// in main.cpp only sets the icon on the live window - Explorer, the NSIS
+// installer's shortcuts, and the taskbar's cold/shortcut-based icon all read
+// this resource instead.
+IDI_ICON1 ICON "../ico/kw_legion.ico"

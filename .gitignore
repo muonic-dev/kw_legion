@@ -32,6 +32,8 @@ qrc_*.cpp
 Thumbs.db
 *.res
 *.rc
+# Hand-written Win32 icon resource, not a qmake-generated one
+!kwlegion_ui/cpp/kw_legion.rc
 /.qmake.cache
 /.qmake.stash
 **/.qmlls.ini

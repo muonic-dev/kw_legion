@@ -113,6 +113,11 @@ if(WIN32)
     set(CPACK_GENERATOR "NSIS;ZIP")
     set(CPACK_NSIS_DISPLAY_NAME "KW Legion")
     set(CPACK_CREATE_DESKTOP_LINKS "kw_legion")
+    # kw_legion.exe now carries this same icon as a native Win32 resource
+    # (see kwlegion_ui/cpp/kw_legion.rc) - this covers the installer.exe
+    # itself and its uninstaller entry in Add/Remove Programs.
+    set(CPACK_NSIS_MUI_ICON "${CMAKE_SOURCE_DIR}/kwlegion_ui/ico/kw_legion.ico")
+    set(CPACK_NSIS_MUI_UNIICON "${CMAKE_SOURCE_DIR}/kwlegion_ui/ico/kw_legion.ico")
 else()
     set(CPACK_GENERATOR "TGZ")
 endif()
