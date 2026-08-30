@@ -29,6 +29,11 @@ class Deferred : public QObject {
     static bool readyForParsing(const QString& path);
 
     /**
+     * Alter the recheck interval. Only triggers the next time the timer fires
+     */
+    void setRecheckIntervalMs(long ms);
+
+    /**
      * Enqueue this path to wait until ready
      */
     void waitForReady(const QString& path);
@@ -44,6 +49,9 @@ class Deferred : public QObject {
     void pathReady(const QString& path);
 
    private:
+    void timerFired();
+
+    long m_recheckIntervalMs;
     QTimer* m_trigger;
     QSet<QString> m_deferred;
 };
