@@ -25,9 +25,9 @@ AppInfo::AppInfo(QObject* parent) : QObject(parent) {}
 
 QString AppInfo::defaultLogFilePath() {
     return DEBUG_BUILD ? QStringLiteral("./kw_legion.log")
-                        : QStandardPaths::writableLocation(
-                              QStandardPaths::CacheLocation) +
-                              QStringLiteral("/kw_legion.log");
+                       : QStandardPaths::writableLocation(
+                             QStandardPaths::CacheLocation) +
+                             QStringLiteral("/kw_legion.log");
 }
 
 // Q_PROPERTY READ accessors must be non-static for Qt's meta-object system to
@@ -45,5 +45,12 @@ QString AppInfo::logFilePath() const { return defaultLogFilePath(); }
 QUrl AppInfo::logDirectoryUrl() const {
     return QUrl::fromLocalFile(QFileInfo(logFilePath()).absolutePath());
 }
+
+void AppInfo::setStartMinimized(bool startMinimized) {
+    AppInfo::mStartMinimized = startMinimized;
+}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+bool AppInfo::shouldStartMinimized() const { return mStartMinimized; }
 
 }  // namespace KWLegionCore

@@ -6,6 +6,7 @@ import QtQuick.Layouts
 import QtQuick.Controls.Basic
 import Qt.labs.platform
 import KWLegionUI
+import KWLegionCore
 import "pages"
 
 ApplicationWindow {
@@ -14,7 +15,7 @@ ApplicationWindow {
     height: 700
     minimumWidth: 200
     minimumHeight: 250
-    visible: true
+    visible: !AppInfo.startMinimized
     title: qsTr("LEGION Replay Manager")
 
     property bool quitting: false

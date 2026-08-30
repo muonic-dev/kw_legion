@@ -101,6 +101,11 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    if (QGuiApplication::arguments().contains(QStringLiteral("--minimized"))) {
+        qInfo() << "Start minimized requested";
+        AppInfo::setStartMinimized(true);
+    }
+
     QGuiApplication::setWindowIcon(
         QIcon(":/qt/qml/KWLegionUI/ico/CNCKW_Marked_of_Kane_Logo.png"));
 
