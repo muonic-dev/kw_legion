@@ -8,12 +8,20 @@ configure_file(
     @ONLY
 )
 
+set(platform_sources)
+if(WIN32)
+    list(APPEND platform_sources src/autostart_windows.cpp)
+else()
+    list(APPEND platform_sources src/autostart_empty.cpp)
+endif()
+
 add_library(kwlegion_core STATIC
     # Public interface (and also MOC)
     include/kwlegion_core/appinfo.h
     include/kwlegion_core/prospector.h
     include/kwlegion_core/store.h
     include/kwlegion_core/storemodel.h
+    include/kwlegion_core/settings.h
     # Main src
     src/appinfo.cpp
     src/prospector.cpp
@@ -28,8 +36,12 @@ add_library(kwlegion_core STATIC
     src/replaymodel.h # MOC
     src/deferred.cpp
     src/deferred.h #MOC
-    src/faction_registration.h #MOC
+    src/faction_registration.h
+    src/settings.cpp
+    src/autostart_windows.cpp
+    ${platform_sources}
 )
+
 add_library(kwlegion::core ALIAS kwlegion_core)
 
 set_target_properties(kwlegion_core PROPERTIES AUTOMOC ON)

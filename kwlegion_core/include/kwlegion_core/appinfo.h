@@ -12,6 +12,13 @@
 
 namespace KWLegionCore {
 
+inline constexpr bool DEBUG_BUILD =
+#ifdef QT_DEBUG
+    true;
+#else
+    false;
+#endif
+
 // Read-only, build-time version/build info surfaced to QML for display (the
 // About page). Values are baked in by CMake - see version.h.in.
 class AppInfo : public QObject {

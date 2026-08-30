@@ -3,6 +3,7 @@
 
 #include <kwlegion_core/appinfo.h>
 #include <kwlegion_core/prospector.h>
+#include <kwlegion_core/settings.h>
 #include <kwlegion_core/store.h>
 #include <kwlegion_core/storemodel.h>
 
@@ -87,7 +88,11 @@ using namespace KWLegionCore;
 
 // NOLINTNEXTLINE(modernize-avoid-c-arrays, cppcoreguidelines-avoid-c-arrays)
 int main(int argc, char* argv[]) {
-    QCoreApplication::setApplicationName("kw_legion");
+    QCoreApplication::setOrganizationName("Muonic-Dev");
+    QCoreApplication::setOrganizationDomain("muonic-dev.github.io");
+
+    QCoreApplication::setApplicationName(
+        KWLegionCore::DEBUG_BUILD ? "kw_legion-debug" : "kw_legion");
 
     qInstallMessageHandler(logMessageHandler);
 
@@ -164,6 +169,14 @@ int main(int argc, char* argv[]) {
             rootWindow->raise();
             rootWindow->requestActivate();
         });
+
+    auto* settings =
+        engine.singletonInstance<Settings*>("KWLegionCore", "Settings");
+    if (settings == nullptr) {
+        qFatal() << "No KWLegionCore.Settings singleton";
+    }
+    settings->setAutostartMechanism(
+        KWLegionCore::createPlatformAutostartMechanism());
 
     auto* storeModel =
         engine.singletonInstance<StoreModel*>("KWLegionCore", "StoreModel");

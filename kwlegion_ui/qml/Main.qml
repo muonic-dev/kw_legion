@@ -15,8 +15,15 @@ ApplicationWindow {
     height: 700
     minimumWidth: 200
     minimumHeight: 250
-    visible: !AppInfo.startMinimized
+    visible: false // so we can control via the on completed
+
     title: qsTr("LEGION Replay Manager")
+
+    Component.onCompleted: {
+        console.log("switch", AppInfo.startMinimized, "setting", Settings.startMinimized);
+        const beVisible = !AppInfo.startMinimized && !Settings.startMinimized;
+        appWindow.visible = beVisible;
+    }
 
     property bool quitting: false
 

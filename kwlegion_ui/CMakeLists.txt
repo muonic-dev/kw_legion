@@ -22,6 +22,7 @@ qt_add_qml_module(kw_legion
         qml/Main.qml
         qml/Theme.qml
         qml/NavRail.qml
+        qml/SettingsSwitchRow.qml
         qml/pages/ReplaysPage.qml
         qml/pages/StatisticsPage.qml
         qml/pages/SettingsPage.qml

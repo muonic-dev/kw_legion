@@ -12,15 +12,6 @@
 
 namespace KWLegionCore {
 
-namespace {
-inline constexpr bool DEBUG_BUILD =
-#ifdef QT_DEBUG
-    true;
-#else
-    false;
-#endif
-}  // namespace
-
 AppInfo::AppInfo(QObject* parent) : QObject(parent) {}
 
 QString AppInfo::defaultLogFilePath() {
