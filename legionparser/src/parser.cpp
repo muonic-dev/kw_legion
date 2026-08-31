@@ -282,6 +282,18 @@ void Parser::parsePlayerSlots(const QStringView header) {
         const QStringView slotView =
             QStringView(header).sliced(slotStart, slotEnd - slotStart);
 
+        // We only ever get 8 players, the synthetic +1 player
+        // just doesn't get parsed in this case
+        if (slotView.isEmpty()) {
+            if (playerIdx == m_metadata.players.size() - 1) {
+                // The synthetic commentator has no slot entry when the lobby is
+                // full
+                break;
+            }
+            throw CorruptDataException(
+                QString("player %1 slot missing").arg(playerIdx),
+                m_reader->lastOffset());
+        }
         // Decode the player data
         const QChar slotType = slotView.at(0);
         qsizetype factionField{};
@@ -448,20 +460,14 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
     // the file, so we can slice out exactly the footer's bytes directly
     // from the end rather than scanning for the magic string.
     if (std::cmp_less(lastChunk.size(), FOOTER_LENGTH_FIELD_SIZE)) {
-        throw CorruptDataException(
-            QLatin1String("replay is missing a valid footer; the file may be a "
-                          "torn/incomplete read"),
-            m_reader->offset());
+        throw TornDataException(m_reader->offset());
     }
 
     const quint32 footerLength =
         readLE32(lastChunk.sliced(lastChunk.size() - FOOTER_LENGTH_FIELD_SIZE));
     if (std::cmp_less(footerLength, FOOTER_MIN_SIZE) ||
         std::cmp_greater(footerLength, lastChunk.size())) {
-        throw CorruptDataException(
-            QLatin1String("replay footer length is invalid; the file may be a "
-                          "torn/incomplete read"),
-            m_reader->offset());
+        throw TornDataException(m_reader->offset());
     }
 
     const QByteArrayView footer =
@@ -469,11 +475,12 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
 
     const auto magicView = QByteArrayView(FOOTER_MAGIC, FOOTER_MAGIC_SIZE);
     if (footer.first(magicView.size()) != magicView) {
-        throw CorruptDataException(
-            QLatin1String("replay is missing a valid footer; the file may be a "
-                          "torn/incomplete read"),
-            m_reader->offset());
+        throw TornDataException(m_reader->offset());
     }
+
+    // Once we have read the FOOTER_MAGIC the likelihood that further validation
+    // errors are the result of a torn read are vanishingly unlikely so we
+    // switch back to throwing CorruptDataException from here on
 
     // data sits between final_time_code and footer_length (the trailing 4
     // bytes, whose value is footer.size() itself); it's either {0x02}, or
@@ -493,7 +500,7 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
     } else if (dataTag == 0x01) {
         constexpr qsizetype extendedDataFixedSize =
             2 + FOOTER_LENGTH_FIELD_SIZE;
-        // Bounds-check before reading the payload length field below - with
+        // Bounds-check before reading the payload length field below with
         // the minimum-size data (dataSize == 1) that field would fall past
         // the end of footer.
         if (std::cmp_less(dataSize, extendedDataFixedSize) ||

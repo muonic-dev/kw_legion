@@ -9,6 +9,7 @@
 #include <QSet>
 #include <QTimeZone>
 #include <catch2/catch_test_macros.hpp>
+#include <limits>
 
 using namespace LegionParser;
 
@@ -49,7 +50,7 @@ TEST_CASE("torn read (footer cut off mid-write) is rejected",
     // the "C&C3 REPLAY FOOTER" magic, simulating a replay read while the
     // game was still flushing its footer to disk.
     CHECK_THROWS_AS(parseReplay(QString::fromUtf8("test_torn_footer.KWReplay")),
-                    CorruptDataException);
+                    TornDataException);
 }
 
 TEST_CASE("parses muonic v branston game 1", "[legionparser][metadata]") {
@@ -211,4 +212,35 @@ TEST_CASE("team inference: FFA slots are never treated as allied",
         teamNumbers.insert(metadata.players.at(i).teamNumber);
     }
     CHECK(teamNumbers.size() == 4);
+}
+
+TEST_CASE(
+    "team inference: a completely full lobby leaves the commentator slot "
+    "at its defaults",
+    "[legionparser][team]") {
+    // 8-player all random ffa.KWReplay: all 8 real slots are filled, so
+    // there's no leftover ;S= entry for the trailing synthetic commentator
+    // player - this is the replay that originally surfaced
+    // Parser::parsePlayerSlots() indexing into an empty slot view once the
+    // header ran out of slot text before the player list did.
+    const ReplayMetadata metadata =
+        parseReplay(QString::fromUtf8("8-player all random ffa.KWReplay"));
+
+    REQUIRE(metadata.players.size() == 9);
+    CHECK(metadata.players.at(7).name == QLatin1String("Muonic"));
+
+    QSet<std::uint32_t> teamNumbers;
+    for (qsizetype i = 0; i < 8; i++) {
+        CHECK_FALSE(metadata.players.at(i).isComputer);
+        teamNumbers.insert(metadata.players.at(i).teamNumber);
+    }
+    CHECK(teamNumbers.size() == 8);
+
+    // parsePlayerSlots stops before ever reaching the commentator, so it's
+    // left at Player's documented "parsing hasn't reached this player yet"
+    // defaults rather than a crash or fabricated data.
+    const Player& commentator = metadata.players.at(8);
+    CHECK(commentator.teamNumber == std::numeric_limits<std::uint32_t>::max());
+    CHECK(commentator.faction == Faction::Unknown);
+    CHECK_FALSE(commentator.isComputer);
 }
