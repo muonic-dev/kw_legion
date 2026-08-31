@@ -60,6 +60,14 @@ constexpr std::array MIGRATIONS{
 
     "CREATE INDEX idx_replay_players_checksum"
     "    ON replay_players(replay_checksum);",
+
+    // In future, add acknowledged_at for tombstoning the UI marker
+    // problem maps to ProblemType::TORN ProblemType::CORRUPT
+    "CREATE TABLE broken_replays"
+    "   ( replay_path TEXT NOT NULL PRIMARY KEY"
+    "   , problem INT NOT NULL"
+    "   , noticed_at INT NOT NULL"
+    "   ) STRICT, WITHOUT ROWID;",
 };
 
 bool Queries::migrate() {
@@ -361,6 +369,36 @@ QList<QString> Queries::selectExternalPaths(const QByteArray& checksum) {
     return paths;
 }
 
+Problem Queries::insertPathProblem(const Problem& problem) {
+    prepare(
+        "INSERT INTO broken_replays(replay_path, problem, noticed_at) "
+        "VALUES (:replay_path, :problem, :noticed_at) "
+        " ON CONFLICT DO UPDATE "
+        "   SET problem = excluded.problem "
+        " RETURNING "
+        "   replay_path, problem, noticed_at");
+    m_query.bindValue(":replay_path", problem.path);
+    m_query.bindValue(":problem", problemToUInt8(problem.type));
+    m_query.bindValue(":noticed_at", problem.noticedAt.toSecsSinceEpoch());
+
+    exec();
+
+    nextOrThrow();
+
+    return Problem{.path = m_query.value(0).toString(),
+                   .noticedAt = QDateTime::fromSecsSinceEpoch(
+                       m_query.value(1).toInt(), QTimeZone::UTC),
+                   .type = problemFromUInt8(
+                       static_cast<uint8_t>(m_query.value(2).toUInt()))};
+}
+
+void Queries::clearPathProblems(const QString& path) {
+    prepare("DELETE FROM broken_replays WHERE replay_path = :replay_path");
+    m_query.bindValue(":replay_path", path);
+
+    exec();
+}
+
 Replay Queries::readReplay() const {
     return Replay{.checksum = m_query.value(0).toByteArray(),
                   .timestamp = QDateTime::fromSecsSinceEpoch(
@@ -397,6 +435,12 @@ void Queries::throwLast() const {
 void Queries::throwLastIfFailed() const {
     if (m_query.lastError().isValid()) {
         throw StorageException(m_query.lastError().text());
+    }
+}
+
+void Queries::nextOrThrow() {
+    if (!m_query.next()) {
+        throw StorageException("expected result row");
     }
 }
 

@@ -4,6 +4,7 @@
 #pragma once
 
 #include <kwlegion_core/actionscope.h>
+#include <kwlegion_core/problems.h>
 #include <kwlegion_core/replay.h>
 #include <legionparser/replay.h>
 
@@ -20,11 +21,16 @@
 
 Q_DECLARE_LOGGING_CATEGORY(logStore);
 
+// TODO: Ideally we wouldn't leak forward declarations into the public interface
+// but for now this is what I've got
+namespace LegionParser {
+class ReplayParseException;
+class TornDataException;
+}  // namespace LegionParser
+
 namespace KWLegionCore {
 class Queries;
 class Deferred;
-
-using Retry = std::tuple<QString, uint>;
 
 class ReplayStore : public QObject {
     Q_OBJECT
@@ -70,7 +76,7 @@ class ReplayStore : public QObject {
     /**
      * A replay file has disappeared or is overwritten with incomplete data
      */
-    void removeReplayFileLink(const QString& path);
+    void removeReplayFileLink(const QString& path) noexcept;
 
     /**
      * Expose a replay to the Kane's Wrath replay folder by checksum
@@ -120,6 +126,11 @@ class ReplayStore : public QObject {
     // that will share the logic
     void performReplayAnalysis(const QString& path);
 
+    void handleTornFailure(const QString& path) noexcept;
+    // Assumes that ReplayParseException is disjoint from TornDataException
+    void handleParseFailure(const LegionParser::ReplayParseException& ex,
+                            const QString& path) noexcept;
+
     // Perform all the steps to try and receive a replay
     // File should probably be an absolute path
     // Returns the checksums that were impacted by the ingestion
@@ -144,7 +155,13 @@ class ReplayStore : public QObject {
         const QByteArray& checksum) const;
 
     void exposeReplay(const QByteArray& checksum);
+
+    Problem handleProblem(const Problem& problem);
+
     static void hideReplay(Queries& queries, const QByteArray& checksum);
+
+    // Don't keep trying on a replay
+    static bool shouldGiveUp(const Problem& problem, const QDateTime& now);
 
     // We want to wait until full analysis is done on all replays before we
     // emit the first event instead of trickling them in with analyze

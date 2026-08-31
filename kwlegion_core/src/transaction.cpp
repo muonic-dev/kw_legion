@@ -21,6 +21,7 @@ bool SqlTransactionGuard::rollback() {
     return !m_inTx;
 }
 
+// TODO: For ergonomics should this throw when commit fails?
 bool SqlTransactionGuard::commit() {
     if (!m_inTx) {
         return false;

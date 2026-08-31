@@ -130,18 +130,10 @@ void ReplayStore::analyzeReplayFile(const QString& path) {
             removeReplayFileLink(path);
             m_deferred->waitForReady(path);
         }
-    } catch (LegionParser::TornDataException& ex) {
-        // If the replay cannot be parsed then whatever then
-        // the link to an existing replay needs to be broken
-        // Also send this back through the deferred logic
-        qDebug(logStore) << "path " << path << " is incomplete, deferring";
-        removeReplayFileLink(path);
-        m_deferred->waitForReady(path);
-    } catch (LegionParser::ReplayParseException& ex) {
-        // The replay is terminally invalid, so just remove it
-        // TODO: Surface this in the UI
-        qInfo(logStore) << "unable to parse " << ex.what();
-        removeReplayFileLink(path);
+    } catch (const LegionParser::TornDataException& ex) {
+        handleTornFailure(path);
+    } catch (const LegionParser::ReplayParseException& ex) {
+        handleParseFailure(ex, path);
     } catch (StorageException& ex) {
         // TODO: This should eventually be noisy
         // TODO: If we catch a StorageException we should also retry in the hope
@@ -153,7 +145,62 @@ void ReplayStore::analyzeReplayFile(const QString& path) {
     }
 }
 
-void ReplayStore::removeReplayFileLink(const QString& path) {
+void ReplayStore::handleTornFailure(const QString& path) noexcept {
+    // If the replay cannot be parsed then whatever then
+    // the link to an existing replay needs to be broken
+    // Also send this back through the deferred logic
+    qDebug(logStore) << "path " << path << " is incomplete, deferring";
+    // No throw since we get external calls
+    removeReplayFileLink(path);
+
+    try {
+        auto now = QDateTime::currentDateTimeUtc();
+        const Problem actual = handleProblem(
+            Problem{.path = path, .noticedAt = now, .type = ProblemType::TORN});
+        if (shouldGiveUp(actual, now)) {
+            qWarning(logStore) << "giving up on repeatedly torn path " << path;
+            return;
+        }
+    } catch (const StorageException& ex) {
+        qWarning(logStore) << "unable to write problem marker: " << ex.what();
+        // fall through to retry again
+    }
+
+    m_deferred->waitForReady(path);
+}
+void ReplayStore::handleParseFailure(
+    const LegionParser::ReplayParseException& ex,
+    const QString& path) noexcept {
+    // The replay is terminally invalid, so just remove it
+    // TODO: Surface this in the UI
+    // TODO: ReplayParseException includes potential IO failures which may
+    // be transient in addition to CorruptDataException
+    qInfo(logStore) << "unable to parse " << ex.what();
+    // No throw since we get external calls
+    removeReplayFileLink(path);
+    try {
+        auto now = QDateTime::currentDateTimeUtc();
+        handleProblem(Problem{
+            .path = path, .noticedAt = now, .type = ProblemType::CORRUPT});
+    } catch (const StorageException& ex) {
+        qWarning(logStore) << "unable to write problem marker: " << ex.what();
+    }
+}
+
+Problem ReplayStore::handleProblem(const Problem& problem) {
+    SqlTransactionGuard tx(m_db);
+    Queries queries{QSqlQuery(m_db)};
+
+    Problem result = queries.insertPathProblem(problem);
+
+    if (!tx.commit()) {
+        throw StorageException("commit failed: " + m_db.lastError().text());
+    }
+
+    return result;
+}
+
+void ReplayStore::removeReplayFileLink(const QString& path) noexcept {
     qDebug(logStore) << "Removing replay: " << path;
     try {
         forwardChangedReplays(removeReplayAtPath(path));
@@ -238,6 +285,10 @@ void ReplayStore::hideReplay(Queries& queries, const QByteArray& checksum) {
     }
 }
 
+bool ReplayStore::shouldGiveUp(const Problem& problem, const QDateTime& now) {
+    return problem.noticedAt < now.addSecs(-60 * 60);
+}
+
 void ReplayStore::performReplayAnalysis(const QString& path) {
     qDebug(logStore) << "Analyzing replay: " << path;
     QFile replayFile(path);
@@ -261,6 +312,10 @@ QList<QByteArray> ReplayStore::ingestReplay(
     QFile& file, const LegionParser::ReplayMetadata& metadata) {
     SqlTransactionGuard tx(m_db);
     Queries queries{QSqlQuery(m_db)};
+
+    // If we have a successful parse at this point we are in a transaction
+    // so also clear any failed parses
+    queries.clearPathProblems(file.fileName());
 
     QList<QByteArray> impactedChecksums{{metadata.checksum}};
 

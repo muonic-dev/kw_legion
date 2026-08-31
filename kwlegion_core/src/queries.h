@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <kwlegion_core/problems.h>
 #include <kwlegion_core/replay.h>
 #include <legionparser/replay.h>
 
@@ -71,6 +72,14 @@ class Queries final {
 
     QList<QString> selectExternalPaths(const QByteArray& checksum);
 
+    // Insert a new problem
+    // Returns the resulting materialized problem which may not be
+    // identical to what was sent in
+    // Use the noticed_at/type to determine what to do about the issue
+    Problem insertPathProblem(const Problem& problem);
+
+    void clearPathProblems(const QString& path);
+
    private:
     void prepare(const QString& sql);
 
@@ -81,6 +90,8 @@ class Queries final {
     void throwLast() const;
 
     void throwLastIfFailed() const;
+
+    void nextOrThrow();
 
     [[nodiscard]] Replay readReplay() const;
 
