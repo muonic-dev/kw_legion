@@ -13,3 +13,5 @@
 
 ### Changed
 
+- The bulk operations moved to a persistent toolbar. There is now a selection menu for all/none/invert.
+
