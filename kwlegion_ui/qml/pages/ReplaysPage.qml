@@ -365,7 +365,7 @@ Page {
 
                     Label {
                         width: parent.width
-                        text: delegateRoot.patch.toUpperCase() + " " + delegateRoot.matchTitle
+                        text: delegateRoot.matchTitle
                         font.bold: true
                         elide: Text.ElideRight
                         color: Theme.lightMode ? Theme.dark : Theme.light
@@ -378,11 +378,19 @@ Page {
                         color: Theme.lightMode ? Theme.dark : Theme.light
                     }
 
-                    Label {
+                    RowLayout {
                         width: parent.width
-                        text: delegateRoot.mapName
-                        elide: Text.ElideRight
-                        color: Theme.lightMode ? Theme.dark : Theme.light
+                        spacing: 8
+                        Label {
+                            Layout.fillWidth: true
+                            text: delegateRoot.mapName
+                            elide: Text.ElideRight
+                            color: Theme.lightMode ? Theme.dark : Theme.light
+                        }
+
+                        PatchPill {
+                            text: delegateRoot.patch
+                        }
                     }
                 }
 

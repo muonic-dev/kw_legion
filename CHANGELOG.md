@@ -5,6 +5,7 @@
 ### Added
 
 - Options to start automatically on login and start with the main window minimized
+- It is now possible to edit the match title and these edits will be used to choose file names when exporting
 
 ### Fixed
 
@@ -14,4 +15,5 @@
 ### Changed
 
 - The bulk operations moved to a persistent toolbar. There is now a selection menu for all/none/invert.
+- The guess patched display has been relocated
 
