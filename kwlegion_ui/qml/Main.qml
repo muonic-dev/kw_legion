@@ -20,7 +20,6 @@ ApplicationWindow {
     title: qsTr("LEGION Replay Manager")
 
     Component.onCompleted: {
-        console.log("switch", AppInfo.startMinimized, "setting", Settings.startMinimized);
         const beVisible = !AppInfo.startMinimized && !Settings.startMinimized;
         appWindow.visible = beVisible;
     }
