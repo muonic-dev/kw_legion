@@ -354,7 +354,7 @@ Page {
                 x: 8
                 y: 8
                 width: delegateRoot.fieldColumnWidth
-                height: Math.max(textColumn.height + 4 + controlRow.height, teamsFlow.height)
+                height: textColumn.height + 4 + actionBar.height
 
                 Column {
                     id: textColumn
@@ -373,7 +373,7 @@ Page {
 
                     Label {
                         width: parent.width
-                        text: delegateRoot.timestamp.toLocaleString(Qt.locale())
+                        text: delegateRoot.timestamp.toLocaleString(Qt.locale(), Locale.ShortFormat)
                         elide: Text.ElideRight
                         color: Theme.lightMode ? Theme.dark : Theme.light
                     }
@@ -394,8 +394,12 @@ Page {
                     }
                 }
 
+                // There's a third (match statistics) button planned for here
+                // eventually - two icons already come close to filling the
+                // same vertical space a stacked layout would need, so a
+                // horizontal row costs little extra height for a third.
                 Row {
-                    id: controlRow
+                    id: actionBar
                     anchors.bottom: parent.bottom
                     anchors.left: parent.left
                     spacing: 8
@@ -464,12 +468,21 @@ Page {
                 }
             }
 
-            Column {
+            Flow {
                 id: teamsFlow
                 x: fieldColumn.x + fieldColumn.width + 16
                 y: 8
                 width: delegateRoot.width - x - 8
                 spacing: 12
+
+                // Every team box is a fixed width, growing vertically as
+                // players are added, rather than sized to fit a particular
+                // match's team count. Most matches have small teams, and a
+                // fixed width keeps every row's boxes aligned with each
+                // other regardless of match type. Bigger teams (e.g. 4v4)
+                // just end up as a taller single column; that's an accepted
+                // trade for consistent alignment across the whole list.
+                readonly property int teamBoxWidth: 140
 
                 // delegateRoot.teams is a QList<TeamModel*>; Repeater
                 // treats it as a JS array, one modelData per team.
@@ -480,19 +493,16 @@ Page {
                         id: teamBox
 
                         required property QtObject modelData
-                        // TODO: There is some kind of rebuild/teardown that causes warnings unless this is guarded
-                        width: parent ? parent.width : 0
+                        width: teamsFlow.teamBoxWidth
                         height: teamColumn.height + 16
                         color: "transparent"
                         border.color: Theme.lightMode ? Theme.dark : Theme.light
                         radius: 4
 
-                        Flow {
+                        Column {
                             id: teamColumn
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.top: parent.top
-                            anchors.margins: 8
+                            x: 8
+                            y: 8
                             spacing: 4
 
                             // Each team is itself a model of players.
@@ -515,7 +525,7 @@ Page {
                                     }
 
                                     Label {
-                                        width: Math.min(120, teamColumn.width)
+                                        width: 94
                                         text: playerDelegate.name
                                         verticalAlignment: Text.AlignVCenter
                                         elide: Text.ElideRight
