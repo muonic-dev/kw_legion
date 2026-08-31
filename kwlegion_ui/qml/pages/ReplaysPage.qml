@@ -134,6 +134,12 @@ Page {
                     }
                 }
 
+                // TODO: Clicking this button again while the menu is open
+                // should close it. CloseOnPressOutside closes the popup on
+                // the press itself, before this button's own click fires, so
+                // toggling based on the popup's state at click time just
+                // reopens it; capturing state on Button.onPressed instead
+                // didn't resolve it either. Revisit before going public.
                 onClicked: selectionMenu.open()
 
                 padding: 10
@@ -144,7 +150,7 @@ Page {
                     id: selectionMenu
                     y: selectionMenuButton.height
 
-                    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
+                    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
                     MenuItem {
                         text: qsTr("Select All")
