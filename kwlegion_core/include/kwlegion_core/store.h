@@ -22,6 +22,7 @@ Q_DECLARE_LOGGING_CATEGORY(logStore);
 
 namespace KWLegionCore {
 class Queries;
+class Deferred;
 
 using Retry = std::tuple<QString, uint>;
 
@@ -33,7 +34,7 @@ class ReplayStore : public QObject {
      * directory will be received from the prospector
      *
      * Subsequently, each new file will come in via an
-     * analyzeReplayFile/removeReplayFile
+     * analyzeReplayFile/removeReplayFileLink
      *
      * Internally, performReplayAnalysis does the parsing
      * This is used both on initial load and on periodic
@@ -67,9 +68,9 @@ class ReplayStore : public QObject {
      */
     void analyzeReplayFile(const QString& path);
     /**
-     * A replay file has disappeared
+     * A replay file has disappeared or is overwritten with incomplete data
      */
-    void removeReplayFile(const QString& path);
+    void removeReplayFileLink(const QString& path);
 
     /**
      * Expose a replay to the Kane's Wrath replay folder by checksum
@@ -137,13 +138,13 @@ class ReplayStore : public QObject {
 
     void forwardChangedReplays(const QList<QByteArray>& checksums);
 
+    void forwardChangedReplays(const std::optional<QByteArray>& checksum);
+
     [[nodiscard]] QString computeIngestionPath(
         const QByteArray& checksum) const;
 
     void exposeReplay(const QByteArray& checksum);
     static void hideReplay(Queries& queries, const QByteArray& checksum);
-
-    void processDeferred();
 
     // We want to wait until full analysis is done on all replays before we
     // emit the first event instead of trickling them in with analyze
@@ -158,11 +159,7 @@ class ReplayStore : public QObject {
     // Path to the Documents\Command &...\Replays dir
     QString m_replayDir;
 
-    // We frequently have to wait for a replay file to settle (be fully written)
-    // when the game is saving. Track this here
-    QSet<QString> m_deferredPaths;
-
-    // A ptr so it thread moves with the store
-    QTimer* m_deferredTrigger;
+    // The deferred path parsing process
+    Deferred* m_deferred;
 };
 }  // namespace KWLegionCore

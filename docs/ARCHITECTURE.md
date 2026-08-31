@@ -42,6 +42,6 @@ data model to populate the view.
 ### Runtime
 
 As the `ReplayProspector` receives directory changed events it determines which files were added or removed
-based on its own cached filesystem state. It emits the events `replayFileChanged` and `replayFileRemoved` for this update. The `ReplayStore` listens for these with `analyzeReplayFile` and `removeReplayFile` to synchronize
+based on its own cached filesystem state. It emits the events `replayFileChanged` and `replayFileRemoved` for this update. The `ReplayStore` listens for these with `analyzeReplayFile` and `removeReplayFileLink` to synchronize
 the database state. It subsequently emits events to keep the `StoreModel` in sync. There is now a 
 `replayDiscovered`, `replayChanged`, and `replayRemoved`. These are keyed on a `Replay` type that bears a checksum. Functionally, the `ReplayStore` sits betwen the `Prospector` and the `Model` and converts between paths and checksums. Logically, a replay is not a file so the changed event can bear information like the replay is now present in the Documents folder or it was removed.

@@ -11,6 +11,7 @@
 #include <QStandardPaths>
 #include <stdexcept>
 
+#include "deferred.h"
 #include "exception.h"
 #include "queries.h"
 
@@ -18,7 +19,7 @@ Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
 
 namespace KWLegionCore {
 
-constexpr int FIVE_SECONDS = 5000;
+constexpr int FIVE_SECONDS_MS = 5000;
 
 ReplayStore::ReplayStore(QString replayDir, const QString& statePath,
                          QObject* parent)
@@ -26,15 +27,17 @@ ReplayStore::ReplayStore(QString replayDir, const QString& statePath,
       m_dbPath(statePath + "/replays.db"),
       m_storageDir(statePath + "/replays"),
       m_replayDir(std::move(replayDir)),
-      m_deferredTrigger(new QTimer(this)) {
-    m_deferredTrigger->start(FIVE_SECONDS);
-    m_deferredTrigger->callOnTimeout(this, &ReplayStore::processDeferred);
+      m_deferred(new Deferred(this)) {
+    m_deferred->setRecheckIntervalMs(FIVE_SECONDS_MS);
+    // Send it back throught the analyze replay file
+    QObject::connect(m_deferred, &Deferred::pathReady, this,
+                     &ReplayStore::analyzeReplayFile);
 }
 
 void ReplayStore::stop() {
     // Silence a warning about stopping the time
     // Trigger from stopping on the thread
-    m_deferredTrigger->stop();
+    m_deferred->stop();
 }
 
 void ReplayStore::saveReplayAs(const QByteArray& checksum, const QUrl& path) {
@@ -117,48 +120,42 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
 
 void ReplayStore::analyzeReplayFile(const QString& path) {
     try {
-        const QFileInfo pathInfo(path);
-        if (pathInfo.size() == 0 ||
-            QDateTime::currentDateTime().addMSecs(-FIVE_SECONDS) <
-                pathInfo.lastModified()) {
-            qDebug(logStore)
-                << "File was empty or very recently modified, deferring "
-                   "modified="
-                << pathInfo.lastModified() << " size=" << pathInfo.size();
-            m_deferredPaths.insert(path);
-        } else {
+        if (Deferred::readyForParsing(path)) {
             performReplayAnalysis(path);
+        } else {
+            // If the replay cannot be parsed then whatever then
+            // the link to an existing replay needs to be broken
+            removeReplayFileLink(path);
+            m_deferred->waitForReady(path);
         }
+    } catch (LegionParser::TornDataException& ex) {
+        // If the replay cannot be parsed then whatever then
+        // the link to an existing replay needs to be broken
+        // Also send this back through the deferred logic
+        removeReplayFileLink(path);
+        m_deferred->waitForReady(path);
     } catch (LegionParser::ReplayParseException& ex) {
-        qDebug(logStore) << "Unable to parse " << path << " " << ex.what();
-        // If there was a replay file at this path it should be removed because
-        // it was overwritten with nonsense
-        try {
-            std::optional checksum = removeReplayAtPath(path);
-            if (checksum.has_value()) {
-                forwardChangedReplays(QList{checksum.value()});
-            }
-        } catch (StorageException& ex) {
-            qCritical(logStore)
-                << "Unable to remove corrupt replay reference " << ex.what();
-        }
+        // The replay is terminally invalid, so just remove it
+        // TODO: Surface this in the UI
+        qInfo(logStore) << "unable to parse " << ex.what();
+        removeReplayFileLink(path);
     } catch (StorageException& ex) {
-        // If it fails we should probably do something to mark the replay for
-        // future processing
-        qCritical(logStore) << "Unable to ingest the replay " << ex.what();
+        // TODO: This should eventually be noisy
+        // TODO: If we catch a StorageException we should also retry in the hope
+        // that whatever happened is transient. Need finer grained on what
+        // errors happened There's really no point in trying to
+        // removeReplayAtPath that we couldn't ingest if we just failed a sqlite
+        // commit.
+        qCritical(logStore) << "db or i/o error occurred " << ex.what();
     }
 }
 
-void ReplayStore::removeReplayFile(const QString& path) {
+void ReplayStore::removeReplayFileLink(const QString& path) {
     qDebug(logStore) << "Removing replay: " << path;
-
     try {
-        std::optional checksum = removeReplayAtPath(path);
-        if (checksum.has_value()) {
-            forwardChangedReplays(QList{checksum.value()});
-        }
+        forwardChangedReplays(removeReplayAtPath(path));
     } catch (StorageException& ex) {
-        qCritical(logStore) << "Unable to remove corrupt replay " << ex.what();
+        qCritical(logStore) << "Unable to remove invalid replay " << ex.what();
     }
 }
 
@@ -341,6 +338,13 @@ void ReplayStore::forwardChangedReplays(const QList<QByteArray>& checksums) {
     emit replaysChanged(replays);
 }
 
+void ReplayStore::forwardChangedReplays(
+    const std::optional<QByteArray>& checksum) {
+    if (checksum.has_value()) {
+        forwardChangedReplays(QList{checksum.value()});
+    }
+}
+
 QString ReplayStore::computeIngestionPath(const QByteArray& checksum) const {
     const QString filename =
         QString::fromLatin1(checksum.toHex()) + ".KWReplay";
@@ -357,21 +361,6 @@ std::optional<QByteArray> ReplayStore::removeReplayAtPath(const QString& path) {
         throw StorageException("failed to commit: " + m_db.lastError().text());
     }
     return result;
-}
-
-void ReplayStore::processDeferred() {
-    // Move so when we call if it is goign to be deferred again it can just push
-    // back
-
-    const auto pending = std::move(m_deferredPaths);
-    if (!pending.isEmpty()) {
-        qDebug(logStore) << "Processing deferred paths: "
-                         << QDateTime::currentDateTime();
-    }
-    for (const auto& path : pending) {
-        qDebug(logStore) << "Considering deferred path " << path;
-        analyzeReplayFile(path);
-    }
 }
 
 void ReplayStore::ensureDb() {

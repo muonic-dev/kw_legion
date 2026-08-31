@@ -31,6 +31,11 @@ class CorruptDataException : public ReplayParseException {
     CorruptDataException(const QString& what, size_t offset);
 };
 
+class TornDataException : public ReplayParseException {
+   public:
+    TornDataException(size_t offset);
+};
+
 class IOException : public ReplayParseException {
    public:
     explicit IOException(const QString& errorString);
