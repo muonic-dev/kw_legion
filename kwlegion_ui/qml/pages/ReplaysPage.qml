@@ -53,6 +53,17 @@ Page {
         }
     }
 
+    // Checksums of the replays currently passing the header's text filter,
+    // in list order. Bulk selection actions are scoped to this set so they
+    // never silently act on rows the user can't currently see.
+    function visibleChecksums() {
+        const checksums = [];
+        for (let row = 0; row < sortedStoreModel.rowCount(); row++) {
+            checksums.push(sortedStoreModel.data(sortedStoreModel.index(row, 0), StoreModel.ChecksumRole));
+        }
+        return checksums;
+    }
+
     FileDialog {
         id: fileDialog
         fileMode: FileDialog.SaveFile
@@ -85,18 +96,151 @@ Page {
 
     Shortcut {
         sequence: StandardKey.SelectAll
-        onActivated: StoreModel.selectAllReplays()
+        onActivated: {
+            StoreModel.clearSelected();
+            StoreModel.extendReplaySelection(page.visibleChecksums());
+        }
     }
 
     header: ToolBar {
-        TextField {
-            id: filterField
-            anchors.fill: parent
-            anchors.margins: 8
-            placeholderText: qsTr("Filter replays…")
+        padding: 8
 
-            Keys.onEscapePressed: replaysListView.forceActiveFocus()
-            onTextChanged: sortedStoreModel.refilter()
+        contentItem: RowLayout {
+            spacing: 8
+
+            TextField {
+                id: filterField
+                Layout.fillWidth: true
+                placeholderText: qsTr("Filter replays…")
+
+                Keys.onEscapePressed: replaysListView.forceActiveFocus()
+                onTextChanged: sortedStoreModel.refilter()
+            }
+
+            Button {
+                id: selectionMenuButton
+
+                contentItem: RowLayout {
+                    spacing: 2
+                    Image {
+                        source: "qrc:/qt/qml/KWLegionUI/ico/check-all-svgrepo-com.svg"
+                        sourceSize: Qt.size(16, 16)
+                        fillMode: Image.PreserveAspectFit
+                    }
+                    Image {
+                        source: "qrc:/qt/qml/KWLegionUI/ico/chevron-down-svgrepo-com.svg"
+                        sourceSize: Qt.size(10, 10)
+                        fillMode: Image.PreserveAspectFit
+                    }
+                }
+
+                onClicked: selectionMenu.open()
+
+                padding: 10
+                implicitWidth: implicitContentWidth + leftPadding + rightPadding
+                implicitHeight: implicitContentHeight + topPadding + bottomPadding
+
+                Menu {
+                    id: selectionMenu
+                    y: selectionMenuButton.height
+
+                    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
+
+                    MenuItem {
+                        text: qsTr("Select All")
+                        icon.source: "qrc:/qt/qml/KWLegionUI/ico/checkbox-check-svgrepo-com.svg"
+                        onTriggered: {
+                            StoreModel.clearSelected();
+                            StoreModel.extendReplaySelection(page.visibleChecksums());
+                        }
+                    }
+                    MenuItem {
+                        text: qsTr("Select None")
+                        icon.source: "qrc:/qt/qml/KWLegionUI/ico/checkbox-unchecked-svgrepo-com.svg"
+                        onTriggered: StoreModel.clearSelected()
+                    }
+                    MenuItem {
+                        text: qsTr("Invert Selection")
+                        icon.source: "qrc:/qt/qml/KWLegionUI/ico/checkbox-fill-svgrepo-com.svg"
+                        onTriggered: StoreModel.invertSelection(page.visibleChecksums())
+                    }
+                }
+            }
+
+            Button {
+                enabled: StoreModel.selectionCount > 0
+                opacity: enabled ? 1 : 0.4
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 120
+                    }
+                }
+
+                contentItem: Image {
+                    source: "qrc:/qt/qml/KWLegionUI/ico/link-horizontal-svgrepo-com.svg"
+                    sourceSize: Qt.size(16, 16)
+                    fillMode: Image.PreserveAspectFit
+                }
+
+                onClicked: {
+                    StoreModel.restrictSelectionTo(page.visibleChecksums());
+                    StoreModel.showSelectedReplays();
+                }
+
+                padding: 10
+                implicitWidth: 16 + leftPadding + rightPadding
+                implicitHeight: 16 + topPadding + bottomPadding
+            }
+
+            Button {
+                enabled: StoreModel.selectionCount > 0
+                opacity: enabled ? 1 : 0.4
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 120
+                    }
+                }
+
+                contentItem: Image {
+                    source: "qrc:/qt/qml/KWLegionUI/ico/link-horizontal-off-svgrepo-com.svg"
+                    sourceSize: Qt.size(16, 16)
+                    fillMode: Image.PreserveAspectFit
+                }
+
+                onClicked: {
+                    StoreModel.restrictSelectionTo(page.visibleChecksums());
+                    StoreModel.hideSelectedReplays();
+                }
+
+                padding: 10
+                implicitWidth: 16 + leftPadding + rightPadding
+                implicitHeight: 16 + topPadding + bottomPadding
+            }
+
+            Button {
+                enabled: StoreModel.selectionCount > 0
+                opacity: enabled ? 1 : 0.4
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 120
+                    }
+                }
+
+                contentItem: Image {
+                    source: "qrc:/qt/qml/KWLegionUI/ico/export-svgrepo-com.svg"
+                    sourceSize: Qt.size(16, 16)
+                    fillMode: Image.PreserveAspectFit
+                }
+
+                onClicked: {
+                    StoreModel.restrictSelectionTo(page.visibleChecksums());
+                    folderDialog.open();
+                }
+
+                padding: 10
+                implicitWidth: 16 + leftPadding + rightPadding
+                implicitHeight: 16 + topPadding + bottomPadding
+            }
         }
     }
 
@@ -250,9 +394,9 @@ Page {
                             implicitWidth: 16
 
                             Image {
-                                id: eyeOpen
+                                id: linkOn
                                 anchors.fill: parent
-                                source: "qrc:/qt/qml/KWLegionUI/ico/eye-show-svgrepo-com.svg"
+                                source: "qrc:/qt/qml/KWLegionUI/ico/link-horizontal-svgrepo-com.svg"
                                 // Fix for blurry
                                 sourceSize: Qt.size(width, height)
                                 opacity: delegateRoot.hasExternalPath ? 1 : 0
@@ -263,9 +407,9 @@ Page {
                                 }
                             }
                             Image {
-                                id: eyeClosed
+                                id: linkOff
                                 anchors.fill: parent
-                                source: "qrc:/qt/qml/KWLegionUI/ico/eye-hide-svgrepo-com.svg"
+                                source: "qrc:/qt/qml/KWLegionUI/ico/link-horizontal-off-svgrepo-com.svg"
                                 // Fix for blurry
                                 sourceSize: Qt.size(width, height)
                                 opacity: delegateRoot.hasExternalPath ? 0 : 1
@@ -288,7 +432,7 @@ Page {
 
                     Button {
                         contentItem: Image {
-                            source: "qrc:/qt/qml/KWLegionUI/ico/save-floppy-svgrepo-com.svg"
+                            source: "qrc:/qt/qml/KWLegionUI/ico/export-svgrepo-com.svg"
                             sourceSize: Qt.size(16, 16)
                             fillMode: Image.PreserveAspectFit
                         }
@@ -368,78 +512,6 @@ Page {
                         }
                     }
                 }
-            }
-        }
-    }
-
-    Rectangle {
-        id: selectionBar
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
-        anchors.right: parent.right
-        anchors.rightMargin: replaysScrollBar.visible ? replaysScrollBar.width : 0
-        height: 48
-        color: Theme.lightMode ? Theme.reallyLight : Theme.reallyDark
-        z: 10
-
-        opacity: StoreModel.selectionCount > 1 ? 1 : 0
-        visible: opacity > 0
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 120
-            }
-        }
-
-        RowLayout {
-            anchors.fill: parent
-            anchors.margins: 8
-
-            Button {
-                contentItem: Image {
-                    source: "qrc:/qt/qml/KWLegionUI/ico/eye-show-svgrepo-com.svg"
-                    sourceSize: Qt.size(16, 16)
-                    fillMode: Image.PreserveAspectFit
-                }
-
-                onClicked: StoreModel.showSelectedReplays()
-
-                padding: 10
-                implicitWidth: 16 + leftPadding + rightPadding
-                implicitHeight: 16 + topPadding + bottomPadding
-            }
-
-            Button {
-                contentItem: Image {
-                    source: "qrc:/qt/qml/KWLegionUI/ico/eye-hide-svgrepo-com.svg"
-                    sourceSize: Qt.size(16, 16)
-                    fillMode: Image.PreserveAspectFit
-                }
-
-                onClicked: StoreModel.hideSelectedReplays()
-
-                padding: 10
-                implicitWidth: 16 + leftPadding + rightPadding
-                implicitHeight: 16 + topPadding + bottomPadding
-            }
-
-            Button {
-                contentItem: Image {
-                    source: "qrc:/qt/qml/KWLegionUI/ico/save-floppy-svgrepo-com.svg"
-                    sourceSize: Qt.size(16, 16)
-                    fillMode: Image.PreserveAspectFit
-                }
-
-                onClicked: {
-                    folderDialog.open();
-                }
-
-                padding: 10
-                implicitWidth: 16 + leftPadding + rightPadding
-                implicitHeight: 16 + topPadding + bottomPadding
-            }
-
-            Item {
-                Layout.fillWidth: true
             }
         }
     }

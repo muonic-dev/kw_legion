@@ -164,19 +164,41 @@ void StoreModel::clearSelected() {
     }
 }
 
-void StoreModel::selectAllReplays() {
-    if (m_replays.isEmpty()) {
-        return;
-    }
-
+void StoreModel::restrictSelectionTo(const QList<QByteArray>& checksums) {
+    const QSet<QByteArray> keep{checksums.begin(), checksums.end()};
     const qsizetype before = m_selections.size();
-    for (const auto& replay : m_replays) {
-        m_selections.insert(replay->checksum());
+    for (auto it = m_replays.cbegin(); it != m_replays.cend(); ++it) {
+        const QByteArray& checksum = (*it)->checksum();
+        if (m_selections.contains(checksum) && !keep.contains(checksum)) {
+            m_selections.remove(checksum);
+            dataChangedByIter(it, SELECTED_ROLE);
+        }
     }
+    if (m_selections.size() != before) {
+        emit selectionCountChanged();
+    }
+}
 
-    const QModelIndex start = index(0);
-    const QModelIndex end = index(static_cast<int>(m_replays.size() - 1));
-    emit dataChanged(start, end, SELECTED_ROLE);
+void StoreModel::invertSelection(const QList<QByteArray>& checksums) {
+    const QSet<QByteArray> scope{checksums.begin(), checksums.end()};
+    const qsizetype before = m_selections.size();
+    for (auto it = m_replays.cbegin(); it != m_replays.cend(); ++it) {
+        const QByteArray& checksum = (*it)->checksum();
+        if (!scope.contains(checksum)) {
+            // Outside the scope this invert applies to - drop any stale
+            // selection rather than leave it lingering untouched.
+            if (m_selections.remove(checksum)) {
+                dataChangedByIter(it, SELECTED_ROLE);
+            }
+            continue;
+        }
+        if (m_selections.contains(checksum)) {
+            m_selections.remove(checksum);
+        } else {
+            m_selections.insert(checksum);
+        }
+        dataChangedByIter(it, SELECTED_ROLE);
+    }
     if (m_selections.size() != before) {
         emit selectionCountChanged();
     }

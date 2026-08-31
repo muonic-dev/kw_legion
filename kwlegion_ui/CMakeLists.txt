@@ -39,9 +39,14 @@ qt_add_qml_module(kw_legion
         ico/CNCKW_Reaper-17_Logo.png
         ico/question-mark.png
         ico/dice-24-svgrepo-com.png
-        ico/eye-hide-svgrepo-com.svg
-        ico/eye-show-svgrepo-com.svg
-        ico/save-floppy-svgrepo-com.svg
+        ico/link-horizontal-off-svgrepo-com.svg
+        ico/link-horizontal-svgrepo-com.svg
+        ico/export-svgrepo-com.svg
+        ico/check-all-svgrepo-com.svg
+        ico/chevron-down-svgrepo-com.svg
+        ico/checkbox-check-svgrepo-com.svg
+        ico/checkbox-unchecked-svgrepo-com.svg
+        ico/checkbox-fill-svgrepo-com.svg
 )
 
 target_include_directories(kw_legion

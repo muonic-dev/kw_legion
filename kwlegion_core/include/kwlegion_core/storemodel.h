@@ -70,7 +70,13 @@ class StoreModel : public QAbstractListModel {
     Q_INVOKABLE bool toggleReplaySelected(const QByteArray& checksum);
     Q_INVOKABLE void extendReplaySelection(const QList<QByteArray>& checksums);
     Q_INVOKABLE void clearSelected();
-    Q_INVOKABLE void selectAllReplays();
+
+    // Drops any selected checksum not present in the given scope (typically
+    // the caller's currently-filtered/visible set), leaving the rest as-is.
+    Q_INVOKABLE void restrictSelectionTo(const QList<QByteArray>& checksums);
+    // Toggles selection for each checksum in the given scope, and drops any
+    // selected checksum outside of it - i.e. invert restricted to that scope.
+    Q_INVOKABLE void invertSelection(const QList<QByteArray>& checksums);
 
     Q_INVOKABLE void saveReplayAs(const QByteArray& checksum, const QUrl& path);
     // Export currently selected replays to the given path
