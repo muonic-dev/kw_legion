@@ -8,6 +8,8 @@
 
 ### Fixed
 
-- A crash when parsing 8 player replays
+- Crash when parsing 8 player replays
+- Some cases where newly written Last Replay.KWReplay woulnd't be ingested correctly
 
 ### Changed
+
