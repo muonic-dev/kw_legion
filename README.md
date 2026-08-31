@@ -21,7 +21,9 @@ This project is licensed under the GNU General Public License v3.0 or later - se
 
 ⚠️ This project is open source because I believe in it. However, as I have limited time if you drive by PR it is very unlikely that I will review and/or merge.
 
-- [Architecture](docs/ARCHITECTURE.md) — how the components (parser, core, UI) fit together and interact.
+- [Architecture](docs/ARCHITECTURE.md) - how the components (parser, core, UI) fit together and interact.
+- [test-harness/trickle.py](test-harness/trickle.py) - A python script to slowly copy a replay from one location to another. 
+It writes 4k blocks and flushes them then sleeps for 4s to simulate the way KW seems to take its sweet time writing kbs of data.
 
 ## AI Disclosure
 

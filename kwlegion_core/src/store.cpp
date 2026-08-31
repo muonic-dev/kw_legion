@@ -125,6 +125,8 @@ void ReplayStore::analyzeReplayFile(const QString& path) {
         } else {
             // If the replay cannot be parsed then whatever then
             // the link to an existing replay needs to be broken
+            qDebug(logStore)
+                << "path " << path << " has not settled, deferring";
             removeReplayFileLink(path);
             m_deferred->waitForReady(path);
         }
@@ -132,6 +134,7 @@ void ReplayStore::analyzeReplayFile(const QString& path) {
         // If the replay cannot be parsed then whatever then
         // the link to an existing replay needs to be broken
         // Also send this back through the deferred logic
+        qDebug(logStore) << "path " << path << " is incomplete, deferring";
         removeReplayFileLink(path);
         m_deferred->waitForReady(path);
     } catch (LegionParser::ReplayParseException& ex) {
