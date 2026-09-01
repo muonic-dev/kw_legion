@@ -5,11 +5,12 @@
 
 #pragma once
 
+#include <kwlegion_core/inboxitem.h>
+
 #include <QAbstractListModel>
 #include <QByteArray>
 #include <QQmlEngine>
 #include <QTimer>
-
 
 namespace KWLegionCore {
 /**
@@ -26,7 +27,8 @@ class IngestionModel : public QAbstractListModel {
    public:
     enum class Roles : std::uint16_t {
         PathRole = Qt::UserRole + 1,
-        WaitingRole,  // Is this a wait for settle or an error
+        TypeRole,  // InboxType - PENDING/TORN/CORRUPT
+        ObservedAtRole,
     };
 
     Q_ENUM(Roles);
@@ -49,7 +51,5 @@ class IngestionModel : public QAbstractListModel {
    private:
     QHash<int, QByteArray> m_roles;
     QList<QHash<int, QVariant>> m_mockData;
-    QTimer* m_toggle;
-    bool m_show;
 };
 }  // namespace KWLegionCore

@@ -23,6 +23,7 @@ add_library(kwlegion_core STATIC
     include/kwlegion_core/storemodel.h
     include/kwlegion_core/settings.h
     include/kwlegion_core/ingestionmodel.h
+    include/kwlegion_core/inboxitem.h
     # Main src
     src/appinfo.cpp
     src/metatypes.cpp

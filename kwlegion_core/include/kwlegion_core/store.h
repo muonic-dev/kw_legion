@@ -31,6 +31,7 @@ namespace KWLegionCore {
 class Queries;
 class Deferred;
 struct ProblemRecord;
+class InboxItem;
 
 class ReplayStore : public QObject {
     Q_OBJECT
@@ -112,6 +113,13 @@ class ReplayStore : public QObject {
     void replaysChanged(const QList<Replay>&);
     // A replay that did exist disappeared
     void replayRemoved(const QByteArray&);
+
+    // A new inbox item was observed. This path may already have been
+    // observed with a different type. Will be emitted in a sequence during
+    // startup to populate the list
+    void inboxItemObserved(const InboxItem& item);
+    // Any inbox items at this path should no longer be displayed.
+    void inboxItemRemoved(const QString& path);
 
    private:
     void ensureDb();

@@ -51,6 +51,15 @@ qt_add_qml_module(kw_legion
         ico/checkbox-check-svgrepo-com.svg
         ico/checkbox-unchecked-svgrepo-com.svg
         ico/checkbox-fill-svgrepo-com.svg
+        ico/download-svgrepo-com.svg
+        ico/chart-line-svgrepo-com.svg
+        ico/chart-pie-svgrepo-com.svg
+        ico/edit-pencil-line-01-svgrepo-com.svg
+        ico/stop-sign-svgrepo-com.svg
+        ico/close-md-svgrepo-com.svg
+        ico/close-lg-svgrepo-com.svg
+        ico/close-sm-svgrepo-com.svg
+        ico/arrow-reload-02-svgrepo-com.svg
 )
 
 target_include_directories(kw_legion
