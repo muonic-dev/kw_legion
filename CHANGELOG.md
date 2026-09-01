@@ -11,6 +11,7 @@
 
 - Crash when parsing 8 player replays
 - Some cases where newly written Last Replay.KWReplay woulnd't be ingested correctly
+- Poor icon visibility in dark mode
 
 ### Changed
 
