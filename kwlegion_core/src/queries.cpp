@@ -369,7 +369,7 @@ QList<QString> Queries::selectExternalPaths(const QByteArray& checksum) {
     return paths;
 }
 
-Problem Queries::insertPathProblem(const Problem& problem) {
+ProblemRecord Queries::insertPathProblem(const ProblemRecord& problem) {
     prepare(
         "INSERT INTO broken_replays(replay_path, problem, noticed_at) "
         "VALUES (:replay_path, :problem, :noticed_at) "
@@ -385,11 +385,11 @@ Problem Queries::insertPathProblem(const Problem& problem) {
 
     nextOrThrow();
 
-    return Problem{.path = m_query.value(0).toString(),
-                   .noticedAt = QDateTime::fromSecsSinceEpoch(
-                       m_query.value(1).toInt(), QTimeZone::UTC),
-                   .type = problemFromUInt8(
-                       static_cast<uint8_t>(m_query.value(2).toUInt()))};
+    return ProblemRecord{.path = m_query.value(0).toString(),
+                         .noticedAt = QDateTime::fromSecsSinceEpoch(
+                             m_query.value(1).toInt(), QTimeZone::UTC),
+                         .type = problemFromUInt8(
+                             static_cast<uint8_t>(m_query.value(2).toUInt()))};
 }
 
 void Queries::clearPathProblems(const QString& path) {

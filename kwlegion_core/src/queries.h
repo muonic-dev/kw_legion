@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include <kwlegion_core/problems.h>
 #include <kwlegion_core/replay.h>
 #include <legionparser/replay.h>
 
@@ -15,6 +14,8 @@
 #include <QString>
 #include <array>
 #include <optional>
+
+#include "problems.h"
 
 namespace KWLegionCore {
 
@@ -76,7 +77,7 @@ class Queries final {
     // Returns the resulting materialized problem which may not be
     // identical to what was sent in
     // Use the noticed_at/type to determine what to do about the issue
-    Problem insertPathProblem(const Problem& problem);
+    ProblemRecord insertPathProblem(const ProblemRecord& problem);
 
     void clearPathProblems(const QString& path);
 

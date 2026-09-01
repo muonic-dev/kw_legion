@@ -22,8 +22,8 @@ inline ProblemType problemFromUInt8(uint8_t t) {
     return static_cast<ProblemType>(t);
 }
 
-/** Record of a replay problem type */
-struct Problem {
+/** Record of a replay problem type as read/stored from the database */
+struct ProblemRecord {
     QString path;
     QDateTime noticedAt;
     ProblemType type;

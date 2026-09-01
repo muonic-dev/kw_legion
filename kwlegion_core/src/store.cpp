@@ -13,6 +13,7 @@
 
 #include "deferred.h"
 #include "exception.h"
+#include "problems.h"
 #include "queries.h"
 
 Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
@@ -155,8 +156,8 @@ void ReplayStore::handleTornFailure(const QString& path) noexcept {
 
     try {
         auto now = QDateTime::currentDateTimeUtc();
-        const Problem actual = handleProblem(
-            Problem{.path = path, .noticedAt = now, .type = ProblemType::TORN});
+        const ProblemRecord actual = handleProblem(ProblemRecord{
+            .path = path, .noticedAt = now, .type = ProblemType::TORN});
         if (shouldGiveUp(actual, now)) {
             qWarning(logStore) << "giving up on repeatedly torn path " << path;
             return;
@@ -180,18 +181,18 @@ void ReplayStore::handleParseFailure(
     removeReplayFileLink(path);
     try {
         auto now = QDateTime::currentDateTimeUtc();
-        handleProblem(Problem{
+        handleProblem(ProblemRecord{
             .path = path, .noticedAt = now, .type = ProblemType::CORRUPT});
     } catch (const StorageException& ex) {
         qWarning(logStore) << "unable to write problem marker: " << ex.what();
     }
 }
 
-Problem ReplayStore::handleProblem(const Problem& problem) {
+ProblemRecord ReplayStore::handleProblem(const ProblemRecord& problem) {
     SqlTransactionGuard tx(m_db);
     Queries queries{QSqlQuery(m_db)};
 
-    Problem result = queries.insertPathProblem(problem);
+    ProblemRecord result = queries.insertPathProblem(problem);
 
     if (!tx.commit()) {
         throw StorageException("commit failed: " + m_db.lastError().text());
@@ -285,8 +286,10 @@ void ReplayStore::hideReplay(Queries& queries, const QByteArray& checksum) {
     }
 }
 
-bool ReplayStore::shouldGiveUp(const Problem& problem, const QDateTime& now) {
-    return problem.noticedAt < now.addSecs(-60 * 60);
+bool ReplayStore::shouldGiveUp(const ProblemRecord& problem,
+                               const QDateTime& now) {
+    const QDateTime cutoff = now.addSecs(-60LL * 60LL);
+    return problem.noticedAt < cutoff;
 }
 
 void ReplayStore::performReplayAnalysis(const QString& path) {

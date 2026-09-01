@@ -4,7 +4,6 @@
 #pragma once
 
 #include <kwlegion_core/actionscope.h>
-#include <kwlegion_core/problems.h>
 #include <kwlegion_core/replay.h>
 #include <legionparser/replay.h>
 
@@ -31,6 +30,7 @@ class TornDataException;
 namespace KWLegionCore {
 class Queries;
 class Deferred;
+struct ProblemRecord;
 
 class ReplayStore : public QObject {
     Q_OBJECT
@@ -156,12 +156,13 @@ class ReplayStore : public QObject {
 
     void exposeReplay(const QByteArray& checksum);
 
-    Problem handleProblem(const Problem& problem);
+    ProblemRecord handleProblem(const ProblemRecord& problem);
 
     static void hideReplay(Queries& queries, const QByteArray& checksum);
 
     // Don't keep trying on a replay
-    static bool shouldGiveUp(const Problem& problem, const QDateTime& now);
+    static bool shouldGiveUp(const ProblemRecord& problem,
+                             const QDateTime& now);
 
     // We want to wait until full analysis is done on all replays before we
     // emit the first event instead of trickling them in with analyze
