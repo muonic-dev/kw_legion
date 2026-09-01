@@ -40,6 +40,17 @@ void Settings::setStartMinimized(bool minimized) {
     emit startMinimizedChanged();
 }
 
+constexpr const char* CLOSE_TO_TRAY = "close/toTray";
+bool Settings::closeToTray() const {
+    return m_settings.value(CLOSE_TO_TRAY, true).toBool();
+}
+
+void Settings::setCloseToTray(bool closeToTray) {
+    m_settings.setValue(CLOSE_TO_TRAY, closeToTray);
+    m_settings.sync();
+    emit closeToTrayChanged();
+}
+
 void Settings::setAutostartMechanism(
     std::unique_ptr<AutostartMechanism> autostarter) {
     m_autostarter = std::move(autostarter);

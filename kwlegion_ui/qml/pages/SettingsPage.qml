@@ -31,6 +31,13 @@ Page {
             onCheckedChanged: Settings.startMinimized = checked
         }
 
+        SettingsSwitchRow {
+            name: qsTr("Minimize to tray")
+            description: qsTr("Hide the window to the tray icon instead of quitting when you close close")
+            checked: Settings.closeToTray
+            onCheckedChanged: Settings.closeToTray = checked
+        }
+
         Item {
             Layout.fillHeight: true
         }

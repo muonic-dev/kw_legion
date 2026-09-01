@@ -30,8 +30,13 @@ ApplicationWindow {
         if (quitting) {
             return;
         }
-        close.accepted = false;
-        appWindow.hide();
+        if (Settings.closeToTray) {
+            close.accepted = false;
+            appWindow.hide();
+        } else {
+            appWindow.quitting = true;
+            Qt.quit();
+        }
     }
 
     Shortcut {

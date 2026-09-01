@@ -25,6 +25,9 @@ class Settings : public QObject {
                    NOTIFY autostartChanged)
     Q_PROPERTY(bool startMinimized READ startMinimized WRITE setStartMinimized
                    NOTIFY startMinimizedChanged)
+    Q_PROPERTY(bool closeToTray READ closeToTray WRITE setCloseToTray NOTIFY
+                   closeToTrayChanged)
+
    public:
     Settings(QObject* parent = nullptr);
 
@@ -34,6 +37,9 @@ class Settings : public QObject {
     [[nodiscard]] bool startMinimized() const;
     void setStartMinimized(bool startMinimized);
 
+    [[nodiscard]] bool closeToTray() const;
+    void setCloseToTray(bool closeToTray);
+
     void setAutostartMechanism(std::unique_ptr<AutostartMechanism> autostarter);
 
     static Settings* create(QQmlEngine* qmlEngine, QJSEngine* jsEngine);
@@ -41,6 +47,7 @@ class Settings : public QObject {
    signals:
     void autostartChanged();
     void startMinimizedChanged();
+    void closeToTrayChanged();
 
    private:
     QSettings m_settings;

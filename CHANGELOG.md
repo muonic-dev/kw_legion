@@ -6,6 +6,7 @@
 
 - Options to start automatically on login and start with the main window minimized
 - It is now possible to edit the match title and these edits will be used to choose file names when exporting
+- Setting to control minimize to tray
 
 ### Fixed
 
