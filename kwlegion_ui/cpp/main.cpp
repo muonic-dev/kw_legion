@@ -2,11 +2,12 @@
 // Copyright (C) 2026 Muonic
 
 #include <kwlegion_core/appinfo.h>
+#include <kwlegion_core/ingestionmodel.h>
 #include <kwlegion_core/metatypes.h>
 #include <kwlegion_core/prospector.h>
-#include <kwlegion_core/settings.h>
 #include <kwlegion_core/replaystore.h>
 #include <kwlegion_core/replaystoremodel.h>
+#include <kwlegion_core/settings.h>
 
 #include <QDebug>
 #include <QDir>
@@ -81,6 +82,15 @@ void logMessageHandler(QtMsgType type, const QMessageLogContext& context,
         stderrStream.flush();
         fflush(stderr);
     }
+}
+
+template <typename T>
+T* requireSingleton(QQmlApplicationEngine& engine, const char* typeName) {
+    auto* instance = engine.singletonInstance<T*>("KWLegionCore", typeName);
+    if (instance == nullptr) {
+        qFatal() << "No KWLegionCore." << typeName << " singleton";
+    }
+    return instance;
 }
 
 }  // namespace
@@ -171,18 +181,17 @@ int main(int argc, char* argv[]) {
             rootWindow->requestActivate();
         });
 
-    auto* settings =
-        engine.singletonInstance<Settings*>("KWLegionCore", "Settings");
-    if (settings == nullptr) {
-        qFatal() << "No KWLegionCore.Settings singleton";
-    }
+    auto* settings = requireSingleton<Settings>(engine, "Settings");
     settings->setAutostartMechanism(
         KWLegionCore::createPlatformAutostartMechanism());
 
-    auto* replayStoreModel = engine.singletonInstance<ReplayStoreModel*>(
-        "KWLegionCore", "ReplayStoreModel");
-
+    auto* replayStoreModel =
+        requireSingleton<ReplayStoreModel>(engine, "ReplayStoreModel");
     replayStoreModel->setStore(&replayStore);
+
+    auto* ingestionModel =
+        requireSingleton<IngestionModel>(engine, "IngestionModel");
+    ingestionModel->setStore(&replayStore);
 
     ioThread.start();
 

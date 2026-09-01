@@ -7,6 +7,8 @@
 #include <kwlegion_core/replaystore.h>
 
 #include <QDateTime>
+#include <algorithm>
+
 
 namespace KWLegionCore {
 IngestionModel* IngestionModel::create(QQmlEngine* /*qmlEngine*/,
@@ -68,10 +70,43 @@ void IngestionModel::setStore(ReplayStore* store) const {
                      &IngestionModel::inboxItemRemoved);
 }
 
-void IngestionModel::inboxReset() {}
+void IngestionModel::inboxReset() {
+    const bool wasEmpty = m_inbox.isEmpty();
+    beginResetModel();
+    m_inbox.clear();
+    endResetModel();
+    if (!wasEmpty) {
+        emit ingestionCountChanged();
+    }
+}
 
-void IngestionModel::inboxItemObserved(const InboxItem& item) {}
+void IngestionModel::inboxItemObserved(const InboxItem& item) {
+    auto it = std::ranges::find_if(
+        m_inbox, [&item](const InboxItem& i) { return item.path == i.path; });
+    if (it != m_inbox.end()) {
+        // Assumes that items will not typically have a changed observed at
+        *it = item;
+        const QModelIndex idx = index(static_cast<int>(it - m_inbox.begin()));
+        emit dataChanged(idx, idx);
+    } else {
+        const int row = static_cast<int>(m_inbox.size());
+        beginInsertRows(QModelIndex(), row, row);
+        m_inbox.append(item);
+        endInsertRows();
+        emit ingestionCountChanged();
+    }
+}
 
-void IngestionModel::inboxItemRemoved(const QString& path) {}
+void IngestionModel::inboxItemRemoved(const QString& path) {
+    auto it = std::ranges::find_if(
+        m_inbox, [&path](const InboxItem& i) { return path == i.path; });
+    if (it != m_inbox.end()) {
+        const int row = static_cast<int>(it - m_inbox.begin());
+        beginRemoveRows(QModelIndex(), row, row);
+        m_inbox.erase(it);
+        endRemoveRows();
+        emit ingestionCountChanged();
+    }
+}
 
 }  // namespace KWLegionCore

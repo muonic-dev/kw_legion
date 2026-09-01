@@ -15,7 +15,7 @@
 namespace KWLegionCore {
 class ReplayStore;
 /**
- * Track the amount of items that are currently
+ * Track the amount of items that are currently being processed
  */
 class IngestionModel : public QAbstractListModel {
     Q_OBJECT
@@ -58,6 +58,7 @@ class IngestionModel : public QAbstractListModel {
 
    private:
     QHash<int, QByteArray> m_roles;
+
     QList<InboxItem> m_inbox;
 };
 }  // namespace KWLegionCore

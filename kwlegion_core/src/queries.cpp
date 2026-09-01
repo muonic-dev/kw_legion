@@ -79,6 +79,10 @@ bool Queries::migrate() {
     m_query.exec("PRAGMA user_version");
     m_query.next();
     const size_t currentVersion = m_query.value(0).toULongLong();
+    // We aren't draining so call finish explicitly - otherwise the
+    // statement stays active and blocks the caller's transaction commit
+    // when there are no pending migrations to run.
+    m_query.finish();
 
     qDebug() << "Current schema version is: " << currentVersion;
 
@@ -300,7 +304,11 @@ std::optional<Replay> Queries::selectReplay(const QByteArray& checksum) {
     exec();
 
     if (m_query.next()) {
-        return readReplay();
+        const Replay result = readReplay();
+        // We aren't draining so call finish explicitly - otherwise the
+        // statement stays active and blocks the caller's transaction commit.
+        m_query.finish();
+        return result;
     }
 
     // Check for termination due to error
@@ -372,11 +380,16 @@ ProblemRecord Queries::insertPathProblem(const ProblemRecord& problem) {
 
     nextOrThrow();
 
-    return ProblemRecord{.path = m_query.value(0).toString(),
-                         .noticedAt = QDateTime::fromSecsSinceEpoch(
-                             m_query.value(1).toInt(), QTimeZone::UTC),
-                         .type = problemFromUInt8(
-                             static_cast<uint8_t>(m_query.value(2).toUInt()))};
+    const ProblemRecord result{
+        .path = m_query.value(0).toString(),
+        .noticedAt = QDateTime::fromSecsSinceEpoch(m_query.value(1).toInt(),
+                                                   QTimeZone::UTC),
+        .type =
+            problemFromUInt8(static_cast<uint8_t>(m_query.value(2).toUInt()))};
+    // We aren't draining so call finish explicitly - otherwise the
+    // statement stays active and blocks the caller's transaction commit.
+    m_query.finish();
+    return result;
 }
 
 void Queries::forgetMissingPathProblems(const QList<QString>& currentPaths) {
@@ -398,7 +411,7 @@ QList<ProblemRecord> Queries::selectPathProblems() {
     prepare(
         "SELECT replay_path, problem, noticed_at "
         "FROM broken_replays "
-        "WHERE acknolwedged_at IS NULL");
+        "WHERE acknowledged_at IS NULL");
     exec();
 
     QList<ProblemRecord> records;

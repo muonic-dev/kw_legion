@@ -135,7 +135,7 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
 
         // Also emit all the pending paths
     } catch (StorageException& ex) {
-        qCritical(logStore) << "Unable to access the db";
+        qCritical(logStore) << "Unable to access the db: " << ex.what();
     }
     // Now that we've handled everything here lets also finish initializing the
     // problems
@@ -173,6 +173,7 @@ void ReplayStore::analyzeReplayFile(const QString& path) {
                 << "path " << path << " has not settled, deferring";
             removeReplayFileLink(path);
             m_deferred->waitForReady(path);
+            emitDeferredItem(path);
         }
     } catch (const LegionParser::TornDataException& ex) {
         // Replay torn, hopefully we get notified in the future if more data
@@ -241,6 +242,7 @@ void ReplayStore::removeReplayFileLink(const QString& path) noexcept {
     qDebug(logStore) << "Removing replay: " << path;
     try {
         forwardChangedReplays(removeReplayAtPath(path));
+        emit inboxItemRemoved(path);
     } catch (StorageException& ex) {
         qCritical(logStore) << "Unable to remove invalid replay " << ex.what();
     }
