@@ -3,11 +3,15 @@
  * Copyright (C) 2026 Muonic
  */
 
+#include <kwlegion_core/inboxitem.h>
 #include <kwlegion_core/metatypes.h>
 #include <kwlegion_core/replay.h>
 
 namespace KWLegionCore {
 
-void registerMetaTypes() { qRegisterMetaType<Replay>(); }
+void registerMetaTypes() {
+    qRegisterMetaType<Replay>();
+    qRegisterMetaType<InboxItem>();
+}
 
 }  // namespace KWLegionCore

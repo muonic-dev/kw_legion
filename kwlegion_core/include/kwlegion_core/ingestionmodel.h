@@ -13,6 +13,7 @@
 #include <QTimer>
 
 namespace KWLegionCore {
+class ReplayStore;
 /**
  * Track the amount of items that are currently
  */
@@ -44,6 +45,13 @@ class IngestionModel : public QAbstractListModel {
                                 int role = Qt::DisplayRole) const override;
     [[nodiscard]] int rowCount(
         const QModelIndex& parent = QModelIndex()) const override;
+
+    void setStore(ReplayStore* store);
+
+    // slots
+    void inboxReset();
+    void inboxItemObserved(const InboxItem& item);
+    void inboxItemRemoved(const QString& path);
 
    signals:
     void ingestionCountChanged();

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Muonic
 
-#include <kwlegion_core/store.h>
+#include <kwlegion_core/replaystore.h>
 #include <legionparser/parser.h>
 
 #include <QDebug>

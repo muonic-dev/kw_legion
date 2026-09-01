@@ -5,8 +5,8 @@
 #include <kwlegion_core/metatypes.h>
 #include <kwlegion_core/prospector.h>
 #include <kwlegion_core/settings.h>
-#include <kwlegion_core/store.h>
-#include <kwlegion_core/storemodel.h>
+#include <kwlegion_core/replaystore.h>
+#include <kwlegion_core/replaystoremodel.h>
 
 #include <QDebug>
 #include <QDir>
@@ -179,10 +179,10 @@ int main(int argc, char* argv[]) {
     settings->setAutostartMechanism(
         KWLegionCore::createPlatformAutostartMechanism());
 
-    auto* storeModel =
-        engine.singletonInstance<StoreModel*>("KWLegionCore", "StoreModel");
+    auto* replayStoreModel = engine.singletonInstance<ReplayStoreModel*>(
+        "KWLegionCore", "ReplayStoreModel");
 
-    storeModel->setStore(&replayStore);
+    replayStoreModel->setStore(&replayStore);
 
     ioThread.start();
 

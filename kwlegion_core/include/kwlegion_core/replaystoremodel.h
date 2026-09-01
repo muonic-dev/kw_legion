@@ -17,7 +17,7 @@ namespace KWLegionCore {
 class ReplayModel;
 class ReplayStore;
 
-class StoreModel : public QAbstractListModel {
+class ReplayStoreModel : public QAbstractListModel {
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
@@ -44,17 +44,17 @@ class StoreModel : public QAbstractListModel {
     // Forces the engine to construct the singleton eagerly (rather than on
     // first QML access) so main.cpp can retrieve the instance and wire up
     // signals before Main.qml loads.
-    static StoreModel* create(QQmlEngine* qmlEngine, QJSEngine* jsEngine);
+    static ReplayStoreModel* create(QQmlEngine* qmlEngine, QJSEngine* jsEngine);
 
-    StoreModel(QObject* parent = nullptr);
+    ReplayStoreModel(QObject* parent = nullptr);
 
-    ~StoreModel() override;
+    ~ReplayStoreModel() override;
 
-    StoreModel(const StoreModel&) = delete;
-    StoreModel(StoreModel&&) = delete;
+    ReplayStoreModel(const ReplayStoreModel&) = delete;
+    ReplayStoreModel(ReplayStoreModel&&) = delete;
 
-    StoreModel& operator=(const StoreModel&) = delete;
-    StoreModel& operator=(StoreModel&&) = delete;
+    ReplayStoreModel& operator=(const ReplayStoreModel&) = delete;
+    ReplayStoreModel& operator=(ReplayStoreModel&&) = delete;
 
     // Wires this model to its ReplayStore: subscribes to replaysLoaded/
     // replaysChanged, and connects the shouldX request signals back to the

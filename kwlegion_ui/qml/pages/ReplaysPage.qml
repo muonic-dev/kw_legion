@@ -58,8 +58,8 @@ Page {
     // never silently act on rows the user can't currently see.
     function visibleChecksums() {
         const checksums = [];
-        for (let row = 0; row < sortedStoreModel.rowCount(); row++) {
-            checksums.push(sortedStoreModel.data(sortedStoreModel.index(row, 0), StoreModel.ChecksumRole));
+        for (let row = 0; row < sortedReplayStoreModel.rowCount(); row++) {
+            checksums.push(sortedReplayStoreModel.data(sortedReplayStoreModel.index(row, 0), ReplayStoreModel.ChecksumRole));
         }
         return checksums;
     }
@@ -74,7 +74,7 @@ Page {
                 console.error("tried to save nothing");
                 return;
             }
-            StoreModel.saveReplayAs(page.currentlySavingChecksum, selectedFile);
+            ReplayStoreModel.saveReplayAs(page.currentlySavingChecksum, selectedFile);
             page.currentlySavingChecksum = null;
         }
     }
@@ -82,14 +82,14 @@ Page {
     FolderDialog {
         id: folderDialog
         onAccepted: {
-            StoreModel.exportSelectedReplaysTo(folderDialog.selectedFolder);
+            ReplayStoreModel.exportSelectedReplaysTo(folderDialog.selectedFolder);
         }
     }
 
     SortFilterProxyModel {
-        id: sortedStoreModel
-        sourceModel: StoreModel
-        sortRole: StoreModel.TimestampRole
+        id: sortedReplayStoreModel
+        sourceModel: ReplayStoreModel
+        sortRole: ReplayStoreModel.TimestampRole
         sortOrder: Qt.DescendingOrder
         filterPredicate: row => filterField.text.length == 0 || row.matchTitle.includes(filterField.text) || row.teams.some(team => team.playerNames.some(name => name.includes(filterField.text)))
     }
@@ -97,8 +97,8 @@ Page {
     Shortcut {
         sequence: StandardKey.SelectAll
         onActivated: {
-            StoreModel.clearSelected();
-            StoreModel.extendReplaySelection(page.visibleChecksums());
+            ReplayStoreModel.clearSelected();
+            ReplayStoreModel.extendReplaySelection(page.visibleChecksums());
         }
     }
 
@@ -114,7 +114,7 @@ Page {
                 placeholderText: qsTr("Filter replays…")
 
                 Keys.onEscapePressed: replaysListView.forceActiveFocus()
-                onTextChanged: sortedStoreModel.refilter()
+                onTextChanged: sortedReplayStoreModel.refilter()
             }
 
             Button {
@@ -155,27 +155,27 @@ Page {
                         icon.source: "qrc:/qt/qml/KWLegionUI/ico/checkbox-check-svgrepo-com.svg"
                         icon.color: Theme.lightMode ? Theme.dark : Theme.light
                         onTriggered: {
-                            StoreModel.clearSelected();
-                            StoreModel.extendReplaySelection(page.visibleChecksums());
+                            ReplayStoreModel.clearSelected();
+                            ReplayStoreModel.extendReplaySelection(page.visibleChecksums());
                         }
                     }
                     MenuItem {
                         text: qsTr("Select None")
                         icon.source: "qrc:/qt/qml/KWLegionUI/ico/checkbox-unchecked-svgrepo-com.svg"
                         icon.color: Theme.lightMode ? Theme.dark : Theme.light
-                        onTriggered: StoreModel.clearSelected()
+                        onTriggered: ReplayStoreModel.clearSelected()
                     }
                     MenuItem {
                         text: qsTr("Invert Selection")
                         icon.source: "qrc:/qt/qml/KWLegionUI/ico/checkbox-fill-svgrepo-com.svg"
                         icon.color: Theme.lightMode ? Theme.dark : Theme.light
-                        onTriggered: StoreModel.invertSelection(page.visibleChecksums())
+                        onTriggered: ReplayStoreModel.invertSelection(page.visibleChecksums())
                     }
                 }
             }
 
             Button {
-                enabled: StoreModel.selectionCount > 0
+                enabled: ReplayStoreModel.selectionCount > 0
                 opacity: enabled ? 1 : 0.4
                 Behavior on opacity {
                     ShortAnimation {}
@@ -187,8 +187,8 @@ Page {
                 }
 
                 onClicked: {
-                    StoreModel.restrictSelectionTo(page.visibleChecksums());
-                    StoreModel.showSelectedReplays();
+                    ReplayStoreModel.restrictSelectionTo(page.visibleChecksums());
+                    ReplayStoreModel.showSelectedReplays();
                 }
 
                 padding: 10
@@ -197,7 +197,7 @@ Page {
             }
 
             Button {
-                enabled: StoreModel.selectionCount > 0
+                enabled: ReplayStoreModel.selectionCount > 0
                 opacity: enabled ? 1 : 0.4
                 Behavior on opacity {
                     ShortAnimation {}
@@ -209,8 +209,8 @@ Page {
                 }
 
                 onClicked: {
-                    StoreModel.restrictSelectionTo(page.visibleChecksums());
-                    StoreModel.hideSelectedReplays();
+                    ReplayStoreModel.restrictSelectionTo(page.visibleChecksums());
+                    ReplayStoreModel.hideSelectedReplays();
                 }
 
                 padding: 10
@@ -219,7 +219,7 @@ Page {
             }
 
             Button {
-                enabled: StoreModel.selectionCount > 0
+                enabled: ReplayStoreModel.selectionCount > 0
                 opacity: enabled ? 1 : 0.4
                 Behavior on opacity {
                     ShortAnimation {}
@@ -231,7 +231,7 @@ Page {
                 }
 
                 onClicked: {
-                    StoreModel.restrictSelectionTo(page.visibleChecksums());
+                    ReplayStoreModel.restrictSelectionTo(page.visibleChecksums());
                     folderDialog.open();
                 }
 
@@ -248,12 +248,12 @@ Page {
 
     ListView {
         id: replaysListView
-        model: sortedStoreModel
+        model: sortedReplayStoreModel
         anchors.fill: parent
         clip: true
         focus: true
 
-        Keys.onEscapePressed: StoreModel.clearSelected()
+        Keys.onEscapePressed: ReplayStoreModel.clearSelected()
 
         Keys.onPressed: event => {
             if (event.key === Qt.Key_PageDown) {
@@ -311,7 +311,7 @@ Page {
                     //
                     // Should revise before we start going public
                     if (mouse.modifiers & Qt.ControlModifier) {
-                        if (StoreModel.toggleReplaySelected(delegateRoot.checksum)) {
+                        if (ReplayStoreModel.toggleReplaySelected(delegateRoot.checksum)) {
                             page.lastSelectedIndex = delegateRoot.index;
                         } else {
                             page.lastSelectedIndex = -1;
@@ -320,23 +320,23 @@ Page {
                         // Nothing has been selected yet do do the direct selection path
                         // Maybe this should do nothing
                         if (page.lastSelectedIndex < 0) {
-                            StoreModel.clearSelected();
-                            StoreModel.setReplaySelected(delegateRoot.checksum);
+                            ReplayStoreModel.clearSelected();
+                            ReplayStoreModel.setReplaySelected(delegateRoot.checksum);
                             page.lastSelectedIndex = delegateRoot.index;
                         } else {
                             const low = Math.min(delegateRoot.index, page.lastSelectedIndex);
                             const high = Math.max(delegateRoot.index, page.lastSelectedIndex);
                             const checkums = [];
                             for (let row = low; row <= high; row++) {
-                                checkums.push(sortedStoreModel.data(sortedStoreModel.index(row, 0), StoreModel.ChecksumRole));
+                                checkums.push(sortedReplayStoreModel.data(sortedReplayStoreModel.index(row, 0), ReplayStoreModel.ChecksumRole));
                             }
                             page.lastSelectedIndex = delegateRoot.index;
-                            StoreModel.extendReplaySelection(checkums);
+                            ReplayStoreModel.extendReplaySelection(checkums);
                         }
                     } else {
                         page.lastSelectedIndex = delegateRoot.index;
-                        StoreModel.clearSelected();
-                        StoreModel.setReplaySelected(delegateRoot.checksum);
+                        ReplayStoreModel.clearSelected();
+                        ReplayStoreModel.setReplaySelected(delegateRoot.checksum);
                     }
                 }
             }
@@ -432,7 +432,7 @@ Page {
                         }
 
                         onClicked: {
-                            StoreModel.toggleReplayExposed(delegateRoot.checksum);
+                            ReplayStoreModel.toggleReplayExposed(delegateRoot.checksum);
                         }
 
                         padding: 10
@@ -448,7 +448,7 @@ Page {
 
                         onClicked: {
                             page.currentlySavingChecksum = delegateRoot.checksum;
-                            fileDialog.selectedFile = `${fileDialog.currentFolder}/${StoreModel.friendlySaveName(delegateRoot.checksum)}`;
+                            fileDialog.selectedFile = `${fileDialog.currentFolder}/${ReplayStoreModel.friendlySaveName(delegateRoot.checksum)}`;
                             fileDialog.open();
                         }
 

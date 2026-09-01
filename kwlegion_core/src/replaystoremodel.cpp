@@ -3,9 +3,9 @@
  * Copyright (C) 2026 Muonic
  */
 
-#include <kwlegion_core/storemodel.h>
+#include <kwlegion_core/replaystoremodel.h>
 
-#include <kwlegion_core/store.h>
+#include <kwlegion_core/replaystore.h>
 
 #include <algorithm>
 #include <utility>
@@ -14,9 +14,9 @@
 
 namespace KWLegionCore {
 
-const QList SELECTED_ROLE{static_cast<int>(StoreModel::Roles::SelectedRole)};
+const QList SELECTED_ROLE{static_cast<int>(ReplayStoreModel::Roles::SelectedRole)};
 
-StoreModel::StoreModel(QObject* parent)
+ReplayStoreModel::ReplayStoreModel(QObject* parent)
     : QAbstractListModel(parent),
       m_roleNames{
           {static_cast<int>(Roles::ChecksumRole),
@@ -38,34 +38,34 @@ StoreModel::StoreModel(QObject* parent)
            QByteArrayLiteral("selected")},
       } {}
 
-StoreModel::~StoreModel() = default;
+ReplayStoreModel::~ReplayStoreModel() = default;
 
-StoreModel* StoreModel::create(QQmlEngine* /*qmlEngine*/,
+ReplayStoreModel* ReplayStoreModel::create(QQmlEngine* /*qmlEngine*/,
                                QJSEngine* /*jsEngine*/) {
     // Signature is Qt's QML_SINGLETON factory contract - must return T*, not
     // gsl::owner<T*>. Ownership transfers to the QML engine at the call site.
-    return new StoreModel();  // NOLINT(cppcoreguidelines-owning-memory)
+    return new ReplayStoreModel();  // NOLINT(cppcoreguidelines-owning-memory)
 }
 
-void StoreModel::setStore(ReplayStore* store) {
+void ReplayStoreModel::setStore(ReplayStore* store) {
     connect(store, &ReplayStore::replaysLoaded, this,
-            &StoreModel::replaysLoaded);
+            &ReplayStoreModel::replaysLoaded);
     connect(store, &ReplayStore::replaysChanged, this,
-            &StoreModel::replaysChanged);
+            &ReplayStoreModel::replaysChanged);
 
-    connect(this, &StoreModel::shouldToggleReplayExposed, store,
+    connect(this, &ReplayStoreModel::shouldToggleReplayExposed, store,
             &ReplayStore::toggleReplayExposed);
-    connect(this, &StoreModel::shouldExposeReplay, store,
+    connect(this, &ReplayStoreModel::shouldExposeReplay, store,
             &ReplayStore::ensureReplayExposed);
-    connect(this, &StoreModel::shouldHideReplay, store,
+    connect(this, &ReplayStoreModel::shouldHideReplay, store,
             &ReplayStore::ensureReplayHidden);
-    connect(this, &StoreModel::shouldSaveReplay, store,
+    connect(this, &ReplayStoreModel::shouldSaveReplay, store,
             &ReplayStore::saveReplayAs);
-    connect(this, &StoreModel::shouldExportReplays, store,
+    connect(this, &ReplayStoreModel::shouldExportReplays, store,
             &ReplayStore::exportReplaysAs);
 }
 
-void StoreModel::replaysLoaded(const QList<Replay>& replays) {
+void ReplayStoreModel::replaysLoaded(const QList<Replay>& replays) {
     beginResetModel();
     qDeleteAll(m_replays);
     m_replays.clear();
@@ -76,7 +76,7 @@ void StoreModel::replaysLoaded(const QList<Replay>& replays) {
     endResetModel();
 }
 
-void StoreModel::replaysChanged(const QList<Replay>& replays) {
+void ReplayStoreModel::replaysChanged(const QList<Replay>& replays) {
     for (const auto& replay : replays) {
         auto it =
             std::ranges::find_if(m_replays, [&replay](const ReplayModel* r) {
@@ -97,7 +97,7 @@ void StoreModel::replaysChanged(const QList<Replay>& replays) {
     }
 }
 
-QString StoreModel::friendlySaveName(const QByteArray& checksum) {
+QString ReplayStoreModel::friendlySaveName(const QByteArray& checksum) {
     auto it = std::ranges::find_if(m_replays, [&checksum](const auto& replay) {
         return replay->checksum() == checksum;
     });
@@ -108,23 +108,23 @@ QString StoreModel::friendlySaveName(const QByteArray& checksum) {
                                   QString(checksum.toHex()).slice(0, 8));
 }
 
-void StoreModel::toggleReplayExposed(const QByteArray& checksum) {
+void ReplayStoreModel::toggleReplayExposed(const QByteArray& checksum) {
     emit shouldToggleReplayExposed(checksum);
 }
 
-void StoreModel::showSelectedReplays() {
+void ReplayStoreModel::showSelectedReplays() {
     for (const auto& checksum : m_selections) {
         emit shouldExposeReplay(checksum);
     }
 }
 
-void StoreModel::hideSelectedReplays() {
+void ReplayStoreModel::hideSelectedReplays() {
     for (const auto& checksum : m_selections) {
         emit shouldHideReplay(checksum);
     }
 }
 
-void StoreModel::setReplaySelected(const QByteArray& checksum) {
+void ReplayStoreModel::setReplaySelected(const QByteArray& checksum) {
     auto it = std::ranges::find_if(m_replays, [&checksum](ReplayModel* replay) {
         return replay->checksum() == checksum;
     });
@@ -138,7 +138,7 @@ void StoreModel::setReplaySelected(const QByteArray& checksum) {
     }
 }
 
-void StoreModel::extendReplaySelection(const QList<QByteArray>& checksums) {
+void ReplayStoreModel::extendReplaySelection(const QList<QByteArray>& checksums) {
     const qsizetype before = m_selections.size();
     for (const auto& checksum : checksums) {
         auto it =
@@ -155,7 +155,7 @@ void StoreModel::extendReplaySelection(const QList<QByteArray>& checksums) {
     }
 }
 
-bool StoreModel::toggleReplaySelected(const QByteArray& checksum) {
+bool ReplayStoreModel::toggleReplaySelected(const QByteArray& checksum) {
     auto it = std::ranges::find_if(m_replays, [&checksum](ReplayModel* replay) {
         return replay->checksum() == checksum;
     });
@@ -173,7 +173,7 @@ bool StoreModel::toggleReplaySelected(const QByteArray& checksum) {
     return active;
 }
 
-void StoreModel::clearSelected() {
+void ReplayStoreModel::clearSelected() {
     const QSet<QByteArray> checksums = std::move(m_selections);
     for (auto it = m_replays.cbegin(); it < m_replays.cend(); ++it) {
         if (checksums.contains((*it)->checksum())) {
@@ -185,7 +185,7 @@ void StoreModel::clearSelected() {
     }
 }
 
-void StoreModel::restrictSelectionTo(const QList<QByteArray>& checksums) {
+void ReplayStoreModel::restrictSelectionTo(const QList<QByteArray>& checksums) {
     const QSet<QByteArray> keep{checksums.begin(), checksums.end()};
     const qsizetype before = m_selections.size();
     for (auto it = m_replays.cbegin(); it != m_replays.cend(); ++it) {
@@ -200,7 +200,7 @@ void StoreModel::restrictSelectionTo(const QList<QByteArray>& checksums) {
     }
 }
 
-void StoreModel::invertSelection(const QList<QByteArray>& checksums) {
+void ReplayStoreModel::invertSelection(const QList<QByteArray>& checksums) {
     const QSet<QByteArray> scope{checksums.begin(), checksums.end()};
     const qsizetype before = m_selections.size();
     for (auto it = m_replays.cbegin(); it != m_replays.cend(); ++it) {
@@ -225,25 +225,25 @@ void StoreModel::invertSelection(const QList<QByteArray>& checksums) {
     }
 }
 
-void StoreModel::saveReplayAs(const QByteArray& checksum, const QUrl& path) {
+void ReplayStoreModel::saveReplayAs(const QByteArray& checksum, const QUrl& path) {
     emit shouldSaveReplay(checksum, path);
 }
 
-void StoreModel::exportSelectedReplaysTo(const QUrl& path) {
+void ReplayStoreModel::exportSelectedReplaysTo(const QUrl& path) {
     const QList<QByteArray> checksums{m_selections.begin(), m_selections.end()};
     emit shouldExportReplays(checksums, path);
 }
 
-QHash<int, QByteArray> StoreModel::roleNames() const { return m_roleNames; }
+QHash<int, QByteArray> ReplayStoreModel::roleNames() const { return m_roleNames; }
 
-int StoreModel::rowCount(const QModelIndex& parent) const {
+int ReplayStoreModel::rowCount(const QModelIndex& parent) const {
     if (parent.isValid()) {
         return 0;
     }
     return static_cast<int>(m_replays.size());
 }
 
-QVariant StoreModel::data(const QModelIndex& index, int role) const {
+QVariant ReplayStoreModel::data(const QModelIndex& index, int role) const {
     if (!index.isValid() ||
         std::cmp_greater_equal(index.row(), m_replays.size())) {
         return {};

@@ -114,6 +114,9 @@ class ReplayStore : public QObject {
     // A replay that did exist disappeared
     void replayRemoved(const QByteArray&);
 
+    // Listeners should purge anything they are currently tracking on
+    // the inbox. Full data reload
+    void inboxReset();
     // A new inbox item was observed. This path may already have been
     // observed with a different type. Will be emitted in a sequence during
     // startup to populate the list

@@ -4,6 +4,7 @@
  */
 
 #include <kwlegion_core/ingestionmodel.h>
+#include <kwlegion_core/replaystore.h>
 
 #include <QDateTime>
 
@@ -70,5 +71,16 @@ QVariant IngestionModel::data(const QModelIndex& index, int role) const {
     }
     return (*it);
 }
+
+void IngestionModel::setStore(ReplayStore* store) {
+    QObject::connect(store, &ReplayStore::inboxReset, this,
+                     &IngestionModel::inboxReset);
+}
+
+void IngestionModel::inboxReset() {}
+
+void IngestionModel::inboxItemObserved(const InboxItem& item) {}
+
+void IngestionModel::inboxItemRemoved(const QString& path) {}
 
 }  // namespace KWLegionCore

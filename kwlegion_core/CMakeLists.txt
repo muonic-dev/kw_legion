@@ -19,8 +19,8 @@ add_library(kwlegion_core STATIC
     # Public interface (and also MOC)
     include/kwlegion_core/appinfo.h
     include/kwlegion_core/prospector.h
-    include/kwlegion_core/store.h
-    include/kwlegion_core/storemodel.h
+    include/kwlegion_core/replaystore.h
+    include/kwlegion_core/replaystoremodel.h
     include/kwlegion_core/settings.h
     include/kwlegion_core/ingestionmodel.h
     include/kwlegion_core/inboxitem.h
@@ -28,11 +28,11 @@ add_library(kwlegion_core STATIC
     src/appinfo.cpp
     src/metatypes.cpp
     src/prospector.cpp
-    src/store.cpp
+    src/replaystore.cpp
     src/transaction.cpp
     src/queries.cpp
     src/replay.cpp
-    src/storemodel.cpp
+    src/replaystoremodel.cpp
     src/teammodel.cpp
     src/teammodel.h #MOC
     src/replaymodel.cpp
@@ -66,7 +66,7 @@ target_include_directories(kwlegion_core
         ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-# QML_ELEMENT/QML_SINGLETON types (currently just StoreModel) are registered
+# QML_ELEMENT/QML_SINGLETON types (currently just ReplayStoreModel) are registered
 # under this module, separately from kwlegion_ui's own "kw_legion" module, so
 # that kwlegion_core stays a plain, headless, independently testable library -
 # nothing here depends on Qt6::Quick or a display.
