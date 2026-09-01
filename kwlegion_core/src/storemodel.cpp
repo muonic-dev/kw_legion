@@ -47,6 +47,7 @@ StoreModel* StoreModel::create(QQmlEngine* /*qmlEngine*/,
 
 void StoreModel::replaysLoaded(const QList<Replay>& replays) {
     beginResetModel();
+    qDeleteAll(m_replays);
     m_replays.clear();
     for (const auto& replay : replays) {
         // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
