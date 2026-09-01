@@ -24,6 +24,7 @@ qt_add_qml_module(kw_legion
         qml/NavRail.qml
         qml/SettingsSwitchRow.qml
         qml/PatchPill.qml
+        qml/TintedIcon.qml
         qml/pages/ReplaysPage.qml
         qml/pages/StatisticsPage.qml
         qml/pages/SettingsPage.qml

@@ -122,15 +122,13 @@ Page {
 
                 contentItem: RowLayout {
                     spacing: 2
-                    Image {
+                    TintedIcon {
                         source: "qrc:/qt/qml/KWLegionUI/ico/check-all-svgrepo-com.svg"
                         sourceSize: Qt.size(16, 16)
-                        fillMode: Image.PreserveAspectFit
                     }
-                    Image {
+                    TintedIcon {
                         source: "qrc:/qt/qml/KWLegionUI/ico/chevron-down-svgrepo-com.svg"
                         sourceSize: Qt.size(10, 10)
-                        fillMode: Image.PreserveAspectFit
                     }
                 }
 
@@ -155,6 +153,7 @@ Page {
                     MenuItem {
                         text: qsTr("Select All")
                         icon.source: "qrc:/qt/qml/KWLegionUI/ico/checkbox-check-svgrepo-com.svg"
+                        icon.color: Theme.lightMode ? Theme.dark : Theme.light
                         onTriggered: {
                             StoreModel.clearSelected();
                             StoreModel.extendReplaySelection(page.visibleChecksums());
@@ -163,11 +162,13 @@ Page {
                     MenuItem {
                         text: qsTr("Select None")
                         icon.source: "qrc:/qt/qml/KWLegionUI/ico/checkbox-unchecked-svgrepo-com.svg"
+                        icon.color: Theme.lightMode ? Theme.dark : Theme.light
                         onTriggered: StoreModel.clearSelected()
                     }
                     MenuItem {
                         text: qsTr("Invert Selection")
                         icon.source: "qrc:/qt/qml/KWLegionUI/ico/checkbox-fill-svgrepo-com.svg"
+                        icon.color: Theme.lightMode ? Theme.dark : Theme.light
                         onTriggered: StoreModel.invertSelection(page.visibleChecksums())
                     }
                 }
@@ -182,10 +183,9 @@ Page {
                     }
                 }
 
-                contentItem: Image {
+                contentItem: TintedIcon {
                     source: "qrc:/qt/qml/KWLegionUI/ico/link-horizontal-svgrepo-com.svg"
                     sourceSize: Qt.size(16, 16)
-                    fillMode: Image.PreserveAspectFit
                 }
 
                 onClicked: {
@@ -207,10 +207,9 @@ Page {
                     }
                 }
 
-                contentItem: Image {
+                contentItem: TintedIcon {
                     source: "qrc:/qt/qml/KWLegionUI/ico/link-horizontal-off-svgrepo-com.svg"
                     sourceSize: Qt.size(16, 16)
-                    fillMode: Image.PreserveAspectFit
                 }
 
                 onClicked: {
@@ -232,10 +231,9 @@ Page {
                     }
                 }
 
-                contentItem: Image {
+                contentItem: TintedIcon {
                     source: "qrc:/qt/qml/KWLegionUI/ico/export-svgrepo-com.svg"
                     sourceSize: Qt.size(16, 16)
-                    fillMode: Image.PreserveAspectFit
                 }
 
                 onClicked: {
@@ -411,7 +409,7 @@ Page {
                             implicitHeight: 16
                             implicitWidth: 16
 
-                            Image {
+                            TintedIcon {
                                 id: linkOn
                                 anchors.fill: parent
                                 source: "qrc:/qt/qml/KWLegionUI/ico/link-horizontal-svgrepo-com.svg"
@@ -424,7 +422,7 @@ Page {
                                     }
                                 }
                             }
-                            Image {
+                            TintedIcon {
                                 id: linkOff
                                 anchors.fill: parent
                                 source: "qrc:/qt/qml/KWLegionUI/ico/link-horizontal-off-svgrepo-com.svg"
@@ -449,10 +447,9 @@ Page {
                     }
 
                     Button {
-                        contentItem: Image {
+                        contentItem: TintedIcon {
                             source: "qrc:/qt/qml/KWLegionUI/ico/export-svgrepo-com.svg"
                             sourceSize: Qt.size(16, 16)
-                            fillMode: Image.PreserveAspectFit
                         }
 
                         onClicked: {
