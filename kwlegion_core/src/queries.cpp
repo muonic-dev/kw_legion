@@ -60,13 +60,19 @@ constexpr std::array MIGRATIONS{
     "CREATE INDEX idx_replay_players_checksum"
     "    ON replay_players(replay_checksum);",
 
-    // In future, add acknowledged_at for tombstoning the UI marker
     // problem maps to ProblemType::TORN ProblemType::CORRUPT
     "CREATE TABLE broken_replays"
     "   ( replay_path TEXT NOT NULL PRIMARY KEY"
     "   , problem INT NOT NULL"
     "   , noticed_at INT NOT NULL"
     "   ) STRICT, WITHOUT ROWID;",
+
+    // Tombstone marker for the UI's dismiss action. NULL means the row is
+    // still active; a timestamp means it was acknowledged and should be
+    // hidden. Nullable so existing rows migrate in as "not acknowledged"
+    // with no backfill needed.
+    "ALTER TABLE broken_replays ADD COLUMN acknowledged_at INT;",
+
 };
 
 bool Queries::migrate() {
@@ -239,32 +245,14 @@ std::optional<QByteArray> Queries::removeExternalFilename(const QString& path) {
 }
 
 void Queries::forgetMissingReplays(const QList<QString>& knownPaths) {
-    // Binding one placeholder per path (the previous "NOT IN (:p0, :p1, ...)"
-    // approach) hits SQLite's per-statement bound-parameter limit once a
-    // replay folder has accumulated enough files over time
-    prepare(
-        "CREATE TEMP TABLE IF NOT EXISTS known_replay_paths "
-        "(path TEXT NOT NULL)");
-    exec();
-
-    prepare("DELETE FROM known_replay_paths");
-    exec();
-
-    if (!knownPaths.isEmpty()) {
-        prepare("INSERT INTO known_replay_paths (path) VALUES (:path)");
-
-        for (const auto& path : knownPaths) {
-            m_query.bindValue(":path", path);
-            exec();
-        }
-    }
+    bootstrapMutationTable(knownPaths);
 
     // An empty knownPaths leaves known_replay_paths empty too, so the
     // subquery matches nothing and every row still gets deleted - the same
     // "nothing is known to exist" behavior as before.
     prepare(
         "DELETE FROM replay_external_paths "
-        "WHERE external_path NOT IN (SELECT path FROM known_replay_paths)");
+        "WHERE external_path NOT IN (SELECT value FROM bulk_mutation_tmp)");
     exec();
 }
 
@@ -391,11 +379,42 @@ ProblemRecord Queries::insertPathProblem(const ProblemRecord& problem) {
                              static_cast<uint8_t>(m_query.value(2).toUInt()))};
 }
 
+void Queries::forgetMissingPathProblems(const QList<QString>& currentPaths) {
+    bootstrapMutationTable(currentPaths);
+    prepare(
+        "DELETE FROM broken_replays "
+        "WHERE replay_path NOT IN (SELECT value FROM bulk_mutation_tmp)");
+    exec();
+}
+
 void Queries::clearPathProblems(const QString& path) {
     prepare("DELETE FROM broken_replays WHERE replay_path = :replay_path");
     m_query.bindValue(":replay_path", path);
 
     exec();
+}
+
+QList<ProblemRecord> Queries::selectPathProblems() {
+    prepare(
+        "SELECT replay_path, problem, noticed_at "
+        "FROM broken_replays "
+        "WHERE acknolwedged_at IS NULL");
+    exec();
+
+    QList<ProblemRecord> records;
+    while (m_query.next()) {
+        records.append(ProblemRecord{
+            .path = m_query.value(0).toString(),
+            .noticedAt = QDateTime::fromSecsSinceEpoch(m_query.value(2).toInt(),
+                                                       QTimeZone::UTC),
+            .type = problemFromUInt8(
+                static_cast<uint8_t>(m_query.value(1).toInt())),
+        });
+    }
+
+    throwLastIfFailed();
+
+    return records;
 }
 
 Replay Queries::readReplay() const {
@@ -407,6 +426,24 @@ Replay Queries::readReplay() const {
                   .mapName = m_query.value(4).toString(),
                   .mapReference = m_query.value(5).toString(),
                   .hasExternalPath = m_query.value(6).toBool()};
+}
+
+void Queries::bootstrapMutationTable(const QList<QString>& values) {
+    prepare(
+        "CREATE TEMP TABLE IF NOT EXISTS bulk_mutation_tmp "
+        "(value TEXT NOT NULL)");
+    exec();
+
+    prepare("DELETE FROM bulk_mutation_tmp");
+    exec();
+
+    if (!values.isEmpty()) {
+        prepare("INSERT INTO bulk_mutation_tmp(value) VALUES (:value)");
+        for (const auto& v : values) {
+            m_query.bindValue(":value", v);
+            exec();
+        }
+    }
 }
 
 void Queries::prepare(const QString& sql) {

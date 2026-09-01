@@ -47,6 +47,13 @@ void Deferred::waitForReady(const QString& path) {
     }
 }
 
+void Deferred::removeWaitForReady(const QString& path) {
+    m_deferred.remove(path);
+    if (m_deferred.isEmpty()) {
+        m_trigger->stop();
+    }
+}
+
 void Deferred::timerFired() {
     const QSet<QString> toCheck = std::move(m_deferred);
 
@@ -58,6 +65,8 @@ void Deferred::timerFired() {
         }
     }
 }
+
+QSet<QString> Deferred::currentPaths() { return m_deferred; }
 
 void Deferred::stop() { m_trigger->stop(); }
 

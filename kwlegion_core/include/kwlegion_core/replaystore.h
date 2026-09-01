@@ -142,6 +142,10 @@ class ReplayStore : public QObject {
     void handleParseFailure(const LegionParser::ReplayParseException& ex,
                             const QString& path) noexcept;
 
+    // Emit an inbox item from a record
+    void emitInboxItem(const ProblemRecord& record);
+    void emitDeferredItem(const QString& deferredPath);
+
     // Perform all the steps to try and receive a replay
     // File should probably be an absolute path
     // Returns the checksums that were impacted by the ingestion
@@ -170,10 +174,6 @@ class ReplayStore : public QObject {
     ProblemRecord handleProblem(const ProblemRecord& problem);
 
     static void hideReplay(Queries& queries, const QByteArray& checksum);
-
-    // Don't keep trying on a replay
-    static bool shouldGiveUp(const ProblemRecord& problem,
-                             const QDateTime& now);
 
     // We want to wait until full analysis is done on all replays before we
     // emit the first event instead of trickling them in with analyze

@@ -79,10 +79,21 @@ class Queries final {
     // Use the noticed_at/type to determine what to do about the issue
     ProblemRecord insertPathProblem(const ProblemRecord& problem);
 
+    void forgetMissingPathProblems(const QList<QString>& currentPaths);
+
     void clearPathProblems(const QString& path);
+
+    // Return all unacknowledged path problems
+    QList<ProblemRecord> selectPathProblems();
+
+    void bootstrapMutationTable(const QList<QString>& values);
 
    private:
     void prepare(const QString& sql);
+
+    // Create a temporary table of text to work around max bound parameters
+    // This is used in several query helpers so standardize it here
+    void bootstrapTemporaryTable(const QList<QString>& values);
 
     void exec();
 

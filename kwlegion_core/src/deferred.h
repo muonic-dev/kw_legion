@@ -38,8 +38,12 @@ class Deferred : public QObject {
      */
     void waitForReady(const QString& path);
 
+    void removeWaitForReady(const QString& path);
+
     // Stop the internal timer (only important to prevent warnings)
     void stop();
+
+    QSet<QString> currentPaths();
 
    signals:
     /**

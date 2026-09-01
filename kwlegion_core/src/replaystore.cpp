@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Muonic
 
+#include <kwlegion_core/inboxitem.h>
 #include <kwlegion_core/replaystore.h>
 #include <legionparser/parser.h>
 
@@ -117,12 +118,54 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     } catch (StorageException& ex) {
         qCritical(logStore) << "Unable to access the replays " << ex.what();
     }
+
+    try {
+        emit inboxReset();
+
+        Queries queries{QSqlQuery(m_db)};
+        queries.forgetMissingPathProblems(paths);
+        const QList<ProblemRecord> problems = queries.selectPathProblems();
+        for (const auto& problem : problems) {
+            emitInboxItem(problem);
+        }
+        const QSet<QString> pendingPaths = m_deferred->currentPaths();
+        for (const auto& path : pendingPaths) {
+            emitDeferredItem(path);
+        }
+
+        // Also emit all the pending paths
+    } catch (StorageException& ex) {
+        qCritical(logStore) << "Unable to access the db";
+    }
+    // Now that we've handled everything here lets also finish initializing the
+    // problems
+}
+
+void ReplayStore::emitInboxItem(const ProblemRecord& record) {
+    emit inboxItemObserved(InboxItem{
+        .path = record.path,
+        .type = record.type == ProblemType::CORRUPT ? InboxType::CORRUPT
+                                                    : InboxType::TORN,
+        .observedAt = record.noticedAt,
+    });
+}
+
+void ReplayStore::emitDeferredItem(const QString& path) {
+    emit inboxItemObserved(InboxItem{
+        .path = path,
+        .type = InboxType::PENDING,
+        .observedAt = QDateTime::currentDateTimeUtc(),
+    });
 }
 
 void ReplayStore::analyzeReplayFile(const QString& path) {
+    // We were waiting but also a file notification happened
+    m_deferred->removeWaitForReady(path);
     try {
         if (Deferred::readyForParsing(path)) {
             performReplayAnalysis(path);
+            // Success = not pending
+            emit inboxItemRemoved(path);
         } else {
             // If the replay cannot be parsed then whatever then
             // the link to an existing replay needs to be broken
@@ -132,16 +175,16 @@ void ReplayStore::analyzeReplayFile(const QString& path) {
             m_deferred->waitForReady(path);
         }
     } catch (const LegionParser::TornDataException& ex) {
+        // Replay torn, hopefully we get notified in the future if more data
+        // occurs
         handleTornFailure(path);
     } catch (const LegionParser::ReplayParseException& ex) {
         handleParseFailure(ex, path);
     } catch (StorageException& ex) {
-        // TODO: This should eventually be noisy
-        // TODO: If we catch a StorageException we should also retry in the hope
-        // that whatever happened is transient. Need finer grained on what
-        // errors happened There's really no point in trying to
-        // removeReplayAtPath that we couldn't ingest if we just failed a sqlite
-        // commit.
+        // TODO: This should eventually be noisy through the ingestionmodel
+        // signalling
+        // TODO: Think about under what circumstances we can try again later or
+        // determine if we should give up
         qCritical(logStore) << "db or i/o error occurred " << ex.what();
     }
 }
@@ -149,8 +192,7 @@ void ReplayStore::analyzeReplayFile(const QString& path) {
 void ReplayStore::handleTornFailure(const QString& path) noexcept {
     // If the replay cannot be parsed then whatever then
     // the link to an existing replay needs to be broken
-    // Also send this back through the deferred logic
-    qDebug(logStore) << "path " << path << " is incomplete, deferring";
+    qDebug(logStore) << "path " << path << " is incomplete";
     // No throw since we get external calls
     removeReplayFileLink(path);
 
@@ -158,22 +200,15 @@ void ReplayStore::handleTornFailure(const QString& path) noexcept {
         auto now = QDateTime::currentDateTimeUtc();
         const ProblemRecord actual = handleProblem(ProblemRecord{
             .path = path, .noticedAt = now, .type = ProblemType::TORN});
-        if (shouldGiveUp(actual, now)) {
-            qWarning(logStore) << "giving up on repeatedly torn path " << path;
-            return;
-        }
+        emitInboxItem(actual);
     } catch (const StorageException& ex) {
         qWarning(logStore) << "unable to write problem marker: " << ex.what();
-        // fall through to retry again
     }
-
-    m_deferred->waitForReady(path);
 }
 void ReplayStore::handleParseFailure(
     const LegionParser::ReplayParseException& ex,
     const QString& path) noexcept {
     // The replay is terminally invalid, so just remove it
-    // TODO: Surface this in the UI
     // TODO: ReplayParseException includes potential IO failures which may
     // be transient in addition to CorruptDataException
     qInfo(logStore) << "unable to parse " << ex.what();
@@ -181,8 +216,9 @@ void ReplayStore::handleParseFailure(
     removeReplayFileLink(path);
     try {
         auto now = QDateTime::currentDateTimeUtc();
-        handleProblem(ProblemRecord{
+        const ProblemRecord actual = handleProblem(ProblemRecord{
             .path = path, .noticedAt = now, .type = ProblemType::CORRUPT});
+        emitInboxItem(actual);
     } catch (const StorageException& ex) {
         qWarning(logStore) << "unable to write problem marker: " << ex.what();
     }
@@ -286,12 +322,6 @@ void ReplayStore::hideReplay(Queries& queries, const QByteArray& checksum) {
     }
 }
 
-bool ReplayStore::shouldGiveUp(const ProblemRecord& problem,
-                               const QDateTime& now) {
-    const QDateTime cutoff = now.addSecs(-60LL * 60LL);
-    return problem.noticedAt < cutoff;
-}
-
 void ReplayStore::performReplayAnalysis(const QString& path) {
     qDebug(logStore) << "Analyzing replay: " << path;
     QFile replayFile(path);
@@ -299,7 +329,7 @@ void ReplayStore::performReplayAnalysis(const QString& path) {
         // We may need to figure out how to recover from this such as by locked
         // files
         qWarning(logStore) << "Unable to open " << path << " for reading";
-        return;
+        throw StorageException(replayFile.errorString());
     }
     // TODO: In theory there is a short race condition here where the file
     // is overwritten before we can analyze and copy it, but meh

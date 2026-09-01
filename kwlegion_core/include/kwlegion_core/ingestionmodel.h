@@ -46,7 +46,7 @@ class IngestionModel : public QAbstractListModel {
     [[nodiscard]] int rowCount(
         const QModelIndex& parent = QModelIndex()) const override;
 
-    void setStore(ReplayStore* store);
+    void setStore(ReplayStore* store) const;
 
     // slots
     void inboxReset();
@@ -58,6 +58,6 @@ class IngestionModel : public QAbstractListModel {
 
    private:
     QHash<int, QByteArray> m_roles;
-    QList<QHash<int, QVariant>> m_mockData;
+    QList<InboxItem> m_inbox;
 };
 }  // namespace KWLegionCore
