@@ -242,7 +242,6 @@ void ReplayStore::removeReplayFileLink(const QString& path) noexcept {
     qDebug(logStore) << "Removing replay: " << path;
     try {
         forwardChangedReplays(removeReplayAtPath(path));
-        emit inboxItemRemoved(path);
     } catch (StorageException& ex) {
         qCritical(logStore) << "Unable to remove invalid replay " << ex.what();
     }
