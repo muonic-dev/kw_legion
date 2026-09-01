@@ -11,7 +11,7 @@ import KWLegionUI
 Rectangle {
     id: root
 
-    property var sections: []
+    property list<QtObject> sections: []
     property int currentIndex: 0
 
     readonly property color navTextColor: Theme.lightMode ? Theme.reallyDark : Theme.reallyLight
@@ -29,10 +29,11 @@ Rectangle {
 
             delegate: Button {
                 id: navButton
-                required property string modelData
+                required property string label
+                required property bool showable
                 required property int index
                 Layout.fillWidth: true
-                text: modelData
+                text: label
                 checkable: true
                 checked: root.currentIndex === index
                 onClicked: root.currentIndex = index

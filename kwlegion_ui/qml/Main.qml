@@ -91,9 +91,29 @@ ApplicationWindow {
             id: navRail
             Layout.fillHeight: true
             Layout.preferredWidth: 160
-            sections: ["Replays",
-                // "Statistics",
-                "Settings", "About"]
+            sections: [
+                QtObject {
+                    readonly property string label: "Replays"
+                    readonly property bool showable: true
+                },
+                QtObject {
+                    readonly property string label: "Inbox"
+                    readonly property bool showable: true
+                } // TODO: Bind later
+                ,
+                QtObject {
+                    readonly property string label: "Statistics"
+                    readonly property bool showable: true
+                },
+                QtObject {
+                    readonly property string label: "Settings"
+                    readonly property bool showable: true
+                },
+                QtObject {
+                    readonly property string label: "About"
+                    readonly property bool showable: true
+                }
+            ]
         }
 
         StackLayout {
@@ -102,7 +122,8 @@ ApplicationWindow {
             currentIndex: navRail.currentIndex
 
             ReplaysPage {}
-            // StatisticsPage {}
+            InboxPage {}
+            StatisticsPage {}
             SettingsPage {}
             AboutPage {}
         }

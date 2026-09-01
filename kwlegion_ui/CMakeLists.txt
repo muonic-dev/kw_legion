@@ -25,9 +25,10 @@ qt_add_qml_module(kw_legion
         qml/SettingsSwitchRow.qml
         qml/PatchPill.qml
         qml/TintedIcon.qml
-        qml/pages/ReplaysPage.qml
         qml/pages/StatisticsPage.qml
         qml/pages/SettingsPage.qml
+        qml/pages/ReplaysPage.qml
+        qml/pages/InboxPage.qml
         qml/pages/AboutPage.qml
     RESOURCES
         ico/CNCKW_GDI_Logo.png
