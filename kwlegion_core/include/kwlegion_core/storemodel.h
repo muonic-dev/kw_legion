@@ -15,6 +15,7 @@
 namespace KWLegionCore {
 
 class ReplayModel;
+class ReplayStore;
 
 class StoreModel : public QAbstractListModel {
     Q_OBJECT
@@ -54,6 +55,12 @@ class StoreModel : public QAbstractListModel {
 
     StoreModel& operator=(const StoreModel&) = delete;
     StoreModel& operator=(StoreModel&&) = delete;
+
+    // Wires this model to its ReplayStore: subscribes to replaysLoaded/
+    // replaysChanged, and connects the shouldX request signals back to the
+    // store's corresponding slots. Keeps the pairing self-contained rather
+    // than requiring external code to know every signal on both sides.
+    void setStore(ReplayStore* store);
 
     void replaysLoaded(const QList<Replay>&);
     void replaysChanged(const QList<Replay>&);

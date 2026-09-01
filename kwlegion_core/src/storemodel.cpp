@@ -5,6 +5,8 @@
 
 #include <kwlegion_core/storemodel.h>
 
+#include <kwlegion_core/store.h>
+
 #include <algorithm>
 #include <utility>
 
@@ -43,6 +45,24 @@ StoreModel* StoreModel::create(QQmlEngine* /*qmlEngine*/,
     // Signature is Qt's QML_SINGLETON factory contract - must return T*, not
     // gsl::owner<T*>. Ownership transfers to the QML engine at the call site.
     return new StoreModel();  // NOLINT(cppcoreguidelines-owning-memory)
+}
+
+void StoreModel::setStore(ReplayStore* store) {
+    connect(store, &ReplayStore::replaysLoaded, this,
+            &StoreModel::replaysLoaded);
+    connect(store, &ReplayStore::replaysChanged, this,
+            &StoreModel::replaysChanged);
+
+    connect(this, &StoreModel::shouldToggleReplayExposed, store,
+            &ReplayStore::toggleReplayExposed);
+    connect(this, &StoreModel::shouldExposeReplay, store,
+            &ReplayStore::ensureReplayExposed);
+    connect(this, &StoreModel::shouldHideReplay, store,
+            &ReplayStore::ensureReplayHidden);
+    connect(this, &StoreModel::shouldSaveReplay, store,
+            &ReplayStore::saveReplayAs);
+    connect(this, &StoreModel::shouldExportReplays, store,
+            &ReplayStore::exportReplaysAs);
 }
 
 void StoreModel::replaysLoaded(const QList<Replay>& replays) {

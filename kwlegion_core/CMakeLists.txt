@@ -25,6 +25,7 @@ add_library(kwlegion_core STATIC
     include/kwlegion_core/ingestionmodel.h
     # Main src
     src/appinfo.cpp
+    src/metatypes.cpp
     src/prospector.cpp
     src/store.cpp
     src/transaction.cpp

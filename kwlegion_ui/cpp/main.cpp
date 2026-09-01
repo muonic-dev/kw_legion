@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Muonic
 
 #include <kwlegion_core/appinfo.h>
+#include <kwlegion_core/metatypes.h>
 #include <kwlegion_core/prospector.h>
 #include <kwlegion_core/settings.h>
 #include <kwlegion_core/store.h>
@@ -114,7 +115,7 @@ int main(int argc, char* argv[]) {
     QGuiApplication::setWindowIcon(
         QIcon(":/qt/qml/KWLegionUI/ico/CNCKW_Marked_of_Kane_Logo.png"));
 
-    qRegisterMetaType<KWLegionCore::Replay>();
+    registerMetaTypes();
 
     QQmlApplicationEngine engine;
     QObject::connect(
@@ -181,26 +182,7 @@ int main(int argc, char* argv[]) {
     auto* storeModel =
         engine.singletonInstance<StoreModel*>("KWLegionCore", "StoreModel");
 
-    QObject::connect(&replayStore, &ReplayStore::replaysLoaded, storeModel,
-                     &StoreModel::replaysLoaded);
-
-    QObject::connect(&replayStore, &ReplayStore::replaysChanged, storeModel,
-                     &StoreModel::replaysChanged);
-
-    QObject::connect(storeModel, &StoreModel::shouldToggleReplayExposed,
-                     &replayStore, &ReplayStore::toggleReplayExposed);
-
-    QObject::connect(storeModel, &StoreModel::shouldExposeReplay, &replayStore,
-                     &ReplayStore::ensureReplayExposed);
-
-    QObject::connect(storeModel, &StoreModel::shouldHideReplay, &replayStore,
-                     &ReplayStore::ensureReplayHidden);
-
-    QObject::connect(storeModel, &StoreModel::shouldSaveReplay, &replayStore,
-                     &ReplayStore::saveReplayAs);
-
-    QObject::connect(storeModel, &StoreModel::shouldExportReplays, &replayStore,
-                     &ReplayStore::exportReplaysAs);
+    storeModel->setStore(&replayStore);
 
     ioThread.start();
 
