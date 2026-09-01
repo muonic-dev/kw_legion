@@ -3,13 +3,12 @@
 
 #include "queries.h"
 
-#include <kwlegion_core/transaction.h>
-
 #include <QSqlError>
 #include <QTimeZone>
 #include <QVariantList>
 
 #include "exception.h"
+#include "transaction.h"
 
 namespace KWLegionCore {
 

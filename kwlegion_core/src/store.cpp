@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Muonic
 
 #include <kwlegion_core/store.h>
-#include <kwlegion_core/transaction.h>
 #include <legionparser/parser.h>
 
 #include <QDebug>
@@ -15,6 +14,7 @@
 #include "exception.h"
 #include "problems.h"
 #include "queries.h"
+#include "transaction.h"
 
 Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
 
