@@ -40,6 +40,11 @@ class StoreModel : public QAbstractListModel {
 
     Q_ENUM(Roles);
 
+    // Forces the engine to construct the singleton eagerly (rather than on
+    // first QML access) so main.cpp can retrieve the instance and wire up
+    // signals before Main.qml loads.
+    static StoreModel* create(QQmlEngine* qmlEngine, QJSEngine* jsEngine);
+
     StoreModel(QObject* parent = nullptr);
 
     ~StoreModel() override;
@@ -49,11 +54,6 @@ class StoreModel : public QAbstractListModel {
 
     StoreModel& operator=(const StoreModel&) = delete;
     StoreModel& operator=(StoreModel&&) = delete;
-
-    // Forces the engine to construct the singleton eagerly (rather than on
-    // first QML access) so main.cpp can retrieve the instance and wire up
-    // signals before Main.qml loads.
-    static StoreModel* create(QQmlEngine* qmlEngine, QJSEngine* jsEngine);
 
     void replaysLoaded(const QList<Replay>&);
     void replaysChanged(const QList<Replay>&);

@@ -34,15 +34,23 @@ Rectangle {
                 required property int index
                 Layout.fillWidth: true
                 text: label
-                checkable: true
+                checkable: navButton.showable
                 checked: root.currentIndex === index
                 onClicked: root.currentIndex = index
+                visible: navButton.showable || navButton.checked || collapseAnimation.running
+                Layout.preferredHeight: navButton.showable || navButton.checked ? implicitHeight : 0
+                Behavior on Layout.preferredHeight {
+                    ShortAnimation {
+                        id: collapseAnimation
+                    }
+                }
 
                 contentItem: Text {
                     text: navButton.text
                     color: root.navTextColor
                     horizontalAlignment: Text.AlignLeft
                     verticalAlignment: Text.AlignVCenter
+                    clip: true
                 }
 
                 background: Rectangle {

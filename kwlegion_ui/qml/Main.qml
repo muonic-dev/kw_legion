@@ -98,9 +98,8 @@ ApplicationWindow {
                 },
                 QtObject {
                     readonly property string label: "Inbox"
-                    readonly property bool showable: true
-                } // TODO: Bind later
-                ,
+                    readonly property bool showable: IngestionModel.ingestionCount > 0
+                },
                 QtObject {
                     readonly property string label: "Statistics"
                     readonly property bool showable: true

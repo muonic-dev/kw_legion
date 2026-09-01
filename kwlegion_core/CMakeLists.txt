@@ -22,6 +22,7 @@ add_library(kwlegion_core STATIC
     include/kwlegion_core/store.h
     include/kwlegion_core/storemodel.h
     include/kwlegion_core/settings.h
+    include/kwlegion_core/ingestionmodel.h
     # Main src
     src/appinfo.cpp
     src/prospector.cpp
@@ -38,8 +39,9 @@ add_library(kwlegion_core STATIC
     src/deferred.h #MOC
     src/faction_registration.h
     src/settings.cpp
-    src/autostart_windows.cpp
+    src/ingestionmodel.cpp
     ${platform_sources}
+    
 )
 
 add_library(kwlegion::core ALIAS kwlegion_core)

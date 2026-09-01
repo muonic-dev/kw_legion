@@ -178,9 +178,7 @@ Page {
                 enabled: StoreModel.selectionCount > 0
                 opacity: enabled ? 1 : 0.4
                 Behavior on opacity {
-                    NumberAnimation {
-                        duration: 120
-                    }
+                    ShortAnimation {}
                 }
 
                 contentItem: TintedIcon {
@@ -202,9 +200,7 @@ Page {
                 enabled: StoreModel.selectionCount > 0
                 opacity: enabled ? 1 : 0.4
                 Behavior on opacity {
-                    NumberAnimation {
-                        duration: 120
-                    }
+                    ShortAnimation {}
                 }
 
                 contentItem: TintedIcon {
@@ -226,9 +222,7 @@ Page {
                 enabled: StoreModel.selectionCount > 0
                 opacity: enabled ? 1 : 0.4
                 Behavior on opacity {
-                    NumberAnimation {
-                        duration: 120
-                    }
+                    ShortAnimation {}
                 }
 
                 contentItem: TintedIcon {

@@ -21,6 +21,7 @@ qt_add_qml_module(kw_legion
     QML_FILES
         qml/Main.qml
         qml/Theme.qml
+        qml/ShortAnimation.qml
         qml/NavRail.qml
         qml/SettingsSwitchRow.qml
         qml/PatchPill.qml
