@@ -355,12 +355,9 @@ Page {
                     anchors.right: parent.right
                     spacing: 4
 
-                    Label {
+                    TextFieldEdit {
                         width: parent.width
                         text: delegateRoot.matchTitle
-                        font.bold: true
-                        elide: Text.ElideRight
-                        color: Theme.lightMode ? Theme.dark : Theme.light
                     }
 
                     Label {
