@@ -2,8 +2,6 @@ find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform Network Sql Svg)
 
 qt_add_executable(kw_legion
     cpp/main.cpp
-    cpp/sortfilterproxymodel.h
-    cpp/sortfilterproxymodel.cpp
     cpp/singleinstanceguard.h
     cpp/singleinstanceguard.cpp
     $<$<PLATFORM_ID:Windows>:cpp/kw_legion.rc>
@@ -61,15 +59,6 @@ qt_add_qml_module(kw_legion
         ico/close-lg-svgrepo-com.svg
         ico/close-sm-svgrepo-com.svg
         ico/arrow-reload-02-svgrepo-com.svg
-)
-
-target_include_directories(kw_legion
-    PRIVATE
-        # AUTOMOC records QML_ELEMENT headers here by bare filename only, so
-        # qmltyperegistrar's generated #include guess for the QML type
-        # registration TU needs the header's own directory on the path too.
-        # See the matching comment in kwlegion_core/CMakeLists.txt.
-        ${CMAKE_CURRENT_SOURCE_DIR}/cpp
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

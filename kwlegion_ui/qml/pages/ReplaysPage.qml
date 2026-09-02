@@ -91,7 +91,12 @@ Page {
         sourceModel: ReplayStoreModel
         sortRole: ReplayStoreModel.TimestampRole
         sortOrder: Qt.DescendingOrder
-        filterPredicate: row => filterField.text.length == 0 || row.matchTitle.includes(filterField.text) || row.teams.some(team => team.playerNames.some(name => name.includes(filterField.text)))
+        filterQuery: replayFilterQueryParser.query
+    }
+
+    ReplayFilterQueryParser {
+        id: replayFilterQueryParser
+        queryText: filterField.text
     }
 
     Shortcut {

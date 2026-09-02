@@ -39,9 +39,17 @@ add_library(kwlegion_core STATIC
     src/replaymodel.h # MOC
     src/deferred.cpp
     src/deferred.h #MOC
-    src/faction_registration.h
+    src/faction_registration.h #MOC
     src/settings.cpp
     src/ingestionmodel.cpp
+    src/replayfilterqueryparser.h #MOC
+    src/replayfilterqueryparser.cpp
+    src/filterquery.h #MOC
+    src/filterquery.cpp
+    src/replayfilterquery.h #MOC
+    src/replayfilterquery.cpp
+    src/sortfilterproxymodel.h #MOC
+    src/sortfilterproxymodel.cpp
     ${platform_sources}
     
 )
