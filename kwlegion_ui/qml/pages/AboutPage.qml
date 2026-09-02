@@ -87,7 +87,7 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
             textFormat: Text.StyledText
             linkColor: Theme.lightMode ? Theme.dark : Theme.light
             onLinkActivated: link => Qt.openUrlExternally(link)
-            text: qsTr(`Vectors and icons by <a href="https://www.svgrepo.com">SVG Repo</a>`)
+            text: qsTr(`LEGION would not be possible without the format reverse engineering work done by <a href="https://github.com/louisdx/cnc-replayreaders/tree/master">lousdx/cnc-replayreaders</a>. Vectors and icons by <a href="https://www.svgrepo.com">SVG Repo</a>`)
             HoverHandler {
                 cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
             }
