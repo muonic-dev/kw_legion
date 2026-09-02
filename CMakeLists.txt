@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.23)
 
 project(kw_legion
-    VERSION "0.1.1"
+    VERSION "0.2.0"
     DESCRIPTION "A C&C 3: Kane's Wrath replay manager"
     LANGUAGES CXX)
 
 # CMake's project(VERSION) accepts only numeric components, so keep it numeric
 # and derive a SemVer pre-release label separately for packaging/display.
-set(KW_LEGION_VERSION_PRERELEASE "")
+set(KW_LEGION_VERSION_PRERELEASE "alpha.1")
 if (KW_LEGION_VERSION_PRERELEASE STREQUAL "") 
 set(KW_LEGION_VERSION_SEMVER "${PROJECT_VERSION}")
 else()
