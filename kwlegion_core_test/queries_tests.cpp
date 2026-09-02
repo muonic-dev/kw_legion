@@ -462,3 +462,78 @@ TEST_CASE("Queries selectReplays reports hasExternalPath per replay") {
     db = QSqlDatabase();
     QSqlDatabase::removeDatabase("queries_select_replays");
 }
+
+TEST_CASE("Queries selectReplay defaults overrideMatchTitle to empty") {
+    QSqlDatabase db = openMigratedDb("queries_override_title_default");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-override-default";
+    queries.insertReplay(makeMetadata(checksum));
+
+    const std::optional<Replay> replay = queries.selectReplay(checksum);
+    REQUIRE(replay.has_value());
+    CHECK(replay->overrideMatchTitle.isEmpty());
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_override_title_default");
+}
+
+TEST_CASE(
+    "Queries updateOverrideTitle is reflected by selectReplay and "
+    "selectReplays") {
+    QSqlDatabase db = openMigratedDb("queries_override_title_update");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-override-update";
+    queries.insertReplay(makeMetadata(checksum));
+
+    queries.updateOverrideTitle(checksum, "Custom Title");
+
+    const std::optional<Replay> replay = queries.selectReplay(checksum);
+    REQUIRE(replay.has_value());
+    CHECK(replay->overrideMatchTitle == "Custom Title");
+
+    const QList<Replay> replays = queries.selectReplays();
+    REQUIRE(replays.size() == 1);
+    CHECK(replays.first().overrideMatchTitle == "Custom Title");
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_override_title_update");
+}
+
+TEST_CASE("Queries updateOverrideTitle overwrites a previous override") {
+    QSqlDatabase db = openMigratedDb("queries_override_title_overwrite");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-override-overwrite";
+    queries.insertReplay(makeMetadata(checksum));
+
+    queries.updateOverrideTitle(checksum, "First Title");
+    queries.updateOverrideTitle(checksum, "Second Title");
+
+    const std::optional<Replay> replay = queries.selectReplay(checksum);
+    REQUIRE(replay.has_value());
+    CHECK(replay->overrideMatchTitle == "Second Title");
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_override_title_overwrite");
+}
+
+TEST_CASE(
+    "Queries updateOverrideTitle with an empty string clears the override") {
+    QSqlDatabase db = openMigratedDb("queries_override_title_clear");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-override-clear";
+    queries.insertReplay(makeMetadata(checksum));
+    queries.updateOverrideTitle(checksum, "Custom Title");
+
+    queries.updateOverrideTitle(checksum, "");
+
+    const std::optional<Replay> replay = queries.selectReplay(checksum);
+    REQUIRE(replay.has_value());
+    CHECK(replay->overrideMatchTitle.isEmpty());
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_override_title_clear");
+}
