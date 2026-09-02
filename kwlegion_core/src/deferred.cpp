@@ -7,47 +7,60 @@
 
 #include <QFileDevice>
 #include <QFileInfo>
+#include <utility>
 
 namespace KWLegionCore {
 namespace {
 const long TIMER_MS = 1000;
-const long WAIT_FOR_SETTLED_MS = 15000;
 
-bool isReady(const QDateTime& currentTimeUTC, const QFileInfo& pathInfo) {
-    // A file might ready for parsing when it has size > 0 and it has been
-    // written more than 5s in the past. It may still not be ready depending on
-    // how fast KW is writting.
-    // We use UTC because there are no time changes in UTC
-    const QDateTime cutoffTime = currentTimeUTC.addMSecs(-WAIT_FOR_SETTLED_MS);
-    return pathInfo.size() > 0 &&
-           pathInfo.fileTime(QFileDevice::FileModificationTime,
-                             QTimeZone::UTC) < cutoffTime;
-}
+// If nothing about a file has moved for this long we make one more attempt
+// anyway. The final write of a match can land, be read as torn (the writer
+// hasn't flushed or closed yet), and then never change size or mtime again -
+// without this the path would sit in the deferred set until the next launch.
+// The clock restarts each time the caller re-enqueues, so a genuinely
+// hopeless file degrades to one cheap attempt per interval rather than
+// spinning or giving up permanently.
+const qint64 LONG_STOP_MS = 5 * 60 * 1000;
 }  // namespace
+
+bool Watermark::differsFrom(const Watermark& other) const {
+    return size != other.size || modifiedAt != other.modifiedAt;
+}
 
 Deferred::Deferred(QObject* parent)
     : QObject(parent),
       m_recheckIntervalMs(TIMER_MS),
+      m_longStopMs(LONG_STOP_MS),
       m_trigger(new QTimer(this)) {
     m_trigger->setSingleShot(true);
     m_trigger->callOnTimeout(this, &Deferred::timerFired);
 }
 
-bool Deferred::readyForParsing(const QString& path) {
+Watermark Deferred::sample(const QString& path) {
+    // Constructed fresh on every call deliberately - QFileInfo caches its
+    // stat results, so a retained instance would never observe the change we
+    // are waiting for.
     const QFileInfo pathInfo(path);
-    return isReady(QDateTime::currentDateTimeUtc(), pathInfo);
+    return Watermark{
+        .size = pathInfo.size(),
+        .modifiedAt = pathInfo.fileTime(QFileDevice::FileModificationTime,
+                                        QTimeZone::UTC),
+        .sampledAt = QDateTime::currentDateTimeUtc(),
+    };
 }
 
 void Deferred::setRecheckIntervalMs(long ms) { m_recheckIntervalMs = ms; }
 
-void Deferred::waitForReady(const QString& path) {
-    m_deferred.insert(path);
+void Deferred::setLongStopMs(qint64 ms) { m_longStopMs = ms; }
+
+void Deferred::waitForChange(const QString& path, const Watermark& observed) {
+    m_deferred.insert(path, observed);
     if (!m_trigger->isActive()) {
         m_trigger->start(m_recheckIntervalMs);
     }
 }
 
-void Deferred::removeWaitForReady(const QString& path) {
+void Deferred::removeWaitForChange(const QString& path) {
     m_deferred.remove(path);
     if (m_deferred.isEmpty()) {
         m_trigger->stop();
@@ -55,18 +68,25 @@ void Deferred::removeWaitForReady(const QString& path) {
 }
 
 void Deferred::timerFired() {
-    const QSet<QString> toCheck = std::move(m_deferred);
+    // Drained up front because emitting pathChanged re-enters us: the
+    // handler will typically remove the path and, if it still can't parse
+    // it, enqueue it again with a fresh watermark.
+    const QHash<QString, Watermark> toCheck = std::exchange(m_deferred, {});
+    const QDateTime now = QDateTime::currentDateTimeUtc();
 
-    for (const auto& path : toCheck) {
-        if (readyForParsing(path)) {
-            emit pathReady(path);
+    for (auto it = toCheck.cbegin(); it != toCheck.cend(); ++it) {
+        const Watermark current = sample(it.key());
+        const bool longStopped = it.value().sampledAt.msecsTo(now) >=
+                                 m_longStopMs;
+        if (current.differsFrom(it.value()) || longStopped) {
+            emit pathChanged(it.key());
         } else {
-            waitForReady(path);
+            // Re-enqueued against the *original* watermark so neither the
+            // comparison baseline nor the long-stop clock resets every poll.
+            waitForChange(it.key(), it.value());
         }
     }
 }
-
-QSet<QString> Deferred::currentPaths() { return m_deferred; }
 
 void Deferred::stop() { m_trigger->stop(); }
 

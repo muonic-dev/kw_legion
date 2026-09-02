@@ -60,7 +60,8 @@ constexpr std::array MIGRATIONS{
     "CREATE INDEX idx_replay_players_checksum"
     "    ON replay_players(replay_checksum);",
 
-    // problem maps to ProblemType::TORN ProblemType::CORRUPT
+    // Dropped again further down - kept here because migrations are
+    // append-only and replayed in order on an older database.
     "CREATE TABLE broken_replays"
     "   ( replay_path TEXT NOT NULL PRIMARY KEY"
     "   , problem INT NOT NULL"
@@ -76,7 +77,15 @@ constexpr std::array MIGRATIONS{
     // The match title override. Default of '' to correspond to QString()
     // defaulting semantics
     "ALTER TABLE replays ADD COLUMN override_match_title TEXT  "
-    "NOT NULL DEFAULT ''"
+    "NOT NULL DEFAULT ''",
+
+    // Problem state is now derived rather than stored. The startup sweep
+    // re-parses every path in the replay folder anyway, so the table was a
+    // cache of state we rebuild regardless - and one that could (and did)
+    // desync from what was actually on disk. Dismissal becomes
+    // session-scoped as a result, which is what we want given the game's
+    // rolling "Last Replay.KWReplay" path.
+    "DROP TABLE broken_replays;"
 
 };
 
@@ -380,82 +389,6 @@ QList<QString> Queries::selectExternalPaths(const QByteArray& checksum) {
     }
     throwLastIfFailed();
     return paths;
-}
-
-ProblemRecord Queries::insertPathProblem(const ProblemRecord& problem) {
-    prepare(
-        "INSERT INTO broken_replays(replay_path, problem, noticed_at) "
-        "VALUES (:replay_path, :problem, :noticed_at) "
-        " ON CONFLICT DO UPDATE "
-        "   SET problem = excluded.problem "
-        " RETURNING "
-        "   replay_path, problem, noticed_at");
-    m_query.bindValue(":replay_path", problem.path);
-    m_query.bindValue(":problem", problemToUInt8(problem.type));
-    m_query.bindValue(":noticed_at", problem.noticedAt.toSecsSinceEpoch());
-
-    exec();
-
-    nextOrThrow();
-
-    const ProblemRecord result{
-        .path = m_query.value(0).toString(),
-        .noticedAt = QDateTime::fromSecsSinceEpoch(m_query.value(2).toInt(),
-                                                   QTimeZone::UTC),
-        .type =
-            problemFromUInt8(static_cast<uint8_t>(m_query.value(1).toUInt()))};
-    // We aren't draining so call finish explicitly - otherwise the
-    // statement stays active and blocks the caller's transaction commit.
-    m_query.finish();
-    return result;
-}
-
-void Queries::forgetMissingPathProblems(const QList<QString>& currentPaths) {
-    bootstrapMutationTable(currentPaths);
-    prepare(
-        "DELETE FROM broken_replays "
-        "WHERE replay_path NOT IN (SELECT value FROM bulk_mutation_tmp)");
-    exec();
-}
-
-void Queries::clearPathProblems(const QString& path) {
-    prepare("DELETE FROM broken_replays WHERE replay_path = :replay_path");
-    m_query.bindValue(":replay_path", path);
-
-    exec();
-}
-
-QList<ProblemRecord> Queries::selectPathProblems() {
-    prepare(
-        "SELECT replay_path, problem, noticed_at "
-        "FROM broken_replays "
-        "WHERE acknowledged_at IS NULL");
-    exec();
-
-    QList<ProblemRecord> records;
-    while (m_query.next()) {
-        records.append(ProblemRecord{
-            .path = m_query.value(0).toString(),
-            .noticedAt = QDateTime::fromSecsSinceEpoch(m_query.value(2).toInt(),
-                                                       QTimeZone::UTC),
-            .type = problemFromUInt8(
-                static_cast<uint8_t>(m_query.value(1).toInt())),
-        });
-    }
-
-    throwLastIfFailed();
-
-    return records;
-}
-
-void Queries::acknowledgeProblem(const QString& path, const QDateTime& now) {
-    prepare(
-        "UPDATE broken_replays SET acknowledged_at = :now WHERE replay_path = "
-        ":path");
-    m_query.bindValue(":now", now.toSecsSinceEpoch());
-    m_query.bindValue(":path", path);
-
-    exec();
 }
 
 Replay Queries::readReplay() const {

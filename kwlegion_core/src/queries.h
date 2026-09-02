@@ -9,13 +9,12 @@
 #include <legionparser/replay.h>
 
 #include <QByteArray>
+#include <QDateTime>
 #include <QList>
 #include <QSqlQuery>
 #include <QString>
 #include <array>
 #include <optional>
-
-#include "problems.h"
 
 namespace KWLegionCore {
 
@@ -75,21 +74,6 @@ class Queries final {
     QList<Player> selectReplayPlayers(const QByteArray& checksum);
 
     QList<QString> selectExternalPaths(const QByteArray& checksum);
-
-    // Insert a new problem
-    // Returns the resulting materialized problem which may not be
-    // identical to what was sent in
-    // Use the noticed_at/type to determine what to do about the issue
-    ProblemRecord insertPathProblem(const ProblemRecord& problem);
-
-    void forgetMissingPathProblems(const QList<QString>& currentPaths);
-
-    void clearPathProblems(const QString& path);
-
-    void acknowledgeProblem(const QString& path, const QDateTime& now);
-
-    // Return all unacknowledged path problems
-    QList<ProblemRecord> selectPathProblems();
 
     void bootstrapMutationTable(const QList<QString>& values);
 

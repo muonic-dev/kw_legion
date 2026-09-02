@@ -30,7 +30,7 @@ class TornDataException;
 namespace KWLegionCore {
 class Queries;
 class Deferred;
-struct ProblemRecord;
+struct Watermark;
 class InboxItem;
 
 class ReplayStore : public QObject {
@@ -145,16 +145,16 @@ class ReplayStore : public QObject {
     // that will share the logic
     void performReplayAnalysis(const QString& path);
 
-    void handleTornFailure(const QString& path) noexcept;
+    // observed is the state of the file sampled before the parse attempt
+    // that came back torn - the path goes back into the deferred set to be
+    // retried once the bytes on disk move past it.
+    void handleTornFailure(const QString& path,
+                           const Watermark& observed) noexcept;
     // Assumes that ReplayParseException is disjoint from TornDataException
     void handleParseFailure(const LegionParser::ReplayParseException& ex,
                             const QString& path) noexcept;
 
     void removeReplayFileLink(const QString& path);
-
-    // Emit an inbox item from a record
-    void emitInboxItem(const ProblemRecord& record);
-    void emitDeferredItem(const QString& deferredPath);
 
     // Perform all the steps to try and receive a replay
     // File should probably be an absolute path
@@ -180,8 +180,6 @@ class ReplayStore : public QObject {
         const QByteArray& checksum) const;
 
     void exposeReplay(const QByteArray& checksum);
-
-    ProblemRecord handleProblem(const ProblemRecord& problem);
 
     static void hideReplay(Queries& queries, const QByteArray& checksum);
 

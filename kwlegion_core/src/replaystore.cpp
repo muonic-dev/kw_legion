@@ -13,7 +13,6 @@
 
 #include "deferred.h"
 #include "exception.h"
-#include "problems.h"
 #include "queries.h"
 #include "transaction.h"
 
@@ -21,7 +20,23 @@ Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
 
 namespace KWLegionCore {
 
-constexpr int FIVE_SECONDS_MS = 5000;
+// The poll itself is only a stat per deferred path, but every poll that sees
+// a change spends a full parse - and a torn parse hashes the whole file
+// before verifyFooter rejects it. During a match the file changes constantly,
+// so this interval really does set the re-read rate.
+constexpr int RECHECK_INTERVAL_MS = 15000;
+
+namespace {
+// Inbox items are derived from what we just observed on disk rather than
+// read back from storage, so the observation time is simply now.
+InboxItem makeInboxItem(const QString& path, InboxType type) {
+    return InboxItem{
+        .path = path,
+        .type = type,
+        .observedAt = QDateTime::currentDateTimeUtc(),
+    };
+}
+}  // namespace
 
 ReplayStore::ReplayStore(QString replayDir, const QString& statePath,
                          QObject* parent)
@@ -30,9 +45,9 @@ ReplayStore::ReplayStore(QString replayDir, const QString& statePath,
       m_storageDir(statePath + "/replays"),
       m_replayDir(std::move(replayDir)),
       m_deferred(new Deferred(this)) {
-    m_deferred->setRecheckIntervalMs(FIVE_SECONDS_MS);
+    m_deferred->setRecheckIntervalMs(RECHECK_INTERVAL_MS);
     // Send it back throught the analyze replay file
-    QObject::connect(m_deferred, &Deferred::pathReady, this,
+    QObject::connect(m_deferred, &Deferred::pathChanged, this,
                      &ReplayStore::analyzeReplayFile);
 }
 
@@ -117,6 +132,12 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     // Perform initial setup operation on the startup signal
     ensureDirectories();
     ensureDb();
+
+    // Inbox contents are derived from what is on disk rather than persisted,
+    // so clear whatever the UI is holding before the sweep below repopulates
+    // it from the paths we actually find.
+    emit inboxReset();
+
     // Bracket analyzeReplayFile so that we don't constantly emit the individual
     // load action
     const auto guard = m_initialSweep.enter();
@@ -143,72 +164,41 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     } catch (StorageException& ex) {
         qCritical(logStore) << "Unable to access the replays " << ex.what();
     }
-
-    try {
-        emit inboxReset();
-
-        Queries queries{QSqlQuery(m_db)};
-        queries.forgetMissingPathProblems(paths);
-        const QList<ProblemRecord> problems = queries.selectPathProblems();
-        for (const auto& problem : problems) {
-            emitInboxItem(problem);
-        }
-        const QSet<QString> pendingPaths = m_deferred->currentPaths();
-        for (const auto& path : pendingPaths) {
-            emitDeferredItem(path);
-        }
-
-        // Also emit all the pending paths
-    } catch (StorageException& ex) {
-        qCritical(logStore) << "Unable to access the db: " << ex.what();
-    }
-    // Now that we've handled everything here lets also finish initializing the
-    // problems
 }
 
 void ReplayStore::removeReplayFile(const QString& path) {
+    // Nothing left to watch for - otherwise the entry would keep getting
+    // polled and re-reported as an empty pending file.
+    m_deferred->removeWaitForChange(path);
     removeReplayFileLink(path);
     emit inboxItemRemoved(path);
 }
 
-void ReplayStore::emitInboxItem(const ProblemRecord& record) {
-    emit inboxItemObserved(InboxItem{
-        .path = record.path,
-        .type = record.type == ProblemType::CORRUPT ? InboxType::CORRUPT
-                                                    : InboxType::TORN,
-        .observedAt = record.noticedAt,
-    });
-}
-
-void ReplayStore::emitDeferredItem(const QString& path) {
-    emit inboxItemObserved(InboxItem{
-        .path = path,
-        .type = InboxType::PENDING,
-        .observedAt = QDateTime::currentDateTimeUtc(),
-    });
-}
-
 void ReplayStore::analyzeReplayFile(const QString& path) {
     // We were waiting but also a file notification happened
-    m_deferred->removeWaitForReady(path);
+    m_deferred->removeWaitForChange(path);
+
+    // Sampled before the parse attempt deliberately: if the file grows while
+    // we are reading it, a sample taken afterwards would record bytes we
+    // never parsed and we would then wait for a change that already happened.
+    const Watermark observed = Deferred::sample(path);
+
+    if (observed.size == 0) {
+        // Nothing to hand the parser yet. Wait for the file to grow rather
+        // than guessing at how long a writer needs.
+        qDebug(logStore) << "path " << path << " is empty, deferring";
+        removeReplayFileLink(path);
+        m_deferred->waitForChange(path, observed);
+        emit inboxItemObserved(makeInboxItem(path, InboxType::PENDING));
+        return;
+    }
+
     try {
-        if (Deferred::readyForParsing(path)) {
-            performReplayAnalysis(path);
-            // Success = not pending
-            emit inboxItemRemoved(path);
-        } else {
-            // If the replay cannot be parsed then whatever then
-            // the link to an existing replay needs to be broken
-            qDebug(logStore)
-                << "path " << path << " has not settled, deferring";
-            removeReplayFileLink(path);
-            m_deferred->waitForReady(path);
-            emitDeferredItem(path);
-        }
+        performReplayAnalysis(path);
+        // Success = not pending
+        emit inboxItemRemoved(path);
     } catch (const LegionParser::TornDataException& ex) {
-        // Replay torn, hopefully we get notified in the future if more data
-        // occurs
-        handleTornFailure(path);
+        handleTornFailure(path, observed);
     } catch (const LegionParser::ReplayParseException& ex) {
         handleParseFailure(ex, path);
     } catch (StorageException& ex) {
@@ -220,54 +210,37 @@ void ReplayStore::analyzeReplayFile(const QString& path) {
     }
 }
 
-void ReplayStore::handleTornFailure(const QString& path) noexcept {
+void ReplayStore::handleTornFailure(const QString& path,
+                                    const Watermark& observed) noexcept {
     // If the replay cannot be parsed then whatever then
     // the link to an existing replay needs to be broken
     qDebug(logStore) << "path " << path << " is incomplete";
     // No throw since we get external calls
     removeReplayFileLink(path);
 
-    try {
-        auto now = QDateTime::currentDateTimeUtc();
-        const ProblemRecord actual = handleProblem(ProblemRecord{
-            .path = path, .noticedAt = now, .type = ProblemType::TORN});
-        emitInboxItem(actual);
-    } catch (const StorageException& ex) {
-        qWarning(logStore) << "unable to write problem marker: " << ex.what();
-    }
+    // The parser is the authority on whether the file is complete, and it
+    // just said no - so there is nothing to learn until the bytes on disk
+    // actually move.
+    m_deferred->waitForChange(path, observed);
+    emit inboxItemObserved(makeInboxItem(path, InboxType::TORN));
 }
+
 void ReplayStore::handleParseFailure(
     const LegionParser::ReplayParseException& ex,
     const QString& path) noexcept {
-    // The replay is terminally invalid, so just remove it
+    // The replay is terminally invalid, so just remove it. Unlike a torn
+    // replay this doesn't go back into the deferred set - nothing is going
+    // to un-corrupt the file, so retrying only burns reads.
     // TODO: ReplayParseException includes potential IO failures which may
     // be transient in addition to CorruptDataException
     qInfo(logStore) << "unable to parse " << ex.what();
     // No throw since we get external calls
     removeReplayFileLink(path);
-    try {
-        auto now = QDateTime::currentDateTimeUtc();
-        const ProblemRecord actual = handleProblem(ProblemRecord{
-            .path = path, .noticedAt = now, .type = ProblemType::CORRUPT});
-        emitInboxItem(actual);
-    } catch (const StorageException& ex) {
-        qWarning(logStore) << "unable to write problem marker: " << ex.what();
-    }
-}
-
-ProblemRecord ReplayStore::handleProblem(const ProblemRecord& problem) {
-    SqlTransactionGuard tx(m_db);
-    Queries queries{QSqlQuery(m_db)};
-
-    ProblemRecord result = queries.insertPathProblem(problem);
-
-    tx.commit();
-
-    return result;
+    emit inboxItemObserved(makeInboxItem(path, InboxType::CORRUPT));
 }
 
 void ReplayStore::removeReplayFileLink(const QString& path) {
-    qDebug(logStore) << "Removing replay: " << path;
+    qDebug(logStore) << "Removing valid replay link: " << path;
     try {
         forwardChangedReplays(removeReplayAtPath(path));
     } catch (StorageException& ex) {
@@ -352,19 +325,12 @@ void ReplayStore::hideReplay(Queries& queries, const QByteArray& checksum) {
 }
 
 void ReplayStore::acknowledgeItem(const QString& path) {
-    try {
-        SqlTransactionGuard tx(m_db);
-        Queries queries{QSqlQuery(m_db)};
-        queries.acknowledgeProblem(path, QDateTime::currentDateTimeUtc());
-
-        tx.commit();
-
-        // After commit clear so that if we fail the user has a chance to
-        // try again
-        emit inboxItemRemoved(path);
-    } catch (StorageException& ex) {
-        qCritical(logStore) << "Failed to acknowledge" << ex.what();
-    }
+    // Dismissal is scoped to this session. Inbox state is derived from what
+    // is on disk, and the paths that reach the inbox include the game's
+    // rolling "Last Replay.KWReplay" - a persisted, path-keyed dismissal
+    // would permanently silence the single most frequently rewritten path in
+    // the folder. A corrupt file left in place is reported again next launch.
+    emit inboxItemRemoved(path);
 }
 
 void ReplayStore::performReplayAnalysis(const QString& path) {
@@ -390,10 +356,6 @@ QList<QByteArray> ReplayStore::ingestReplay(
     QFile& file, const LegionParser::ReplayMetadata& metadata) {
     SqlTransactionGuard tx(m_db);
     Queries queries{QSqlQuery(m_db)};
-
-    // If we have a successful parse at this point we are in a transaction
-    // so also clear any failed parses
-    queries.clearPathProblems(file.fileName());
 
     QList<QByteArray> impactedChecksums{{metadata.checksum}};
 

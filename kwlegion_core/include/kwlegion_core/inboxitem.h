@@ -11,8 +11,8 @@
 #include <QString>
 
 // InboxType/InboxItem live in the public API rather than kwlegion_core's
-// private src/ despite otherwise being good candidates (see ProblemRecord,
-// transaction.h). They're expected to be emitted from ReplayStore (which
+// private src/ despite otherwise being good candidates (see transaction.h).
+// They're expected to be emitted from ReplayStore (which
 // runs on a background thread) to something like IngestionModel, and any
 // type used as a QObject signal argument on a publicly-declared class needs
 // to be complete wherever that class's header is compiled - moc generates
