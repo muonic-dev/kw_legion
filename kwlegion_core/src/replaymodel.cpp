@@ -80,7 +80,7 @@ QString ReplayModel::inferPatch() const {
 // QRegularExpression's ctor only stores the pattern (compilation is lazy on
 // first match); the only throw path is std::bad_alloc
 // NOLINTNEXTLINE(bugprone-throwing-static-initialization)
-static const QRegularExpression PATCH_RE(".*__([0-9]+[a-z]+)$");
+static const QRegularExpression PATCH_RE(".*__([0-9]+[a-z])$");
 
 QString ReplayModel::inferPatch(QStringView mapPath) {
     Q_ASSERT(PATCH_RE.isValid());
@@ -88,7 +88,7 @@ QString ReplayModel::inferPatch(QStringView mapPath) {
     if (!match.hasMatch()) {
         return "";
     }
-    return match.captured(1);
+    return "R" + match.captured(1);
 }
 
 }  // namespace KWLegionCore

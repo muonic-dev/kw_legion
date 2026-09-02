@@ -10,6 +10,8 @@ Rectangle {
 
     property alias text: patchLabel.text
 
+    opacity: text.length == 0 ? 0 : 1
+
     radius: height / 2
     color: "transparent"
     border.color: Theme.lightMode ? Theme.dark : Theme.light

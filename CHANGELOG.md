@@ -19,4 +19,5 @@
 
 - The bulk operations have moved to a persistent toolbar. There is now a selection menu for all/none/invert.
 - The layout of the replay display has been improved
+- The patch version now displays R at its header and will not return things like R24BETA for things like WEC map WIPs
 
