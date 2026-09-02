@@ -9,6 +9,7 @@
 
 #include <QObject>
 #include <QString>
+#include <exception>
 
 namespace KWLegionCore {
 
@@ -35,6 +36,8 @@ class ReplayFilterQueryParser : public QObject {
     void queryChanged();
 
    private:
+    FilterQuery* parse(QStringView view);
+
     QString m_text;
     FilterQuery* m_current;
 };

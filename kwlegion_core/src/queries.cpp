@@ -400,10 +400,10 @@ ProblemRecord Queries::insertPathProblem(const ProblemRecord& problem) {
 
     const ProblemRecord result{
         .path = m_query.value(0).toString(),
-        .noticedAt = QDateTime::fromSecsSinceEpoch(m_query.value(1).toInt(),
+        .noticedAt = QDateTime::fromSecsSinceEpoch(m_query.value(2).toInt(),
                                                    QTimeZone::UTC),
         .type =
-            problemFromUInt8(static_cast<uint8_t>(m_query.value(2).toUInt()))};
+            problemFromUInt8(static_cast<uint8_t>(m_query.value(1).toUInt()))};
     // We aren't draining so call finish explicitly - otherwise the
     // statement stays active and blocks the caller's transaction commit.
     m_query.finish();

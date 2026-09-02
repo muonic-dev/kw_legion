@@ -45,7 +45,7 @@ Page {
             required property int type
             required property var observedAt
 
-            readonly property bool terminal: type !== InboxType.PENDING
+            readonly property bool terminal: type === InboxType.CORRUPT
 
             width: ListView.view.width - 6 // some slight padding for the scrollbar
             height: rowLayout.implicitHeight + 16
