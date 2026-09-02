@@ -4,6 +4,7 @@
 #include <legionparser/exception.h>
 #include <legionparser/parser.h>
 
+#include <QBuffer>
 #include <QDir>
 #include <QFile>
 #include <QSet>
@@ -42,6 +43,15 @@ void checkMirrorMatchFaction(const QString& filename, Faction faction) {
     CHECK(metadata.players.at(2).faction == Faction::Unknown);
 }
 
+// QBuffer is seekable, so this stands in for the pipe/socket case where
+// looksComplete can't inspect the tail at all.
+class SequentialBuffer : public QBuffer {
+   public:
+    using QBuffer::QBuffer;
+
+    [[nodiscard]] bool isSequential() const override { return true; }
+};
+
 }  // namespace
 
 TEST_CASE("torn read (footer cut off mid-write) is rejected",
@@ -51,6 +61,84 @@ TEST_CASE("torn read (footer cut off mid-write) is rejected",
     // game was still flushing its footer to disk.
     CHECK_THROWS_AS(parseReplay(QString::fromUtf8("test_torn_footer.KWReplay")),
                     TornDataException);
+}
+
+TEST_CASE("looksComplete accepts every replay the parser accepts",
+          "[legionparser][footer]") {
+    // The invariant the short-circuit rests on: looksComplete inspects a
+    // fixed-size window of the tail and must never reject a file a full
+    // parse would have accepted. It runs first, so its answer wins - a
+    // window smaller than the one verifyFooter gets would silently strand
+    // any replay whose footer landed in the gap.
+    const QDir dir(QString::fromUtf8(REPLAY_TEST_DATA_DIR));
+    const QStringList fixtures =
+        dir.entryList(QStringList{QString::fromUtf8("*.KWReplay")}, QDir::Files);
+    REQUIRE_FALSE(fixtures.isEmpty());
+
+    for (const QString& filename : fixtures) {
+        QFile replayFile(dir.filePath(filename));
+        REQUIRE(replayFile.open(QIODevice::ReadOnly));
+
+        bool accepted = true;
+        try {
+            const ReplayMetadata metadata = Parser::parse(replayFile);
+            CHECK_FALSE(metadata.checksum.isEmpty());
+        } catch (const ReplayParseException&) {
+            // e.g. the deliberately torn fixture - nothing to agree about.
+            accepted = false;
+        }
+
+        if (accepted) {
+            REQUIRE(replayFile.seek(0));
+            INFO("fixture: " << filename.toStdString());
+            CHECK(Parser::looksComplete(replayFile));
+        }
+    }
+}
+
+TEST_CASE("looksComplete rejects a footer cut off mid-write",
+          "[legionparser][footer]") {
+    const QDir dir(QString::fromUtf8(REPLAY_TEST_DATA_DIR));
+    QFile replayFile(
+        dir.filePath(QString::fromUtf8("test_torn_footer.KWReplay")));
+    REQUIRE(replayFile.open(QIODevice::ReadOnly));
+
+    CHECK_FALSE(Parser::looksComplete(replayFile));
+}
+
+TEST_CASE("looksComplete leaves the device position untouched",
+          "[legionparser][footer]") {
+    // Deliberately the largest fixture, so the tail window is genuinely
+    // seeked to rather than covering the whole file.
+    const QDir dir(QString::fromUtf8(REPLAY_TEST_DATA_DIR));
+    QFile replayFile(
+        dir.filePath(QString::fromUtf8("8-player all random ffa.KWReplay")));
+    REQUIRE(replayFile.open(QIODevice::ReadOnly));
+    REQUIRE(replayFile.seek(37));
+
+    CHECK(Parser::looksComplete(replayFile));
+    CHECK(replayFile.pos() == 37);
+}
+
+TEST_CASE("looksComplete rejects a file too small to hold a footer",
+          "[legionparser][footer]") {
+    QByteArray tiny(QByteArrayLiteral("abcd"));
+    QBuffer buffer(&tiny);
+    REQUIRE(buffer.open(QIODevice::ReadOnly));
+
+    CHECK_FALSE(Parser::looksComplete(buffer));
+}
+
+TEST_CASE("looksComplete defers on a device it cannot seek",
+          "[legionparser][footer]") {
+    // Nothing about this content ends in a footer, but an unseekable device
+    // can't be inspected - answering false would report a torn file on the
+    // strength of a check that never ran.
+    QByteArray bytes(1024, 'x');
+    SequentialBuffer buffer(&bytes);
+    REQUIRE(buffer.open(QIODevice::ReadOnly));
+
+    CHECK(Parser::looksComplete(buffer));
 }
 
 TEST_CASE("parses muonic v branston game 1", "[legionparser][metadata]") {

@@ -20,11 +20,10 @@ Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
 
 namespace KWLegionCore {
 
-// The poll itself is only a stat per deferred path, but every poll that sees
-// a change spends a full parse - and a torn parse hashes the whole file
-// before verifyFooter rejects it. During a match the file changes constantly,
-// so this interval really does set the re-read rate.
-constexpr int RECHECK_INTERVAL_MS = 15000;
+// The poll itself is only a stat per deferred path, and since
+// Parser::looksComplete rejects an unfinished file from its tail, a poll that
+// sees a change no longer costs a whole-payload hash either.
+constexpr int RECHECK_INTERVAL_MS = 5000;
 
 namespace {
 // Inbox items are derived from what we just observed on disk rather than
@@ -342,6 +341,18 @@ void ReplayStore::performReplayAnalysis(const QString& path) {
         qWarning(logStore) << "Unable to open " << path << " for reading";
         throw StorageException(replayFile.errorString());
     }
+    // While a match is in progress this path is retried on every recheck, and
+    // a full parse fingerprints the whole payload before verifyFooter gets to
+    // reject it. Checking the tail first turns that into two small reads.
+    // Only ever a short-circuit: a file it doesn't rule out still goes
+    // through the parser, which stays the authority on torn vs corrupt.
+    if (!LegionParser::Parser::looksComplete(replayFile)) {
+        // Reported at the end of the file - that's where the footer we
+        // didn't find would have been.
+        throw LegionParser::TornDataException(
+            static_cast<size_t>(replayFile.size()));
+    }
+
     // TODO: In theory there is a short race condition here where the file
     // is overwritten before we can analyze and copy it, but meh
     const LegionParser::ReplayMetadata metadata =

@@ -14,6 +14,7 @@
 #include <bit>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <utility>
 
 #include "reader.h"
@@ -75,10 +76,51 @@ constexpr qsizetype FOOTER_LENGTH_FIELD_SIZE =
 // length, so this is only a lower bound, not the footer's actual size.
 constexpr qsizetype FOOTER_MIN_SIZE =
     FOOTER_MAGIC_SIZE + FOOTER_LENGTH_FIELD_SIZE + 1 + FOOTER_LENGTH_FIELD_SIZE;
+// How much of the file's tail is enough to find the footer in. This is the
+// largest footer either path will accept, so it has to be the same number in
+// both: readRemainingChunked hands verifyFooter the last two chunks, and
+// looksComplete seeks back by this much. Were looksComplete to read less, it
+// would reject files that a full parse accepts - and since it short-circuits
+// before the parser ever runs, its answer would win.
+constexpr qint64 FOOTER_TAIL_WINDOW = 2 * BODY_READ_CHUNK_SIZE;
 
 namespace {
 quint32 readLE32(QByteArrayView data) {
     return qFromLittleEndian<quint32>(data.data());
+}
+
+// Locates the footer structure at the end of tail, which MUST be a view of
+// the file's final bytes - every offset here is measured backwards from the
+// end, so a view that stops short of EOF silently reads the wrong fields.
+//
+// This is only the cheap, structural half of footer validation: enough to
+// tell "the file doesn't end in a footer yet" (the writer is still going)
+// from "it does". Returns the footer's bytes when one is present, so callers
+// that want to validate further don't have to recompute the bounds.
+std::optional<QByteArrayView> footerFromTail(QByteArrayView tail) {
+    if (std::cmp_less(tail.size(), FOOTER_LENGTH_FIELD_SIZE)) {
+        return std::nullopt;
+    }
+
+    // footer_length is self-describing and lives in the final 4 bytes of
+    // the file, so we can slice out exactly the footer's bytes directly
+    // from the end rather than scanning for the magic string.
+    const quint32 footerLength =
+        readLE32(tail.sliced(tail.size() - FOOTER_LENGTH_FIELD_SIZE));
+    if (std::cmp_less(footerLength, FOOTER_MIN_SIZE) ||
+        std::cmp_greater(footerLength, tail.size())) {
+        return std::nullopt;
+    }
+
+    const QByteArrayView footer =
+        tail.last(static_cast<qsizetype>(footerLength));
+
+    const auto magicView = QByteArrayView(FOOTER_MAGIC, FOOTER_MAGIC_SIZE);
+    if (footer.first(magicView.size()) != magicView) {
+        return std::nullopt;
+    }
+
+    return footer;
 }
 }  // namespace
 
@@ -456,27 +498,12 @@ void Parser::parseBody() {
 }
 
 void Parser::verifyFooter(QByteArrayView lastChunk) const {
-    // footer_length is self-describing and lives in the final 4 bytes of
-    // the file, so we can slice out exactly the footer's bytes directly
-    // from the end rather than scanning for the magic string.
-    if (std::cmp_less(lastChunk.size(), FOOTER_LENGTH_FIELD_SIZE)) {
+    const std::optional<QByteArrayView> maybeFooter =
+        footerFromTail(lastChunk);
+    if (!maybeFooter) {
         throw TornDataException(m_reader->offset());
     }
-
-    const quint32 footerLength =
-        readLE32(lastChunk.sliced(lastChunk.size() - FOOTER_LENGTH_FIELD_SIZE));
-    if (std::cmp_less(footerLength, FOOTER_MIN_SIZE) ||
-        std::cmp_greater(footerLength, lastChunk.size())) {
-        throw TornDataException(m_reader->offset());
-    }
-
-    const QByteArrayView footer =
-        lastChunk.last(static_cast<qsizetype>(footerLength));
-
-    const auto magicView = QByteArrayView(FOOTER_MAGIC, FOOTER_MAGIC_SIZE);
-    if (footer.first(magicView.size()) != magicView) {
-        throw TornDataException(m_reader->offset());
-    }
+    const QByteArrayView footer = *maybeFooter;
 
     // Once we have read the FOOTER_MAGIC the likelihood that further validation
     // errors are the result of a torn read are vanishingly unlikely so we
@@ -523,6 +550,40 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
             QLatin1String("replay footer data has an unrecognized structure"),
             m_reader->offset());
     }
+}
+
+bool Parser::looksComplete(QIODevice& replayFile) {
+    // Every "can't tell" path here answers true. This check exists only to
+    // rule a file out cheaply - anything it can't inspect falls through to a
+    // full parse, which is the authority on the result either way.
+    if (replayFile.isSequential()) {
+        return true;
+    }
+
+    const qint64 size = replayFile.size();
+    if (std::cmp_less(size, FOOTER_MIN_SIZE)) {
+        // Too small to hold a footer at all - no point spending the seeks.
+        return false;
+    }
+
+    const qint64 window = qMin(size, FOOTER_TAIL_WINDOW);
+    const qint64 resume = replayFile.pos();
+    if (!replayFile.seek(size - window)) {
+        return true;
+    }
+
+    const QByteArray tail = replayFile.read(window);
+    replayFile.seek(resume);
+
+    // A short read means the view doesn't actually reach EOF - the file was
+    // truncated out from under us, most likely - and footerFromTail's
+    // offsets are all measured from the end, so the answer would be
+    // meaningless. Defer to the full parse instead.
+    if (tail.size() != window) {
+        return true;
+    }
+
+    return footerFromTail(tail).has_value();
 }
 
 ReplayMetadata Parser::parse(QIODevice& replayFile) {

@@ -41,6 +41,24 @@ class Parser {
      */
     static ReplayMetadata parse(QIODevice& replayFile);
 
+    /**
+     * @brief Cheaply test whether replayFile ends in a replay footer.
+     *
+     * Reads only the file's tail, so callers can skip a full parse - which
+     * fingerprints the entire payload - on a replay the game is still
+     * writing. This is a one-sided test: false means the file definitely
+     * isn't finished, true only means it wasn't ruled out, and parse() stays
+     * the authority on whether it is actually valid. A device that can't be
+     * inspected (sequential, unseekable, changing underneath us) answers
+     * true so the caller falls through to parse().
+     *
+     * The device's position is restored before returning.
+     *
+     * @param replayFile the file to inspect
+     * @return false when the file definitely has no footer yet
+     */
+    static bool looksComplete(QIODevice& replayFile);
+
    private:
     explicit Parser(QIODevice&);
 
