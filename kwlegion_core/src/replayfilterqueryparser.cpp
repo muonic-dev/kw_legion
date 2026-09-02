@@ -95,6 +95,8 @@ FilterQuery* ReplayFilterQueryParser::parse(QStringView text) {
     if (text.isEmpty()) {
         return new TautologyFilterQuery(this);
     }
+    // Temporarily disable the parsing for alpha.2
+    return new AnyTextReplayFilterQuery(text.toString(), this);
     // Is there a `:` indicating an attempt to filter
     if (!text.contains(QChar(':'))) {
         return new AnyTextReplayFilterQuery(text.toString(), this);
