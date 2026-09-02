@@ -13,9 +13,10 @@ and toggle which replays are placed in the replay folder.
 
 See [CHANGELOG.md](CHANGELOG.md) for recent changes
 
-## ☢️ _*UNDER DEVELOPMENT/UNSTABLE*_ ☢️
+Licensed under GPLv3 (see [LICENSE](LICENSE))
 
-This software is under active developmet and may be unstable. You should definitely back up any replays that you consider important. If you do encounter problems feel free to open an issue.
+Caveat emptor: I use this for my own replays but the program is very new and I have backups. You should 
+make sure you have backups of any files you need.
 
 ## License
 
