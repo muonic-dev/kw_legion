@@ -7,7 +7,11 @@ LEGION will gather every replay in your replay folder (including the rolling Las
 and track it in a local database. You can then filter by player, map, faction, time and more
 and toggle which replays are placed in the replay folder.
 
-![Replay screen](docs/Replay%20Screen.png)
+| Light | Dark |
+|---|---|
+| ![Replay screen](docs/Replay%20Screen.png) | ![Replay screen (dark)](docs/Replay%20Screen-Dark.png) |
+
+See [CHANGELOG.md](CHANGELOG.md) for recent changes
 
 ## ☢️ _*UNDER DEVELOPMENT/UNSTABLE*_ ☢️
 
