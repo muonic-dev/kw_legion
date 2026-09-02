@@ -83,6 +83,8 @@ class Queries final {
 
     void clearPathProblems(const QString& path);
 
+    void acknowledgeProblem(const QString& path, const QDateTime& now);
+
     // Return all unacknowledged path problems
     QList<ProblemRecord> selectPathProblems();
 

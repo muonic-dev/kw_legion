@@ -48,6 +48,8 @@ class IngestionModel : public QAbstractListModel {
 
     void setStore(ReplayStore* store) const;
 
+    Q_INVOKABLE void acknowledgeItem(const QString& path);
+
     // slots
     void inboxReset();
     void inboxItemObserved(const InboxItem& item);
@@ -55,6 +57,9 @@ class IngestionModel : public QAbstractListModel {
 
    signals:
     void ingestionCountChanged();
+
+    // Emitted to indicate that a path has been acknowledged
+    void shouldAcknowledgeItem(const QString& path);
 
    private:
     QHash<int, QByteArray> m_roles;

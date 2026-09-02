@@ -18,9 +18,9 @@ class SqlTransactionGuard {
     SqlTransactionGuard& operator=(const SqlTransactionGuard&) = delete;
     SqlTransactionGuard& operator=(SqlTransactionGuard&&) = delete;
 
-    // Only commit is no-discard to force checks on whether the commit actually
-    // succeeded
-    [[nodiscard]] bool commit();
+    // Throws StorageException if there is no active transaction to commit,
+    // or if the underlying commit fails.
+    void commit();
     bool rollback();
 
    private:

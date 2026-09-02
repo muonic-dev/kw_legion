@@ -131,13 +131,7 @@ Page {
                             sourceSize: Qt.size(14, 14)
                         }
 
-                        onClicked: {
-                            // TODO: wire to a real acknowledge invokable once
-                            // IngestionModel is backed by ReplayStore.
-                            // Dismissal should remove the row via
-                            // inboxItemRemoved, not any persisted per-item
-                            // "acknowledged" state.
-                        }
+                        onClicked: IngestionModel.acknowledgeItem(delegateRoot.path)
 
                         padding: 8
                         implicitWidth: implicitContentWidth + leftPadding + rightPadding

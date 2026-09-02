@@ -430,6 +430,16 @@ QList<ProblemRecord> Queries::selectPathProblems() {
     return records;
 }
 
+void Queries::acknowledgeProblem(const QString& path, const QDateTime& now) {
+    prepare(
+        "UPDATE broken_replays SET acknowledged_at = :now WHERE replay_path = "
+        ":path");
+    m_query.bindValue(":now", now.toSecsSinceEpoch());
+    m_query.bindValue(":path", path);
+
+    exec();
+}
+
 Replay Queries::readReplay() const {
     return Replay{.checksum = m_query.value(0).toByteArray(),
                   .timestamp = QDateTime::fromSecsSinceEpoch(

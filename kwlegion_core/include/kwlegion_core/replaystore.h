@@ -75,9 +75,11 @@ class ReplayStore : public QObject {
      */
     void analyzeReplayFile(const QString& path);
     /**
-     * A replay file has disappeared or is overwritten with incomplete data
+     * A replay file has disappeared
+     * This is seperate from removeReplayFileLink so that we can clear any
+     * problem records here
      */
-    void removeReplayFileLink(const QString& path) noexcept;
+    void removeReplayFile(const QString& path);
 
     /**
      * Expose a replay to the Kane's Wrath replay folder by checksum
@@ -94,6 +96,9 @@ class ReplayStore : public QObject {
      * replays, and toggling the already-exposed ones would hide them instead.
      */
     void ensureReplayExposed(const QByteArray& checksum);
+
+    // Mark an item as acknowledges, will trigger inboxItemRemoved
+    void acknowledgeItem(const QString& path);
 
     /**
      * Ensure a replay is hidden regardless of its current state. See
@@ -141,6 +146,8 @@ class ReplayStore : public QObject {
     // Assumes that ReplayParseException is disjoint from TornDataException
     void handleParseFailure(const LegionParser::ReplayParseException& ex,
                             const QString& path) noexcept;
+
+    void removeReplayFileLink(const QString& path);
 
     // Emit an inbox item from a record
     void emitInboxItem(const ProblemRecord& record);

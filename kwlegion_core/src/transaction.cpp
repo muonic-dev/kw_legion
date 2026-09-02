@@ -3,6 +3,10 @@
 
 #include "transaction.h"
 
+#include <QSqlError>
+
+#include "exception.h"
+
 namespace KWLegionCore {
 SqlTransactionGuard::SqlTransactionGuard(QSqlDatabase db)
     : m_db(db), m_inTx(db.transaction()) {}
@@ -21,13 +25,14 @@ bool SqlTransactionGuard::rollback() {
     return !m_inTx;
 }
 
-// TODO: For ergonomics should this throw when commit fails?
-bool SqlTransactionGuard::commit() {
+void SqlTransactionGuard::commit() {
     if (!m_inTx) {
-        return false;
+        throw StorageException("commit failed: no active transaction");
     }
     // When commit is succesful we aren't in a transaction anymore
     m_inTx = !m_db.commit();
-    return !m_inTx;
+    if (m_inTx) {
+        throw StorageException("commit failed: " + m_db.lastError().text());
+    }
 }
 }  // namespace KWLegionCore

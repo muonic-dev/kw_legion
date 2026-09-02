@@ -7,6 +7,8 @@
 #include <QSqlQuery>
 #include <catch2/catch_test_macros.hpp>
 
+#include "exception.h"
+
 using namespace KWLegionCore;
 
 namespace {
@@ -31,7 +33,7 @@ TEST_CASE("SqlTransactionGuard commits on success") {
     {
         SqlTransactionGuard tx(db);
         REQUIRE(query.exec("INSERT INTO t (id) VALUES (1)"));
-        REQUIRE(tx.commit());
+        REQUIRE_NOTHROW(tx.commit());
     }
 
     CHECK(countRows(query) == 1);
@@ -61,7 +63,7 @@ TEST_CASE("SqlTransactionGuard rolls back if never committed") {
     QSqlDatabase::removeDatabase("transaction_rollback");
 }
 
-TEST_CASE("SqlTransactionGuard commit fails leaves the guard rollback-ready") {
+TEST_CASE("SqlTransactionGuard second commit throws instead of recommitting") {
     QSqlDatabase db =
         QSqlDatabase::addDatabase("QSQLITE", "transaction_double_commit");
     db.setDatabaseName(":memory:");
@@ -72,10 +74,10 @@ TEST_CASE("SqlTransactionGuard commit fails leaves the guard rollback-ready") {
 
     SqlTransactionGuard tx(db);
     REQUIRE(query.exec("INSERT INTO t (id) VALUES (1)"));
-    REQUIRE(tx.commit());
-    // A second commit() with no open transaction should just report failure,
-    // not crash or attempt to commit again.
-    CHECK_FALSE(tx.commit());
+    REQUIRE_NOTHROW(tx.commit());
+    // A second commit() with no open transaction should throw rather than
+    // crash or attempt to commit again.
+    CHECK_THROWS_AS(tx.commit(), StorageException);
 
     db = QSqlDatabase();
     QSqlDatabase::removeDatabase("transaction_double_commit");

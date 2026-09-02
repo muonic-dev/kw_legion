@@ -9,7 +9,6 @@
 #include <QDateTime>
 #include <algorithm>
 
-
 namespace KWLegionCore {
 IngestionModel* IngestionModel::create(QQmlEngine* /*qmlEngine*/,
                                        QJSEngine* /*jsEngine*/) {
@@ -68,6 +67,14 @@ void IngestionModel::setStore(ReplayStore* store) const {
                      &IngestionModel::inboxItemObserved);
     QObject::connect(store, &ReplayStore::inboxItemRemoved, this,
                      &IngestionModel::inboxItemRemoved);
+
+    // Reverse connect
+    QObject::connect(this, &IngestionModel::shouldAcknowledgeItem, store,
+                     &ReplayStore::acknowledgeItem);
+}
+
+void IngestionModel::acknowledgeItem(const QString& path) {
+    emit shouldAcknowledgeItem(path);
 }
 
 void IngestionModel::inboxReset() {

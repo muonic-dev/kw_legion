@@ -141,6 +141,11 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     // problems
 }
 
+void ReplayStore::removeReplayFile(const QString& path) {
+    removeReplayFileLink(path);
+    emit inboxItemRemoved(path);
+}
+
 void ReplayStore::emitInboxItem(const ProblemRecord& record) {
     emit inboxItemObserved(InboxItem{
         .path = record.path,
@@ -231,14 +236,12 @@ ProblemRecord ReplayStore::handleProblem(const ProblemRecord& problem) {
 
     ProblemRecord result = queries.insertPathProblem(problem);
 
-    if (!tx.commit()) {
-        throw StorageException("commit failed: " + m_db.lastError().text());
-    }
+    tx.commit();
 
     return result;
 }
 
-void ReplayStore::removeReplayFileLink(const QString& path) noexcept {
+void ReplayStore::removeReplayFileLink(const QString& path) {
     qDebug(logStore) << "Removing replay: " << path;
     try {
         forwardChangedReplays(removeReplayAtPath(path));
@@ -323,6 +326,22 @@ void ReplayStore::hideReplay(Queries& queries, const QByteArray& checksum) {
     }
 }
 
+void ReplayStore::acknowledgeItem(const QString& path) {
+    try {
+        SqlTransactionGuard tx(m_db);
+        Queries queries{QSqlQuery(m_db)};
+        queries.acknowledgeProblem(path, QDateTime::currentDateTimeUtc());
+
+        tx.commit();
+
+        // After commit clear so that if we fail the user has a chance to
+        // try again
+        emit inboxItemRemoved(path);
+    } catch (StorageException& ex) {
+        qCritical(logStore) << "Failed to acknowledge" << ex.what();
+    }
+}
+
 void ReplayStore::performReplayAnalysis(const QString& path) {
     qDebug(logStore) << "Analyzing replay: " << path;
     QFile replayFile(path);
@@ -385,10 +404,7 @@ QList<QByteArray> ReplayStore::ingestReplay(
         }
     }
 
-    if (!tx.commit()) {
-        qCritical(logStore) << "Failed to commit: " << m_db.lastError().text();
-        throw StorageException("failed to commit");
-    }
+    tx.commit();
 
     return impactedChecksums;
 }
@@ -449,9 +465,7 @@ std::optional<QByteArray> ReplayStore::removeReplayAtPath(const QString& path) {
 
     std::optional result = queries.removeExternalFilename(path);
 
-    if (!tx.commit()) {
-        throw StorageException("failed to commit: " + m_db.lastError().text());
-    }
+    tx.commit();
     return result;
 }
 
@@ -469,15 +483,16 @@ void ReplayStore::ensureDb() {
     }
 
     // TODO: Do we need some kind of internally broken structure?
-    SqlTransactionGuard tx(m_db);
-    Queries queries{QSqlQuery(m_db)};
-    if (!queries.migrate()) {
-        qCritical(logStore)
-            << "Failed to migrate database: " << m_db.lastError().text();
-    }
-    if (!tx.commit()) {
-        qCritical(logStore)
-            << "Failed to migrate database: " << m_db.lastError().text();
+    try {
+        // Outside a transaction so that we do as much as we can
+        // if we ever ship a broken migration this means there is less to do
+        Queries queries{QSqlQuery(m_db)};
+        if (!queries.migrate()) {
+            qCritical(logStore)
+                << "Failed to migrate database: " << m_db.lastError().text();
+        }
+    } catch (const StorageException& ex) {
+        qCritical(logStore) << "Failed to migrate database: " << ex.what();
     }
 }
 

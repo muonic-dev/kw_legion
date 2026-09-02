@@ -164,7 +164,7 @@ int main(int argc, char* argv[]) {
     QObject::connect(&replayProspector, &ReplayProspector::replayFileChanged,
                      &replayStore, &ReplayStore::analyzeReplayFile);
     QObject::connect(&replayProspector, &ReplayProspector::replayFileRemoved,
-                     &replayStore, &ReplayStore::removeReplayFileLink);
+                     &replayStore, &ReplayStore::removeReplayFile);
 
     engine.loadFromModule("KWLegionUI", "Main");
 

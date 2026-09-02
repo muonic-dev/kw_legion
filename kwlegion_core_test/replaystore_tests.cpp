@@ -176,7 +176,7 @@ TEST_CASE(
     store.analyzeReplayFile(replayPath);
 
     QSignalSpy changedSpy(&store, &ReplayStore::replaysChanged);
-    store.removeReplayFileLink(replayPath);
+    store.removeReplayFile(replayPath);
 
     REQUIRE(changedSpy.count() == 1);
     const QList<Replay> replays = changedSpy.at(0).at(0).value<QList<Replay>>();
@@ -185,7 +185,8 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "ReplayStore removeReplayFileLink on an untracked path is a harmless no-op") {
+    "ReplayStore removeReplayFileLink on an untracked path is a harmless "
+    "no-op") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -194,7 +195,7 @@ TEST_CASE(
     store.receiveInitialReplayPaths({});
 
     QSignalSpy changedSpy(&store, &ReplayStore::replaysChanged);
-    store.removeReplayFileLink(root.filePath("never-existed.KWReplay"));
+    store.removeReplayFile(root.filePath("never-existed.KWReplay"));
 
     CHECK(changedSpy.count() == 0);
 }
