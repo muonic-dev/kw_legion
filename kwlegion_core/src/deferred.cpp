@@ -11,7 +11,7 @@
 
 namespace KWLegionCore {
 namespace {
-const long TIMER_MS = 1000;
+const long TIMER_MS = 10000;
 
 // If nothing about a file has moved for this long we make one more attempt
 // anyway. The final write of a match can land, be read as torn (the writer
@@ -53,8 +53,10 @@ void Deferred::setRecheckIntervalMs(long ms) { m_recheckIntervalMs = ms; }
 
 void Deferred::setLongStopMs(qint64 ms) { m_longStopMs = ms; }
 
-void Deferred::waitForChange(const QString& path, const Watermark& observed) {
-    m_deferred.insert(path, observed);
+void Deferred::waitForChange(const QString& path, const Watermark& observed,
+                             bool allowLongStop) {
+    m_deferred.insert(path, WatermarkRecord{.watermark = observed,
+                                            .allowLongStop = allowLongStop});
     if (!m_trigger->isActive()) {
         m_trigger->start(m_recheckIntervalMs);
     }
@@ -71,19 +73,26 @@ void Deferred::timerFired() {
     // Drained up front because emitting pathChanged re-enters us: the
     // handler will typically remove the path and, if it still can't parse
     // it, enqueue it again with a fresh watermark.
-    const QHash<QString, Watermark> toCheck = std::exchange(m_deferred, {});
+    const QHash<QString, WatermarkRecord> toCheck =
+        std::exchange(m_deferred, {});
     const QDateTime now = QDateTime::currentDateTimeUtc();
 
     for (auto it = toCheck.cbegin(); it != toCheck.cend(); ++it) {
         const Watermark current = sample(it.key());
-        const bool longStopped = it.value().sampledAt.msecsTo(now) >=
-                                 m_longStopMs;
-        if (current.differsFrom(it.value()) || longStopped) {
+        const bool longStopped =
+            it.value().watermark.sampledAt.msecsTo(now) >= m_longStopMs;
+        if (current.differsFrom(it.value().watermark) ||
+            // Known good records are polled forever in case they are
+            // overwritten
+            (longStopped && it.value().allowLongStop)) {
+            // If the file hasn't changed in considerable time then give it one
+            // more chance.
             emit pathChanged(it.key());
         } else {
             // Re-enqueued against the *original* watermark so neither the
             // comparison baseline nor the long-stop clock resets every poll.
-            waitForChange(it.key(), it.value());
+            waitForChange(it.key(), it.value().watermark,
+                          it.value().allowLongStop);
         }
     }
 }

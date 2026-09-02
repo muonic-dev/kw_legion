@@ -71,7 +71,8 @@ class Deferred : public QObject {
      * observed should be the state sampled before the parse attempt that
      * failed.
      */
-    void waitForChange(const QString& path, const Watermark& observed);
+    void waitForChange(const QString& path, const Watermark& observed,
+                       bool allowLongStop = true);
 
     void removeWaitForChange(const QString& path);
 
@@ -88,11 +89,17 @@ class Deferred : public QObject {
     void pathChanged(const QString& path);
 
    private:
+    struct WatermarkRecord {
+        Watermark watermark;
+        // We must be able to continue watching some paths forever
+        bool allowLongStop;
+    };
+
     void timerFired();
 
     long m_recheckIntervalMs;
     qint64 m_longStopMs;
     QTimer* m_trigger;
-    QHash<QString, Watermark> m_deferred;
+    QHash<QString, WatermarkRecord> m_deferred;
 };
 }  // namespace KWLegionCore

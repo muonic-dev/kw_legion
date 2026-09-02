@@ -196,6 +196,9 @@ void ReplayStore::analyzeReplayFile(const QString& path) {
         performReplayAnalysis(path);
         // Success = not pending
         emit inboxItemRemoved(path);
+        // Also, there are replay files that are overwritten such as Last
+        // Replay.KWLegion We re-arm to continue watching them
+        m_deferred->waitForChange(path, observed, false);
     } catch (const LegionParser::TornDataException& ex) {
         handleTornFailure(path, observed);
     } catch (const LegionParser::ReplayParseException& ex) {
