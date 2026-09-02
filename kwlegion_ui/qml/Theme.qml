@@ -4,6 +4,7 @@
 pragma Singleton
 
 import QtQuick
+import KWLegionCore
 
 QtObject {
     readonly property bool lightMode: Application.styleHints.colorScheme === Qt.Light
@@ -15,7 +16,7 @@ QtObject {
 
     readonly property color selectionTint: Qt.rgba((Theme.lightMode ? Theme.dark : Theme.light).r, (Theme.lightMode ? Theme.dark : Theme.light).g, (Theme.lightMode ? Theme.dark : Theme.light).b, Theme.lightMode ? 0.08 : 0.14)
 
-    readonly property url appIcon: "qrc:/qt/qml/KWLegionUI/ico/CNCKW_Marked_of_Kane_Logo.png"
+    readonly property url appIcon: AppInfo.debugBuild ? "qrc:/qt/qml/KWLegionUI/ico/CNCKW_Traveler-59_Logo.png" : "qrc:/qt/qml/KWLegionUI/ico/CNCKW_Marked_of_Kane_Logo.png"
 
     readonly property int shortAnimationDuration: 120
 }

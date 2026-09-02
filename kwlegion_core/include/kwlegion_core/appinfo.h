@@ -30,6 +30,7 @@ class AppInfo : public QObject {
     Q_PROPERTY(QString logFilePath READ logFilePath CONSTANT)
     Q_PROPERTY(QUrl logDirectoryUrl READ logDirectoryUrl CONSTANT)
     Q_PROPERTY(bool startMinimized READ shouldStartMinimized CONSTANT)
+    Q_PROPERTY(bool debugBuild READ debugBuild)
 
    public:
     explicit AppInfo(QObject* parent = nullptr);
@@ -51,6 +52,8 @@ class AppInfo : public QObject {
     [[nodiscard]] QString logFilePath() const;
     // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
     [[nodiscard]] QUrl logDirectoryUrl() const;
+    // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+    [[nodiscard]] bool debugBuild() const;
 
    private:
     inline static bool mStartMinimized = false;

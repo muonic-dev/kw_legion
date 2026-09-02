@@ -123,7 +123,11 @@ int main(int argc, char* argv[]) {
     }
 
     QGuiApplication::setWindowIcon(
-        QIcon(":/qt/qml/KWLegionUI/ico/CNCKW_Marked_of_Kane_Logo.png"));
+        KWLegionCore::DEBUG_BUILD
+            // Different icon so we can determine which app is which when both
+            // are running
+            ? QIcon(":/qt/qml/KWLegionUI/ico/CNCKW_Traveler-59_Logo.png")
+            : QIcon(":/qt/qml/KWLegionUI/ico/CNCKW_Marked_of_Kane_Logo.png"));
 
     registerMetaTypes();
 

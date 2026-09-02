@@ -44,4 +44,6 @@ void AppInfo::setStartMinimized(bool startMinimized) {
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool AppInfo::shouldStartMinimized() const { return mStartMinimized; }
 
+bool AppInfo::debugBuild() const { return DEBUG_BUILD; }
+
 }  // namespace KWLegionCore
