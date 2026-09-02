@@ -91,6 +91,10 @@ class ReplayStoreModel : public QAbstractListModel {
 
     Q_INVOKABLE QString friendlySaveName(const QByteArray& checksum);
 
+    Q_INVOKABLE void clearOverrideTitle(const QByteArray& checksum);
+    Q_INVOKABLE void setOverrideTitle(const QByteArray& checksum,
+                                      const QString& title);
+
     [[nodiscard]] int selectionCount() const {
         return static_cast<int>(m_selections.size());
     }
@@ -109,12 +113,19 @@ class ReplayStoreModel : public QAbstractListModel {
     void shouldSaveReplay(const QByteArray& checksum, const QUrl& path);
     void shouldExportReplays(const QList<QByteArray>& checksums,
                              const QUrl& path);
+    void shouldClearOverrideTitle(const QByteArray& checksum);
+    void shouldSetOverrideTitle(const QByteArray& checksum,
+                                const QString& title);
 
     void selectionCountChanged();
 
    private:
     template <typename Iter>
     void dataChangedByIter(Iter it, const QList<int>& roles) {
+        // No rows changed so don't do emit anything
+        if (roles.isEmpty()) {
+            return;
+        }
         const QList<ReplayModel*>::const_iterator cit(it);
         const int row = static_cast<int>(cit - m_replays.cbegin());
         const QModelIndex idx = index(row);

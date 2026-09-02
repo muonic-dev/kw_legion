@@ -41,6 +41,9 @@ class Queries final {
 
     void insertReplay(const LegionParser::ReplayMetadata& metadata);
 
+    void updateOverrideTitle(const QByteArray& checksum,
+                             const QString& overrideTitle);
+
     void insertReplayPlayers(const QByteArray& checksum,
                              const QList<LegionParser::Player>& players);
 

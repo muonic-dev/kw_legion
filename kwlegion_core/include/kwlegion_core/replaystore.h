@@ -110,6 +110,9 @@ class ReplayStore : public QObject {
     void exportReplaysAs(const QList<QByteArray>& checksums,
                          const QUrl& folderPath);
 
+    void setOverrideTitle(const QByteArray& checksum, const QString& title);
+    void clearOverrideTitle(const QByteArray& checksum);
+
     void stop();
 
    signals:

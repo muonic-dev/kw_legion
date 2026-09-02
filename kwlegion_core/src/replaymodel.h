@@ -40,10 +40,21 @@ class ReplayModel : public QObject {
     // Update the replay from a given different input
     // Writes the roles that changes for emission
     QList<int> updateFromReplay(const Replay& replay);
+    // Update the override title locally
+    // Currently unused but exists in the future in case the write/commit/async
+    // return leg proves to be too slow
+    QList<int> updateOverrideTitle(QString overrideTitle);
 
     [[nodiscard]] QByteArray checksum() const { return m_checksum; }
     [[nodiscard]] QDateTime timestamp() const { return m_timestamp; }
     [[nodiscard]] QString matchTitle() const { return m_matchTitle; }
+    [[nodiscard]] QString overrideMatchTitle() const {
+        return m_overrideMatchTitle;
+    }
+    [[nodiscard]] QString displayMatchTitle() const {
+        return m_overrideMatchTitle.isEmpty() ? m_matchTitle
+                                              : m_overrideMatchTitle;
+    }
     [[nodiscard]] QString matchDescription() const {
         return m_matchDescription;
     }
@@ -65,6 +76,7 @@ class ReplayModel : public QObject {
     QByteArray m_checksum;
     QDateTime m_timestamp;
     QString m_matchTitle;
+    QString m_overrideMatchTitle;
     QString m_matchDescription;
     QString m_mapName;
     QString m_mapReference;

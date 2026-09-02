@@ -358,6 +358,13 @@ Page {
                     TextFieldEdit {
                         width: parent.width
                         text: delegateRoot.matchTitle
+                        onFieldChanged: text => {
+                            if (text.length === 0) {
+                                ReplayStoreModel.clearOverrideTitle(delegateRoot.checksum);
+                            } else {
+                                ReplayStoreModel.setOverrideTitle(delegateRoot.checksum, text);
+                            }
+                        }
                     }
 
                     Label {

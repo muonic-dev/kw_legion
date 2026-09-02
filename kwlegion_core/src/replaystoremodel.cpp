@@ -3,9 +3,8 @@
  * Copyright (C) 2026 Muonic
  */
 
-#include <kwlegion_core/replaystoremodel.h>
-
 #include <kwlegion_core/replaystore.h>
+#include <kwlegion_core/replaystoremodel.h>
 
 #include <algorithm>
 #include <utility>
@@ -14,7 +13,8 @@
 
 namespace KWLegionCore {
 
-const QList SELECTED_ROLE{static_cast<int>(ReplayStoreModel::Roles::SelectedRole)};
+const QList SELECTED_ROLE{
+    static_cast<int>(ReplayStoreModel::Roles::SelectedRole)};
 
 ReplayStoreModel::ReplayStoreModel(QObject* parent)
     : QAbstractListModel(parent),
@@ -41,7 +41,7 @@ ReplayStoreModel::ReplayStoreModel(QObject* parent)
 ReplayStoreModel::~ReplayStoreModel() = default;
 
 ReplayStoreModel* ReplayStoreModel::create(QQmlEngine* /*qmlEngine*/,
-                               QJSEngine* /*jsEngine*/) {
+                                           QJSEngine* /*jsEngine*/) {
     // Signature is Qt's QML_SINGLETON factory contract - must return T*, not
     // gsl::owner<T*>. Ownership transfers to the QML engine at the call site.
     return new ReplayStoreModel();  // NOLINT(cppcoreguidelines-owning-memory)
@@ -63,6 +63,11 @@ void ReplayStoreModel::setStore(ReplayStore* store) {
             &ReplayStore::saveReplayAs);
     connect(this, &ReplayStoreModel::shouldExportReplays, store,
             &ReplayStore::exportReplaysAs);
+
+    connect(this, &ReplayStoreModel::shouldClearOverrideTitle, store,
+            &ReplayStore::clearOverrideTitle);
+    connect(this, &ReplayStoreModel::shouldSetOverrideTitle, store,
+            &ReplayStore::setOverrideTitle);
 }
 
 void ReplayStoreModel::replaysLoaded(const QList<Replay>& replays) {
@@ -104,8 +109,32 @@ QString ReplayStoreModel::friendlySaveName(const QByteArray& checksum) {
     if (it == std::ranges::end(m_replays)) {
         return {};
     }
-    return QString("%1 - %2").arg((*it)->matchTitle(),
+    const QString displayTitle = (*it)->displayMatchTitle();
+    return QString("%1 - %2").arg(displayTitle,
                                   QString(checksum.toHex()).slice(0, 8));
+}
+
+void ReplayStoreModel::setOverrideTitle(const QByteArray& checksum,
+                                        const QString& title) {
+    // TODO: Extract this to a helper since it occurs so often
+    auto it = std::ranges::find_if(m_replays, [&checksum](const auto& replay) {
+        return replay->checksum() == checksum;
+    });
+    if (it == std::ranges::end(m_replays)) {
+        return;
+    }
+    emit shouldSetOverrideTitle(checksum, title);
+}
+
+void ReplayStoreModel::clearOverrideTitle(const QByteArray& checksum) {
+    // TODO: Extract this to a helper since it occurs so often
+    auto it = std::ranges::find_if(m_replays, [&checksum](const auto& replay) {
+        return replay->checksum() == checksum;
+    });
+    if (it == std::ranges::end(m_replays)) {
+        return;
+    }
+    emit shouldClearOverrideTitle(checksum);
 }
 
 void ReplayStoreModel::toggleReplayExposed(const QByteArray& checksum) {
@@ -138,7 +167,8 @@ void ReplayStoreModel::setReplaySelected(const QByteArray& checksum) {
     }
 }
 
-void ReplayStoreModel::extendReplaySelection(const QList<QByteArray>& checksums) {
+void ReplayStoreModel::extendReplaySelection(
+    const QList<QByteArray>& checksums) {
     const qsizetype before = m_selections.size();
     for (const auto& checksum : checksums) {
         auto it =
@@ -225,7 +255,8 @@ void ReplayStoreModel::invertSelection(const QList<QByteArray>& checksums) {
     }
 }
 
-void ReplayStoreModel::saveReplayAs(const QByteArray& checksum, const QUrl& path) {
+void ReplayStoreModel::saveReplayAs(const QByteArray& checksum,
+                                    const QUrl& path) {
     emit shouldSaveReplay(checksum, path);
 }
 
@@ -234,7 +265,9 @@ void ReplayStoreModel::exportSelectedReplaysTo(const QUrl& path) {
     emit shouldExportReplays(checksums, path);
 }
 
-QHash<int, QByteArray> ReplayStoreModel::roleNames() const { return m_roleNames; }
+QHash<int, QByteArray> ReplayStoreModel::roleNames() const {
+    return m_roleNames;
+}
 
 int ReplayStoreModel::rowCount(const QModelIndex& parent) const {
     if (parent.isValid()) {
@@ -255,7 +288,7 @@ QVariant ReplayStoreModel::data(const QModelIndex& index, int role) const {
         case Roles::TimestampRole:
             return replay->timestamp();
         case Roles::MatchTitleRole:
-            return replay->matchTitle();
+            return replay->displayMatchTitle();
         case Roles::MatchDescriptionRole:
             return replay->matchDescription();
         case Roles::MapNameRole:

@@ -72,9 +72,13 @@ void ReplayStore::exportReplaysAs(const QList<QByteArray>& checksums,
             continue;
         }
 
+        const QString matchTitle = replay->overrideMatchTitle.isEmpty()
+                                       ? replay->matchTitle
+                                       : replay->overrideMatchTitle;
+
         const QString name =
             QString("%1 - %2.KWReplay")
-                .arg(replay->matchTitle, QString(checksum.toHex()).slice(0, 8));
+                .arg(matchTitle, QString(checksum.toHex()).slice(0, 8));
         const QString outputPath = folderPath.toLocalFile() + "/" + name;
 
         const QString expectedLocation = computeIngestionPath(checksum);
@@ -85,6 +89,27 @@ void ReplayStore::exportReplaysAs(const QList<QByteArray>& checksums,
             qInfo(logStore)
                 << "Copied " << expectedLocation << " to " << outputPath;
         }
+    }
+}
+
+void ReplayStore::clearOverrideTitle(const QByteArray& checksum) {
+    setOverrideTitle(checksum, QStringLiteral(""));
+}
+void ReplayStore::setOverrideTitle(const QByteArray& checksum,
+                                   const QString& title) {
+    try {
+        std::optional<Replay> replay;
+        SqlTransactionGuard guard(m_db);
+        Queries queries{QSqlQuery(m_db)};
+        queries.updateOverrideTitle(checksum, title);
+        replay = queries.selectReplay(checksum);
+        guard.commit();
+        if (replay.has_value()) {
+            emit replaysChanged(QList{replay.value()});
+        }  // else unlikely but not forbidden by types
+    } catch (StorageException& ex) {
+        qCritical(logStore) << "Failed to store override title for "
+                            << QString(checksum.toHex());
     }
 }
 

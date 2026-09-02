@@ -38,6 +38,8 @@ struct Replay {
     // Does this replay have a version that is stored in the replay directory
     bool hasExternalPath = false;
 
+    QString overrideMatchTitle;
+
     QList<Player> players;
 
     // Static so it remains an aggregate type

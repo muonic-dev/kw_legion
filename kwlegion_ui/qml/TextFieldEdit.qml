@@ -13,7 +13,6 @@ StackLayout {
     currentIndex: editing ? 1 : 0
 
     signal fieldChanged(string text)
-    signal fieldCleared
 
     RowLayout {
         id: rowLayout
@@ -66,6 +65,9 @@ StackLayout {
     TextField {
         id: edit
         visible: textField.editing
+        color: Theme.lightMode ? Theme.dark : Theme.light
+        selectionColor: Theme.lightMode ? Theme.dark : Theme.light
+        selectedTextColor: Theme.lightMode ? Theme.reallyLight : Theme.reallyDark
         onEditingFinished: textField.commitEdit()
         // TODO: Contemplate where to remove focus if the user clicks onto somewhere like the list view
         // It seems that changing pages removes focus so we only need to deal with the current page

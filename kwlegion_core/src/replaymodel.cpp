@@ -19,6 +19,7 @@ ReplayModel::ReplayModel(const Replay& replay, QObject* parent)
       m_checksum(replay.checksum),
       m_timestamp(replay.timestamp),
       m_matchTitle(replay.matchTitle),
+      m_overrideMatchTitle(replay.overrideMatchTitle),
       m_matchDescription(replay.matchDescription),
       m_mapName(replay.mapName),
       m_mapReference(replay.mapReference),
@@ -53,8 +54,23 @@ ReplayModel::ReplayModel(const Replay& replay, QObject* parent)
 
 QList<int> ReplayModel::updateFromReplay(const Replay& replay) {
     // Most things are immutable but we may in the future change properties
-    m_hasExternalPath = replay.hasExternalPath;
-    return QList{static_cast<int>(ReplayStoreModel::Roles::HasExternalPathRole)};
+    QList<int> roles;
+
+    if (m_hasExternalPath != replay.hasExternalPath) {
+        m_hasExternalPath = replay.hasExternalPath;
+        roles.append(
+            static_cast<int>(ReplayStoreModel::Roles::HasExternalPathRole));
+    }
+    if (m_overrideMatchTitle != replay.overrideMatchTitle) {
+        m_overrideMatchTitle = replay.overrideMatchTitle;
+        roles.append(static_cast<int>(ReplayStoreModel::Roles::MatchTitleRole));
+    }
+    return roles;
+}
+
+QList<int> ReplayModel::updateOverrideTitle(QString title) {
+    m_overrideMatchTitle = std::move(title);
+    return QList{static_cast<int>(ReplayStoreModel::Roles::MatchTitleRole)};
 }
 
 QString ReplayModel::inferPatch() const {

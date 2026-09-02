@@ -94,6 +94,7 @@ struct ReplayMetadata {
     bool hasCommentary;
 
     QString matchTitle;
+    QString overrideMatchTitle;
     QString matchDescription;
     QString mapName;
     QString mapId;

@@ -73,6 +73,11 @@ constexpr std::array MIGRATIONS{
     // with no backfill needed.
     "ALTER TABLE broken_replays ADD COLUMN acknowledged_at INT;",
 
+    // The match title override. Default of '' to correspond to QString()
+    // defaulting semantics
+    "ALTER TABLE replays ADD COLUMN override_match_title TEXT  "
+    "NOT NULL DEFAULT ''"
+
 };
 
 bool Queries::migrate() {
@@ -156,6 +161,17 @@ void Queries::insertReplay(const LegionParser::ReplayMetadata& metadata) {
     m_query.bindValue(":version_minor", metadata.versionMinor);
     m_query.bindValue(":build_major", metadata.buildMajor);
     m_query.bindValue(":build_minor", metadata.buildMinor);
+    exec();
+}
+
+void Queries::updateOverrideTitle(const QByteArray& checksum,
+                                  const QString& overrideTitle) {
+    prepare(
+        "UPDATE replays "
+        "SET override_match_title = :override "
+        "WHERE checksum = :checksum");
+    m_query.bindValue(":checksum", checksum);
+    m_query.bindValue(":override", overrideTitle);
     exec();
 }
 
@@ -272,6 +288,7 @@ QList<Replay> Queries::selectReplays() {
         "        SELECT 1 FROM replay_external_paths"
         "        WHERE replay_checksum = replays.checksum"
         "      ) AS has_external_path"
+        "    , override_match_title"
         " FROM replays");
     exec();
 
@@ -297,6 +314,7 @@ std::optional<Replay> Queries::selectReplay(const QByteArray& checksum) {
         "        SELECT 1 FROM replay_external_paths"
         "        WHERE replay_checksum = replays.checksum"
         "      ) AS has_external_path"
+        "    , override_match_title"
         " FROM replays"
         " WHERE checksum = :checksum");
     m_query.bindValue(":checksum", checksum);
@@ -304,7 +322,7 @@ std::optional<Replay> Queries::selectReplay(const QByteArray& checksum) {
     exec();
 
     if (m_query.next()) {
-        const Replay result = readReplay();
+        Replay result = readReplay();
         // We aren't draining so call finish explicitly - otherwise the
         // statement stays active and blocks the caller's transaction commit.
         m_query.finish();
@@ -441,14 +459,17 @@ void Queries::acknowledgeProblem(const QString& path, const QDateTime& now) {
 }
 
 Replay Queries::readReplay() const {
-    return Replay{.checksum = m_query.value(0).toByteArray(),
-                  .timestamp = QDateTime::fromSecsSinceEpoch(
-                      m_query.value(1).toLongLong(), QTimeZone(QTimeZone::UTC)),
-                  .matchTitle = m_query.value(2).toString(),
-                  .matchDescription = m_query.value(3).toString(),
-                  .mapName = m_query.value(4).toString(),
-                  .mapReference = m_query.value(5).toString(),
-                  .hasExternalPath = m_query.value(6).toBool()};
+    return Replay{
+        .checksum = m_query.value(0).toByteArray(),
+        .timestamp = QDateTime::fromSecsSinceEpoch(
+            m_query.value(1).toLongLong(), QTimeZone(QTimeZone::UTC)),
+        .matchTitle = m_query.value(2).toString(),
+        .matchDescription = m_query.value(3).toString(),
+        .mapName = m_query.value(4).toString(),
+        .mapReference = m_query.value(5).toString(),
+        .hasExternalPath = m_query.value(6).toBool(),
+        .overrideMatchTitle = m_query.value(7).toString(),
+    };
 }
 
 void Queries::bootstrapMutationTable(const QList<QString>& values) {
