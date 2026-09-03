@@ -62,6 +62,34 @@ TextFieldReplayFilterQuery* TextFieldReplayFilterQuery::patch(QString needle,
 }
 // NOLINTEND(cppcoreguidelines-owning-memory)
 
+StringListContainsReplayFilterQuery::StringListContainsReplayFilterQuery(
+    ReplayStoreModel::Roles role, QString needle, QObject* parent)
+    : FilterQuery(parent), m_role(role), m_needle(std::move(needle)) {}
+
+bool StringListContainsReplayFilterQuery::acceptRow(
+    const QAbstractItemModel& source, int row,
+    const QModelIndex& parent) const {
+    const QVariant value =
+        source.data(source.index(row, 0, parent), static_cast<int>(m_role));
+    const auto list = value.toStringList();
+    return std::ranges::any_of(list, [this](const QString& str) {
+        return str.contains(this->m_needle, Qt::CaseInsensitive);
+    });
+}
+
+QString StringListContainsReplayFilterQuery::repr() const {
+    const QMetaEnum roleEnum = QMetaEnum::fromType<ReplayStoreModel::Roles>();
+    return QStringLiteral("%1=%2").arg(
+        QString::fromUtf8(roleEnum.valueToKey(static_cast<int>(m_role))),
+        m_needle);
+}
+
+StringListContainsReplayFilterQuery*
+StringListContainsReplayFilterQuery::player(QString needle, QObject* parent) {
+    return new StringListContainsReplayFilterQuery(
+        ReplayStoreModel::Roles::PlayersRole, std::move(needle), parent);
+}
+
 AnyTextReplayFilterQuery::AnyTextReplayFilterQuery(QString needle,
                                                    QObject* parent)
     : DisjunctionFilterQuery(parent) {

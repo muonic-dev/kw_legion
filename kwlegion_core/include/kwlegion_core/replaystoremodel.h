@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <qqmlintegration.h>
+
 #include <QAbstractListModel>
 #include <QQmlEngine>
 #include <QSet>
@@ -34,8 +36,9 @@ class ReplayStoreModel : public QAbstractListModel {
         MapReferenceRole,
         HasExternalPathRole,
         TeamsRole,
-        PatchRole,  // We guess the patch based on the suffix of the
-                    // map_reference
+        PatchRole,    // We guess the patch based on the suffix of the
+                      // map_reference
+        PlayersRole,  // All players from all teams, utility for search
         SelectedRole
     };
 

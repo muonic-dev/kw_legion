@@ -8,6 +8,8 @@
 #include "filterquery.h"
 #include "replaystoremodel.h"
 
+class QObject;
+
 namespace KWLegionCore {
 
 // Case-insensitive substring match against a single plain-string
@@ -29,6 +31,26 @@ class TextFieldReplayFilterQuery : public FilterQuery {
                                                QObject* parent = nullptr);
     static TextFieldReplayFilterQuery* patch(QString needle,
                                              QObject* parent = nullptr);
+
+   private:
+    ReplayStoreModel::Roles m_role;
+    QString m_needle;
+};
+
+class StringListContainsReplayFilterQuery : public FilterQuery {
+    Q_OBJECT
+   public:
+    StringListContainsReplayFilterQuery(ReplayStoreModel::Roles role,
+                                        QString needle,
+                                        QObject* parent = nullptr);
+
+    [[nodiscard]] bool acceptRow(const QAbstractItemModel& source, int row,
+                                 const QModelIndex& parent) const override;
+
+    [[nodiscard]] QString repr() const override;
+
+    static StringListContainsReplayFilterQuery* player(
+        QString needle, QObject* parent = nullptr);
 
    private:
     ReplayStoreModel::Roles m_role;

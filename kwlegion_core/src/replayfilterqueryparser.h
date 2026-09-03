@@ -5,11 +5,10 @@
 
 #pragma once
 
-#include <QtQml/qqmlregistration.h>
+#include <qqmlintegration.h>
 
 #include <QObject>
 #include <QString>
-#include <exception>
 
 namespace KWLegionCore {
 

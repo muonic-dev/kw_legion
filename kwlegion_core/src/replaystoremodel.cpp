@@ -24,6 +24,7 @@
 
 #include "legionparser/replay.h"
 #include "replaymodel.h"
+#include "teammodel.h"
 
 namespace KWLegionCore {
 
@@ -47,6 +48,7 @@ ReplayStoreModel::ReplayStoreModel(QObject* parent)
           {static_cast<int>(Roles::HasExternalPathRole),
            QByteArrayLiteral("hasExternalPath")},
           {static_cast<int>(Roles::TeamsRole), QByteArrayLiteral("teams")},
+          {static_cast<int>(Roles::PlayersRole), QByteArrayLiteral("players")},
           {static_cast<int>(Roles::PatchRole), QByteArrayLiteral("patch")},
           {static_cast<int>(Roles::SelectedRole),
            QByteArrayLiteral("selected")},
@@ -311,6 +313,17 @@ QVariant ReplayStoreModel::data(const QModelIndex& index, int role) const {
             return replay->hasExternalPath();
         case Roles::TeamsRole:
             return QVariant::fromValue(replay->teams());
+        case Roles::PlayersRole: {
+            QStringList players;
+            for (const auto* const obj : replay->teams()) {
+                const auto* const team = qobject_cast<const TeamModel*>(obj);
+                if (team == nullptr) {  // should be impossible
+                    continue;
+                }
+                players.append(team->playerNames());
+            }
+            return players;
+        }
         case Roles::SelectedRole:
             return m_selections.contains(replay->checksum());
         case Roles::PatchRole:

@@ -142,6 +142,23 @@ class TextQueryParser : public FieldQueryParser {
     ReplayStoreModel::Roles m_role;
 };
 
+class StringListQueryParser : public FieldQueryParser {
+   public:
+    StringListQueryParser(QString fieldLabel, ReplayStoreModel::Roles role)
+        : FieldQueryParser(std::move(fieldLabel)), m_role(role) {}
+
+    [[nodiscard]] std::tuple<FilterQuery*, QStringView> parse(
+        QStringView input) override {
+        const auto [word, rest] = nextWord(input);
+        return {
+            new StringListContainsReplayFilterQuery(m_role, word.toString()),
+            rest};
+    }
+
+   private:
+    ReplayStoreModel::Roles m_role;
+};
+
 // The field dispatch table, shared by every CompoundQueryParser instead of
 // rebuilt per parse. Safe only because TextQueryParser (and any future
 // subparser added here) is stateless after construction, and dispatch runs
@@ -156,6 +173,10 @@ const std::vector<std::unique_ptr<FieldQueryParser>>& fieldParsers() {
             "map", ReplayStoreModel::Roles::MapNameRole));
         v.emplace_back(std::make_unique<TextQueryParser>(
             "title", ReplayStoreModel::Roles::MatchTitleRole));
+        v.emplace_back(std::make_unique<TextQueryParser>(
+            "patch", ReplayStoreModel::Roles::PatchRole));
+        v.emplace_back(std::make_unique<StringListQueryParser>(
+            "player", ReplayStoreModel::Roles::PlayersRole));
         return v;
     }();
     return PARSERS;
