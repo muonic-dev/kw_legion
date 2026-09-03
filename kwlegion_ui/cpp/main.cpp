@@ -125,8 +125,8 @@ int main(int argc, char* argv[]) {
     QGuiApplication::setWindowIcon(
         KWLegionCore::DEBUG_BUILD
             // Different icon so we can determine which app is which when both
-            // are running
-            ? QIcon(":/qt/qml/KWLegionUI/ico/CNCKW_Traveler-59_Logo.png")
+            // are running BH looks like stop
+            ? QIcon(":/qt/qml/KWLegionUI/ico/CNCKW_Black_Hand_Logo.png")
             : QIcon(":/qt/qml/KWLegionUI/ico/CNCKW_Marked_of_Kane_Logo.png"));
 
     registerMetaTypes();

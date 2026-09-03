@@ -70,7 +70,7 @@ Page {
         nameFilters: ["C&C Kane's Wrath Replays (*.KWReplay)"]
         defaultSuffix: "KWReplay"
         onAccepted: {
-            if (page.currentlySavingChecksum) {
+            if (!page.currentlySavingChecksum) {
                 console.error("tried to save nothing");
                 return;
             }
