@@ -7,6 +7,11 @@
 
 #include <QFileDevice>
 #include <QFileInfo>
+#include <QHash>
+#include <QHashFunctions>
+#include <QObject>
+#include <QTimer>
+#include <QtTypes>
 #include <utility>
 
 namespace KWLegionCore {

@@ -4,6 +4,7 @@
 #include "singleinstanceguard.h"
 
 #include <QLocalSocket>
+#include <QObject>
 
 namespace {
 // No response is expected on the connection - its existence alone is the

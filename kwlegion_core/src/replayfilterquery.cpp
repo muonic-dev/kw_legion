@@ -6,6 +6,14 @@
 #include "replayfilterquery.h"
 
 #include <QAbstractItemModel>
+#include <QMetaEnum>
+#include <QObject>
+#include <QVariant>
+#include <Qt>
+#include <utility>
+
+#include "filterquery.h"
+#include "replaystoremodel.h"
 
 namespace KWLegionCore {
 TextFieldReplayFilterQuery::TextFieldReplayFilterQuery(
@@ -23,6 +31,18 @@ bool TextFieldReplayFilterQuery::acceptRow(const QAbstractItemModel& source,
     return value.toString().contains(m_needle, Qt::CaseInsensitive);
 }
 
+QString TextFieldReplayFilterQuery::repr() const {
+    // Reuses the Roles enum's own key names (e.g. "MapNameRole") rather than
+    // keeping a second field-name table in sync with the parser's dispatch
+    // table.
+    const QMetaEnum roleEnum = QMetaEnum::fromType<ReplayStoreModel::Roles>();
+    return QStringLiteral("%1=%2").arg(
+        QString::fromUtf8(roleEnum.valueToKey(static_cast<int>(m_role))),
+        m_needle);
+}
+
+// Memory management is by qobject hierarchy
+// NOLINTBEGIN(cppcoreguidelines-owning-memory)
 TextFieldReplayFilterQuery* TextFieldReplayFilterQuery::matchTitle(
     QString needle, QObject* parent) {
     return new TextFieldReplayFilterQuery(
@@ -40,6 +60,7 @@ TextFieldReplayFilterQuery* TextFieldReplayFilterQuery::patch(QString needle,
     return new TextFieldReplayFilterQuery(ReplayStoreModel::Roles::PatchRole,
                                           std::move(needle), parent);
 }
+// NOLINTEND(cppcoreguidelines-owning-memory)
 
 AnyTextReplayFilterQuery::AnyTextReplayFilterQuery(QString needle,
                                                    QObject* parent)

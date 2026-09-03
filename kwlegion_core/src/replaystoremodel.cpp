@@ -6,9 +6,23 @@
 #include <kwlegion_core/replaystore.h>
 #include <kwlegion_core/replaystoremodel.h>
 
+#include <QAbstractItemModel>
+#include <QHash>
+#include <QHashFunctions>
+#include <QJSEngine>
+#include <QList>
+#include <QObject>
+#include <QQmlEngine>
+#include <QSet>
+#include <QUrl>
+#include <QVariant>
+#include <QtAlgorithms>
+#include <QtTypes>
 #include <algorithm>
+#include <ranges>
 #include <utility>
 
+#include "legionparser/replay.h"
 #include "replaymodel.h"
 
 namespace KWLegionCore {

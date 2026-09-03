@@ -15,7 +15,6 @@ Checks: >
   -readability-identifier-length,
   -modernize-use-trailing-return-type,
   -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
-  -misc-include-cleaner,
   -misc-non-private-member-variables-in-classes,
   -cppcoreguidelines-non-private-member-variables-in-classes,
   -portability-avoid-pragma-once
@@ -27,6 +26,13 @@ HeaderFilterRegex: '[/\\](legionparser|kwlegion_ui)[/\\](include|src)[/\\]'
 FormatStyle: file
 
 CheckOptions:
+  # Q_OBJECT, emit, signals and friends come from qtmetamacros.h, the one Qt
+  # header with no umbrella equivalent - every other Qt header has one
+  # (<QObject>, <QByteArray>, ...) carrying an IWYU export pragma that
+  # include-cleaner honours. Ignoring just this header keeps the codebase free
+  # of lowercase Qt includes, which nothing else here uses.
+  - key: misc-include-cleaner.IgnoreHeaders
+    value: '.*qtmetamacros\.h'
   - key: readability-identifier-naming.NamespaceCase
     value: CamelCase
   - key: readability-identifier-naming.ClassCase

@@ -7,6 +7,8 @@
 #include <kwlegion_core/metatypes.h>
 #include <kwlegion_core/replay.h>
 
+#include <QVariant>
+
 namespace KWLegionCore {
 
 void registerMetaTypes() {

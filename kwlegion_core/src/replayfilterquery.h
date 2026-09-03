@@ -21,10 +21,12 @@ class TextFieldReplayFilterQuery : public FilterQuery {
     [[nodiscard]] bool acceptRow(const QAbstractItemModel& source, int row,
                                  const QModelIndex& parent) const override;
 
+    [[nodiscard]] QString repr() const override;
+
     static TextFieldReplayFilterQuery* matchTitle(QString needle,
-                                                   QObject* parent = nullptr);
+                                                  QObject* parent = nullptr);
     static TextFieldReplayFilterQuery* mapName(QString needle,
-                                                QObject* parent = nullptr);
+                                               QObject* parent = nullptr);
     static TextFieldReplayFilterQuery* patch(QString needle,
                                              QObject* parent = nullptr);
 

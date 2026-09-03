@@ -7,16 +7,21 @@
 #include <QByteArrayView>
 #include <QCryptographicHash>
 #include <QDataStream>
+#include <QList>
 #include <QString>
 #include <QStringList>
 #include <QTimeZone>
+#include <Qt>
 #include <QtEndian>
-#include <bit>
+#include <QtMinMax>
+#include <QtTypes>
+#include <cstddef>
 #include <cstdint>
-#include <limits>
+#include <memory>
 #include <optional>
 #include <utility>
 
+#include "legionparser/replay.h"
 #include "reader.h"
 
 namespace LegionParser {
@@ -498,8 +503,7 @@ void Parser::parseBody() {
 }
 
 void Parser::verifyFooter(QByteArrayView lastChunk) const {
-    const std::optional<QByteArrayView> maybeFooter =
-        footerFromTail(lastChunk);
+    const std::optional<QByteArrayView> maybeFooter = footerFromTail(lastChunk);
     if (!maybeFooter) {
         throw TornDataException(m_reader->offset());
     }

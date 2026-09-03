@@ -3,6 +3,7 @@
 
 #include "transaction.h"
 
+#include <QSqlDatabase>
 #include <QSqlError>
 
 #include "exception.h"

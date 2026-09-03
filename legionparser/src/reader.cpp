@@ -5,6 +5,10 @@
 
 #include <legionparser/exception.h>
 
+#include <QLatin1StringView>
+#include <QObject>
+#include <QtTypes>
+#include <cstddef>
 #include <utility>
 
 namespace LegionParser {
@@ -27,8 +31,9 @@ QString Reader::readUtf16String() {
         if (codeUnit != 0) {
             if (std::cmp_greater_equal(result.size(), MAX_STRING_LENGTH)) {
                 throw LimitExceededException(
-                    QLatin1String("match metadata string"), m_offsetMgr.lastOffset(),
-                    MAX_STRING_LENGTH, MAX_STRING_LENGTH + 1);
+                    QLatin1String("match metadata string"),
+                    m_offsetMgr.lastOffset(), MAX_STRING_LENGTH,
+                    MAX_STRING_LENGTH + 1);
             }
             result.append(QChar(codeUnit));
         }

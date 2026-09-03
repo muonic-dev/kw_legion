@@ -9,19 +9,29 @@
 #include <kwlegion_core/replaystoremodel.h>
 #include <kwlegion_core/settings.h>
 
+#include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QIcon>
+#include <QLatin1StringView>
+#include <QList>
 #include <QMutex>
+#include <QObject>
 #include <QQmlApplicationEngine>
+#include <QQmlError>
 #include <QTextStream>
 #include <QThread>
+#include <QUrl>
+#include <QWidgetSet>
 #include <QWindow>
+#include <Qt>
+#include <QtLogging>
 #include <cstdio>
 
+#include "kwlegion_core/autostart.h"
 #include "singleinstanceguard.h"
 
 namespace {

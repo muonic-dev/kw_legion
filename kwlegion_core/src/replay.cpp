@@ -6,6 +6,8 @@
 #include <kwlegion_core/replay.h>
 #include <legionparser/replay.h>
 
+#include <QList>
+
 namespace KWLegionCore {
 Replay Replay::fromReplay(const LegionParser::ReplayMetadata& replay,
                           bool hasExternalPath) {

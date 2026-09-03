@@ -6,8 +6,16 @@
 #include <kwlegion_core/ingestionmodel.h>
 #include <kwlegion_core/replaystore.h>
 
+#include <QAbstractItemModel>
 #include <QDateTime>
+#include <QHash>
+#include <QHashFunctions>
+#include <QJSEngine>
+#include <QObject>
+#include <QQmlEngine>
+#include <QVariant>
 #include <algorithm>
+#include <utility>
 
 namespace KWLegionCore {
 IngestionModel* IngestionModel::create(QQmlEngine* /*qmlEngine*/,

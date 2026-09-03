@@ -5,6 +5,10 @@
 
 #include "filterquery.h"
 
+#include <QObject>
+#include <algorithm>
+#include <ranges>
+
 namespace KWLegionCore {
 FilterQuery::FilterQuery(QObject* parent) : QObject(parent) {}
 
@@ -17,6 +21,8 @@ bool TautologyFilterQuery::acceptRow(const QAbstractItemModel& /* source */,
     return true;
 }
 
+QString TautologyFilterQuery::repr() const { return QStringLiteral("TRUE"); }
+
 ContradictionFilterQuery::ContradictionFilterQuery(QObject* parent)
     : FilterQuery(parent) {}
 
@@ -24,6 +30,10 @@ bool ContradictionFilterQuery::acceptRow(
     const QAbstractItemModel& /* source */, int /* row */,
     const QModelIndex& /* parent */) const {
     return false;
+}
+
+QString ContradictionFilterQuery::repr() const {
+    return QStringLiteral("FALSE");
 }
 
 ConjunctionFilterQuery::ConjunctionFilterQuery(QObject* parent)
@@ -47,6 +57,16 @@ bool ConjunctionFilterQuery::acceptRow(const QAbstractItemModel& source,
     return falsified == std::ranges::end(m_conjuctionOf);
 }
 
+QString ConjunctionFilterQuery::repr() const {
+    QString repr("(AND ");
+    for (const auto* const conj : m_conjuctionOf) {
+        repr += conj->repr();
+        repr += " ";
+    }
+    repr += ")";
+    return repr;
+}
+
 DisjunctionFilterQuery::DisjunctionFilterQuery(QObject* parent)
     : FilterQuery(parent) {}
 
@@ -66,6 +86,16 @@ bool DisjunctionFilterQuery::acceptRow(const QAbstractItemModel& source,
             return filter->acceptRow(source, row, parent);
         });
     return verified != std::ranges::end(m_disjunctionOf);
+}
+
+QString DisjunctionFilterQuery::repr() const {
+    QString repr("(OR ");
+    for (const auto* const disj : m_disjunctionOf) {
+        repr += disj->repr();
+        repr += " ";
+    }
+    repr += ")";
+    return repr;
 }
 
 }  // namespace KWLegionCore

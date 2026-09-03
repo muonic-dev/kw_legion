@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QSettings>
 #include <QString>
+#include <memory>
 
 namespace KWLegionCore {
 namespace {

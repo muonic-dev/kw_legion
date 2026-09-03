@@ -3,6 +3,10 @@
 
 #include "sortfilterproxymodel.h"
 
+#include <QObject>
+#include <Qt>
+#include <QtLogging>
+
 #include "filterquery.h"
 
 namespace KWLegionCore {
@@ -15,9 +19,7 @@ void SortFilterProxyModel::setSortOrder(Qt::SortOrder order) {
     emit sortOrderChanged();
 }
 
-QObject* SortFilterProxyModel::filterQuery() const {
-    return m_filterQuery;
-}
+QObject* SortFilterProxyModel::filterQuery() const { return m_filterQuery; }
 
 void SortFilterProxyModel::setFilterQuery(QObject* value) {
     m_filterQuery = value;

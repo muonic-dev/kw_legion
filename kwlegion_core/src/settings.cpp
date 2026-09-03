@@ -5,7 +5,10 @@
 
 #include "settings.h"
 
+#include <QObject>
 #include <QString>
+#include <memory>
+#include <utility>
 
 namespace KWLegionCore {
 Settings::Settings(QObject* parent) : QObject(parent) {}

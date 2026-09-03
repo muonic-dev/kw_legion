@@ -5,14 +5,28 @@
 #include <kwlegion_core/replaystore.h>
 #include <legionparser/parser.h>
 
+#include <QDateTime>
 #include <QDebug>
+#include <QDir>
+#include <QHashFunctions>
+#include <QLatin1StringView>
+#include <QList>
+#include <QLoggingCategory>
+#include <QObject>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QStandardPaths>
+#include <QUrl>
+#include <QVariant>
+#include <QtLogging>
+#include <cstddef>
+#include <optional>
 #include <stdexcept>
+#include <utility>
 
 #include "deferred.h"
 #include "exception.h"
+#include "legionparser/replay.h"
 #include "queries.h"
 #include "transaction.h"
 

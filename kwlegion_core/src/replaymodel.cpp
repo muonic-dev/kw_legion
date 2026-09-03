@@ -7,8 +7,12 @@
 
 #include <replay.h>
 
+#include <QList>
+#include <QObject>
 #include <QRegularExpression>
+#include <QtAssert>
 #include <algorithm>
+#include <utility>
 
 #include "replaystoremodel.h"
 #include "teammodel.h"

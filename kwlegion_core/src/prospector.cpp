@@ -6,9 +6,15 @@
 #include <QDebug>
 #include <QDir>
 #include <QDirIterator>
+#include <QFileInfo>
+#include <QList>
+#include <QLoggingCategory>
+#include <QObject>
+#include <QSet>
 #include <QStack>
 #include <QStandardPaths>
 #include <QThread>
+#include <Qt>
 
 Q_LOGGING_CATEGORY(logProspector, "kwlegion.prospector")
 

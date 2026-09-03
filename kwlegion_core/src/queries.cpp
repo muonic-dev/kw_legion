@@ -3,12 +3,19 @@
 
 #include "queries.h"
 
+#include <QHashFunctions>
+#include <QList>
 #include <QSqlError>
 #include <QTimeZone>
 #include <QVariantList>
+#include <QtLogging>
+#include <array>
+#include <cstddef>
+#include <optional>
 
 #include "exception.h"
-#include "transaction.h"
+#include "legionparser/replay.h"
+#include "replay.h"
 
 namespace KWLegionCore {
 

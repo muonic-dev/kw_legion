@@ -5,7 +5,12 @@
 
 #include "teammodel.h"
 
+#include <QAbstractItemModel>
+#include <QHash>
 #include <QVariant>
+#include <QtContainerFwd>
+#include <cstdint>
+#include <utility>
 
 #include "replay.h"
 

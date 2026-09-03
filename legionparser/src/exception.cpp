@@ -3,6 +3,9 @@
 
 #include <legionparser/exception.h>
 
+#include <cstddef>
+#include <stdexcept>
+
 namespace LegionParser {
 
 ReplayParseException::ReplayParseException(const QString& msg)

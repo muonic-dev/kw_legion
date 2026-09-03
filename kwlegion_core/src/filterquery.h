@@ -29,6 +29,8 @@ class FilterQuery : public QObject {
     [[nodiscard]] virtual bool acceptRow(const QAbstractItemModel& source,
                                          int row,
                                          const QModelIndex& parent) const = 0;
+    // Canonical text representation used for testing
+    [[nodiscard]] virtual QString repr() const = 0;
 };
 
 /**
@@ -41,6 +43,8 @@ class TautologyFilterQuery : public FilterQuery {
 
     [[nodiscard]] bool acceptRow(const QAbstractItemModel& source, int row,
                                  const QModelIndex& parent) const override;
+
+    [[nodiscard]] QString repr() const override;
 };
 
 class ContradictionFilterQuery : public FilterQuery {
@@ -50,6 +54,8 @@ class ContradictionFilterQuery : public FilterQuery {
 
     [[nodiscard]] bool acceptRow(const QAbstractItemModel& source, int row,
                                  const QModelIndex& parent) const override;
+
+    [[nodiscard]] QString repr() const override;
 };
 
 /**
@@ -71,6 +77,8 @@ class ConjunctionFilterQuery : public FilterQuery {
 
     [[nodiscard]] bool acceptRow(const QAbstractItemModel& source, int row,
                                  const QModelIndex& parent) const override;
+
+    [[nodiscard]] QString repr() const override;
 
    private:
     QList<FilterQuery*> m_conjuctionOf;
@@ -96,6 +104,8 @@ class DisjunctionFilterQuery : public FilterQuery {
 
     [[nodiscard]] bool acceptRow(const QAbstractItemModel& source, int row,
                                  const QModelIndex& parent) const override;
+
+    [[nodiscard]] QString repr() const override;
 
    private:
     QList<FilterQuery*> m_disjunctionOf;

@@ -6,7 +6,9 @@
 #include <kwlegion_core/appinfo.h>
 
 #include <QFileInfo>
+#include <QObject>
 #include <QStandardPaths>
+#include <QUrl>
 
 #include "version.h"
 

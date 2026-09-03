@@ -5,8 +5,19 @@
 
 #include "replayfilterqueryparser.h"
 
+#include <QObject>
+#include <QString>
+#include <QStringView>
+#include <algorithm>
+#include <memory>
+#include <stdexcept>
+#include <tuple>
+#include <utility>
+#include <vector>
+
 #include "filterquery.h"
 #include "replayfilterquery.h"
+#include "replaystoremodel.h"
 
 namespace KWLegionCore {
 ReplayFilterQueryParser::ReplayFilterQueryParser(QObject* parent)
@@ -33,11 +44,120 @@ void ReplayFilterQueryParser::setQueryText(const QString& value) {
 QObject* ReplayFilterQueryParser::query() const { return m_current; }
 
 namespace {
+// Memory is handled by QObject ownership
+// NOLINTBEGIN(cppcoreguidelines-owning-memory)
+// QStringView iterator are pointers so iterator math becomes pointer math
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+class ParseError : public std::runtime_error {
+   public:
+    ParseError(const QString& what) : std::runtime_error(what.toStdString()) {}
+};
+// Return the next relevant token as [word, rest]. This will stop at either
+// `:`, whitespace, or the quote boundary if current starts with a quote.
+// You should eatWhitespace before calling this.
+//
+// Throws ParseError rather than ever handing back an empty word. That is
+// load bearing on two counts: an empty word would leave rest == the input,
+// so parseField's raw-word path could not advance and the caller would spin;
+// and it is what makes a half-typed clause (`map:`, a bare `""`) fail the
+// parse, so the last good query stays live instead of the empty needle
+// matching every row.
+std::tuple<QStringView, QStringView> nextWord(QStringView current) {
+    if (current.isEmpty()) {
+        throw ParseError(QStringLiteral("expected a word"));
+    }
+
+    QStringView word;
+    QStringView rest;
+
+    if (current.at(0) == QChar('"')) {
+        // Advance past the '"'
+        const QStringView quoted = current.sliced(1);
+        const auto* const it = std::ranges::find(quoted, QChar('"'));
+        // Unclosed `"`
+        if (it == quoted.end()) {
+            throw ParseError(QStringLiteral("unclosed quote"));
+        }
+        word = QStringView(quoted.begin(), it);
+        rest = QStringView(it + 1, quoted.end());
+    } else {
+        const auto* const it =
+            std::ranges::find_if(current, [](const QChar& c) {
+                return c.isSpace() || c == QChar(':') || c == QChar('"');
+            });
+        word = QStringView(current.begin(), it);
+        rest = QStringView(it, current.end());
+    }
+
+    if (word.isEmpty()) {
+        throw ParseError(QStringLiteral("expected a word"));
+    }
+
+    return {word, rest};
+}
+
+QStringView eatWhitespace(QStringView current) {
+    const auto* const it = std::ranges::find_if(
+        current, [](const QChar& c) { return !c.isSpace(); });
+
+    return {it, current.end()};
+}
+
+class FieldQueryParser {
+   public:
+    FieldQueryParser(QString fieldLabel)
+        : m_fieldLabel(std::move(fieldLabel)) {}
+    FieldQueryParser(const FieldQueryParser&) = default;
+    FieldQueryParser(FieldQueryParser&&) = default;
+
+    FieldQueryParser& operator=(const FieldQueryParser&) = delete;
+    FieldQueryParser& operator=(FieldQueryParser&&) = delete;
+
+    virtual ~FieldQueryParser() = default;
+
+    bool matches(QStringView fieldLabel) { return m_fieldLabel == fieldLabel; }
+
+    // Parse the string, returning the remaining input
+    [[nodiscard]] virtual QStringView parse(QStringView input) = 0;
+    // Build a query from the parsed input if parse did not throw
+    [[nodiscard]] virtual FilterQuery* parsed() const = 0;
+
+   private:
+    QString m_fieldLabel;
+};
+
+class TextQueryParser : public FieldQueryParser {
+   public:
+    TextQueryParser(QString fieldLabel, ReplayStoreModel::Roles role)
+        : FieldQueryParser(std::move(fieldLabel)), m_role(role) {}
+
+    [[nodiscard]] QStringView parse(QStringView input) override {
+        const auto [word, rest] = nextWord(input);
+        m_text = word;
+        return rest;
+    }
+
+    [[nodiscard]] FilterQuery* parsed() const override {
+        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+        return new TextFieldReplayFilterQuery(m_role, m_text.toString());
+    }
+
+   private:
+    ReplayStoreModel::Roles m_role;
+
+    QStringView m_text;
+};
 
 class CompoundQueryParser final {
    public:
     CompoundQueryParser(QStringView text)
-        : m_text(text), m_conj(new ConjunctionFilterQuery()) {}
+        : m_text(text), m_conj(new ConjunctionFilterQuery()) {
+        m_subparsers.emplace_back(std::make_unique<TextQueryParser>(
+            "map", ReplayStoreModel::Roles::MapNameRole));
+        m_subparsers.emplace_back(std::make_unique<TextQueryParser>(
+            "title", ReplayStoreModel::Roles::MatchTitleRole));
+    }
 
     CompoundQueryParser(const CompoundQueryParser&) = delete;
     CompoundQueryParser(CompoundQueryParser&&) = delete;
@@ -48,7 +168,8 @@ class CompoundQueryParser final {
 
     ConjunctionFilterQuery* parse() {
         try {
-            parseField();
+            while (parseField()) {
+            }
 
             // We are done so we release ownership
             ConjunctionFilterQuery* v = m_conj;
@@ -59,34 +180,44 @@ class CompoundQueryParser final {
         }
     }
 
-    void eatWhitespace() {
-        m_text = QStringView(
-            std::ranges::find_if(m_text, [](QChar c) { return !c.isSpace(); }),
-            m_text.end());
+    bool parseField() {
+        m_text = eatWhitespace(m_text);
+
+        // Empty after whitespace, we are done
+        if (m_text.isEmpty()) {
+            return false;
+        }
+
+        const auto [word, rest] = nextWord(m_text);
+        // We are doing a field
+        if (!rest.isEmpty() && rest.at(0) == QChar(':')) {
+            m_text = rest.sliced(1);
+            for (const auto& subparser : m_subparsers) {
+                if (subparser->matches(word)) {
+                    m_text = subparser->parse(m_text);
+                    m_conj->addQuery(subparser->parsed());
+                    return true;
+                }
+            }
+            throw ParseError(QStringLiteral("unrecognized field %1").arg(word));
+        }
+        // Raw word
+        m_text = rest;
+        m_conj->addQuery(new AnyTextReplayFilterQuery(word.toString()));
+        return true;
     }
-
-    void parseField() {
-        eatWhitespace();
-
-        const auto* const colon = std::ranges::find(m_text, QChar(':'));
-        const QStringView field = QStringView(m_text.begin(), colon - 1);
-
-        // Find the closest match filterSwitch
-    }
-
-   private:
-    class ParseError : public std::runtime_error {
-       public:
-        ParseError(const QString& what)
-            : std::runtime_error(what.toStdString()) {}
-    };
 
     QStringView m_text;
     // We always need a conjunction, however, on failure we need to free
     // So, we store and then if m_conj hasn't been taken from us by the time we
     // are destroyed we free it
     ConjunctionFilterQuery* m_conj;
+
+    std::vector<std::unique_ptr<FieldQueryParser>> m_subparsers;
 };
+
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+// NOLINTEND(cppcoreguidelines-owning-memory)
 }  // namespace
 
 // Memory management by QObject semantics
@@ -94,10 +225,6 @@ class CompoundQueryParser final {
 FilterQuery* ReplayFilterQueryParser::parse(QStringView text) {
     if (text.isEmpty()) {
         return new TautologyFilterQuery(this);
-    }
-    // Is there a `:` indicating an attempt to filter
-    if (!text.contains(QChar(':'))) {
-        return new AnyTextReplayFilterQuery(text.toString(), this);
     }
     CompoundQueryParser parser{text};
     return parser.parse();

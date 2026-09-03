@@ -5,6 +5,8 @@
 
 #include <kwlegion_core/autostart.h>
 
+#include <memory>
+
 #pragma message( \
     "kw_legion: no autostart mechanism for this platform - using EmptyAutostartMechanism")
 
