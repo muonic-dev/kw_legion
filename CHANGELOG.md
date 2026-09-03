@@ -8,6 +8,10 @@
 - Setting to control minimize to tray
 - It is now possible to edit the match title and these edits will be used to choose file names when exporting
 - An inbox to provide indication on the current status of replays that are waiting or have failed to parse
+- Improved search - use magic prefixes like map: title:, player: or patch: to search
+    - on:/before:/after: will search via date comparison (using whatever your system configured locale accepts)
+    - known quirk of after: the search includes the day input
+    - quote multiword filters like map:"Atacama Road" 
 
 ### Fixed
 
