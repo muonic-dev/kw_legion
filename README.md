@@ -5,7 +5,12 @@ Organize your replays because Kane's Wrath built-in replay doesn't support filte
 
 LEGION will gather every replay in your replay folder (including the rolling Last Replay)
 and track it in a local database. You can then filter by player, map, faction, time and more
-and toggle which replays are placed in the replay folder.
+and toggle which replays are placed in the replay folder for Kane's Wrath to view.
+
+⚠️ If you install LEGION and have issues with your replays not being detected or imported please open an issue.
+I use this for my own replays but the program is very new and I keep backups. Make sure you
+have backups of anything you value as well.
+
 
 | Light | Dark |
 |---|---|
@@ -15,8 +20,6 @@ See [CHANGELOG.md](CHANGELOG.md) for recent changes
 
 Licensed under GPLv3 (see [LICENSE](LICENSE))
 
-Caveat emptor: I use this for my own replays but the program is very new and I have backups. You should 
-make sure you have backups of any files you need.
 
 ## License
 
