@@ -96,7 +96,15 @@ Page {
 
     ReplayFilterQueryParser {
         id: replayFilterQueryParser
-        queryText: filterField.text
+    }
+
+    // Prevent partial searches from immediately blanking the view
+    // Fast enough the application doesn't seem slow but hopefully not so slow
+    Timer {
+        id: filterDebounce
+        interval: 500
+        repeat: false
+        onTriggered: replayFilterQueryParser.queryText = filterField.text
     }
 
     Shortcut {
@@ -119,7 +127,13 @@ Page {
                 placeholderText: qsTr("Filter replays…")
 
                 Keys.onEscapePressed: replaysListView.forceActiveFocus()
-                onTextChanged: sortedReplayStoreModel.refilter()
+                Keys.onEnterPressed: {
+                    // Avoid immediate assignemnt
+                    filterDebounce.stop();
+                    replayFilterQueryParser.queryText = text;
+                }
+
+                onTextChanged: filterDebounce.restart()
             }
 
             Button {
