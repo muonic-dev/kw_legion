@@ -8,6 +8,7 @@
 #include <legionparser/replay.h>
 
 #include <QDir>
+#include <QHash>
 #include <QLoggingCategory>
 #include <QObject>
 #include <QSet>
@@ -32,6 +33,7 @@ class Queries;
 class Deferred;
 struct Watermark;
 class InboxItem;
+class StorageException;
 
 class ReplayStore : public QObject {
     Q_OBJECT
@@ -154,6 +156,14 @@ class ReplayStore : public QObject {
     void handleParseFailure(const LegionParser::ReplayParseException& ex,
                             const QString& path) noexcept;
 
+    // We could not read the file, or could not record what we read. Unlike
+    // the two above, this says nothing about the file's contents, so the path
+    // goes back into the deferred set to be retried. observed is only the
+    // fallback baseline once the fast retries have been used up - see the
+    // definition for why it is the wrong thing to wait on initially.
+    void handleStorageFailure(const QString& path, const Watermark& observed,
+                              const StorageException& ex) noexcept;
+
     void removeReplayFileLink(const QString& path);
 
     // Perform all the steps to try and receive a replay
@@ -198,5 +208,10 @@ class ReplayStore : public QObject {
 
     // The deferred path parsing process
     Deferred* m_deferred;
+
+    // Consecutive failed open/record attempts per path, so that a lock which
+    // never clears stops being retried at the fast interval. Cleared as soon
+    // as the path parses, or when the file goes away.
+    QHash<QString, int> m_storageRetries;
 };
 }  // namespace KWLegionCore

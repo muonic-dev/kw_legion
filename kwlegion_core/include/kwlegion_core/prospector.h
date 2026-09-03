@@ -99,11 +99,24 @@ class ReplayProspector : public QObject {
    private:
     void watchedDirectoryChanged(const QString& path);
 
+    // A directory watch only reports namespace changes, so an existing file
+    // being rewritten in place is invisible to it. This is the other half:
+    // its verification is against the file itself, whose size and mtime do
+    // move while a writer holds it open.
+    void watchedFileChanged(const QString& path);
+
     // Starts watching path and everything nested beneath it, emitting
     // replayFileChanged for any matching files already present there. Used
     // when a directory shows up after the initial sweep, since it wouldn't
     // otherwise be under watch until something inside it changes again.
     void watchDirectoryTree(const QString& path);
+
+    // The only two places m_knownFiles is added to or removed from. Pairing
+    // the map with the watch set in one place each is what keeps the two
+    // from drifting apart - notably when Qt silently drops a watch because
+    // its file disappeared, and the path is later recreated.
+    void trackFile(const QString& canonicalPath, const QFileInfo& info);
+    void untrackFile(const QString& canonicalPath);
 
     QFileSystemWatcher m_watcher;
     QString m_replayDirectory;

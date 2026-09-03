@@ -25,6 +25,15 @@ namespace KWLegionCore {
 // sees a change no longer costs a whole-payload hash either.
 constexpr int RECHECK_INTERVAL_MS = 5000;
 
+// How many times in a row a path may fail to open before it stops being
+// retried at RECHECK_INTERVAL_MS. A copy holding its destination open
+// releases it within seconds of the last write, so a minute of fast attempts
+// covers that comfortably. A lock still standing after that is more likely
+// something long-lived - a sync client, an indexer, a backup pass - and
+// polling it forever would be a permanent background read loop over a file
+// nothing is going to hand us.
+constexpr int MAX_FAST_STORAGE_RETRIES = 12;
+
 namespace {
 // Inbox items are derived from what we just observed on disk rather than
 // read back from storage, so the observation time is simply now.
@@ -33,6 +42,21 @@ InboxItem makeInboxItem(const QString& path, InboxType type) {
         .path = path,
         .type = type,
         .observedAt = QDateTime::currentDateTimeUtc(),
+    };
+}
+
+// A watermark deliberately constructed so that any file that exists differs
+// from it: zero bytes and no modification time at all. Waiting on this makes
+// the very next poll report the path as changed.
+//
+// The only state that matches it is a path that does not exist, since that
+// is exactly what Deferred::sample reports for one - which is the right
+// outcome, as there is nothing there to open.
+Watermark unmatchableWatermark() {
+    return Watermark{
+        .size = 0,
+        .modifiedAt = QDateTime(),
+        .sampledAt = QDateTime::currentDateTimeUtc(),
     };
 }
 }  // namespace
@@ -169,6 +193,7 @@ void ReplayStore::removeReplayFile(const QString& path) {
     // Nothing left to watch for - otherwise the entry would keep getting
     // polled and re-reported as an empty pending file.
     m_deferred->removeWaitForChange(path);
+    m_storageRetries.remove(path);
     removeReplayFileLink(path);
     emit inboxItemRemoved(path);
 }
@@ -195,20 +220,19 @@ void ReplayStore::analyzeReplayFile(const QString& path) {
     try {
         performReplayAnalysis(path);
         // Success = not pending
+        m_storageRetries.remove(path);
         emit inboxItemRemoved(path);
-        // Also, there are replay files that are overwritten such as Last
-        // Replay.KWLegion We re-arm to continue watching them
-        m_deferred->waitForChange(path, observed, false);
+        // Deliberately not re-armed. A path we have already parsed only
+        // becomes interesting again if it is overwritten, and that arrives
+        // as a fileChanged notification from the prospector - so the
+        // deferred set stays scoped to files we cannot parse yet, and the
+        // poll goes idle whenever nothing is in flight.
     } catch (const LegionParser::TornDataException& ex) {
         handleTornFailure(path, observed);
     } catch (const LegionParser::ReplayParseException& ex) {
         handleParseFailure(ex, path);
     } catch (StorageException& ex) {
-        // TODO: This should eventually be noisy through the ingestionmodel
-        // signalling
-        // TODO: Think about under what circumstances we can try again later or
-        // determine if we should give up
-        qCritical(logStore) << "db or i/o error occurred " << ex.what();
+        handleStorageFailure(path, observed, ex);
     }
 }
 
@@ -239,6 +263,52 @@ void ReplayStore::handleParseFailure(
     // No throw since we get external calls
     removeReplayFileLink(path);
     emit inboxItemObserved(makeInboxItem(path, InboxType::CORRUPT));
+}
+
+void ReplayStore::handleStorageFailure(const QString& path,
+                                       const Watermark& observed,
+                                       const StorageException& ex) noexcept {
+    // TODO: This should eventually be distinguishable from PENDING through the
+    // ingestionmodel signalling - a persistent db fault currently presents as
+    // a replay that is perpetually being written.
+    qCritical(logStore) << "db or i/o error occurred " << ex.what();
+
+    // Deliberately does *not* call removeReplayFileLink. An empty file has
+    // been truncated and a torn one was rejected by the parser, so in both
+    // those cases whatever we had recorded for the path is known stale. This
+    // is not evidence of anything, and dropping the link would blank a
+    // perfectly good entry out of the UI until a retry succeeds.
+    //
+    // The case this exists for is a copy into the replay folder that still
+    // holds the destination open, so our read lands on a sharing violation.
+    // Without the re-arm that file is stranded: the writer's remaining
+    // chunks might produce another notification, but the handle closing at
+    // the end of the copy does not, so a violation on the last write would
+    // never be retried at all.
+    //
+    // Waiting on observed is wrong here, and measurably so. For a torn or
+    // empty file the retry condition genuinely is "the bytes moved", which is
+    // what a watermark expresses. For a failed open the retry condition is
+    // "the lock went away", which stat cannot see at all - and if observed
+    // was sampled after the copier's last write it already describes the
+    // file's final state, so differsFrom is false forever and only the long
+    // stop rescues the path. Measured at five minutes stranded for an eight
+    // second hold.
+    //
+    // So retry against something no existing file can match, which asks the
+    // only question that matters: can we open it yet.
+    const int attempts = ++m_storageRetries[path];
+    if (attempts <= MAX_FAST_STORAGE_RETRIES) {
+        m_deferred->waitForChange(path, unmatchableWatermark());
+    } else {
+        // Out of fast attempts. Fall back to the ordinary baseline rather
+        // than dropping the path - a real change or the long stop can still
+        // pick it up, it just stops costing an open every interval.
+        qWarning(logStore) << path << " has failed to open " << attempts
+                           << " times, backing off";
+        m_deferred->waitForChange(path, observed);
+    }
+    emit inboxItemObserved(makeInboxItem(path, InboxType::PENDING));
 }
 
 void ReplayStore::removeReplayFileLink(const QString& path) {

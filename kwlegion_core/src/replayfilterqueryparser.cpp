@@ -34,8 +34,6 @@ QObject* ReplayFilterQueryParser::query() const { return m_current; }
 
 namespace {
 
-constexpr std::array RECOGNIZED_FIELDS = {"map", "title"};
-
 class CompoundQueryParser final {
    public:
     CompoundQueryParser(QStringView text)
@@ -70,8 +68,10 @@ class CompoundQueryParser final {
     void parseField() {
         eatWhitespace();
 
-        const auto colon = std::ranges::find(m_text, QChar(':'));
+        const auto* const colon = std::ranges::find(m_text, QChar(':'));
         const QStringView field = QStringView(m_text.begin(), colon - 1);
+
+        // Find the closest match filterSwitch
     }
 
    private:
@@ -95,8 +95,6 @@ FilterQuery* ReplayFilterQueryParser::parse(QStringView text) {
     if (text.isEmpty()) {
         return new TautologyFilterQuery(this);
     }
-    // Temporarily disable the parsing for alpha.2
-    return new AnyTextReplayFilterQuery(text.toString(), this);
     // Is there a `:` indicating an attempt to filter
     if (!text.contains(QChar(':'))) {
         return new AnyTextReplayFilterQuery(text.toString(), this);

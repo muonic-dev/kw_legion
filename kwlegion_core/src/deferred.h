@@ -21,10 +21,11 @@ struct Watermark {
     // Size in bytes. Zero for a path that does not exist.
     qint64 size = 0;
     // Last modification time, invalid for a path that does not exist.
-    // Windows does not reliably update this while a writer holds the file
-    // open, but it does get updated when the handle is closed - which makes
-    // a change here a decent "the game finally let go of the file" signal,
-    // and one that catches a final write that didn't change the size.
+    // Both this and size track a writer that still holds the file open -
+    // measured on NTFS and ReFS, path stat stayed exactly in step with an
+    // unflushed writer's own view of the length. Size alone would be enough
+    // for a file that only grows; mtime additionally catches a rewrite that
+    // lands on the same byte count, which the rolling replay path can do.
     QDateTime modifiedAt;
     // When this watermark was taken. Drives the long-stop retry.
     QDateTime sampledAt;
@@ -71,8 +72,7 @@ class Deferred : public QObject {
      * observed should be the state sampled before the parse attempt that
      * failed.
      */
-    void waitForChange(const QString& path, const Watermark& observed,
-                       bool allowLongStop = true);
+    void waitForChange(const QString& path, const Watermark& observed);
 
     void removeWaitForChange(const QString& path);
 
@@ -89,17 +89,11 @@ class Deferred : public QObject {
     void pathChanged(const QString& path);
 
    private:
-    struct WatermarkRecord {
-        Watermark watermark;
-        // We must be able to continue watching some paths forever
-        bool allowLongStop;
-    };
-
     void timerFired();
 
     long m_recheckIntervalMs;
     qint64 m_longStopMs;
     QTimer* m_trigger;
-    QHash<QString, WatermarkRecord> m_deferred;
+    QHash<QString, Watermark> m_deferred;
 };
 }  // namespace KWLegionCore
