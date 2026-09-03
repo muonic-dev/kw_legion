@@ -1,10 +1,22 @@
 find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform Network Sql Svg)
 
+# Bakes the friendly name/version resource into kw_legion.exe (see
+# cpp/kw_legion.rc.in for why FILEVERSION can't carry the full SemVer).
+# KW_LEGION_ICON_PATH is set here rather than hardcoded in the template
+# since the generated .rc lives under CMAKE_CURRENT_BINARY_DIR, not next
+# to ico/, so a relative path from the template wouldn't resolve.
+set(KW_LEGION_ICON_PATH ${CMAKE_CURRENT_SOURCE_DIR}/ico/kw_legion.ico)
+configure_file(
+    cpp/kw_legion.rc.in
+    ${CMAKE_CURRENT_BINARY_DIR}/kw_legion.rc
+    @ONLY
+)
+
 qt_add_executable(kw_legion
     cpp/main.cpp
     cpp/singleinstanceguard.h
     cpp/singleinstanceguard.cpp
-    $<$<PLATFORM_ID:Windows>:cpp/kw_legion.rc>
+    $<$<PLATFORM_ID:Windows>:${CMAKE_CURRENT_BINARY_DIR}/kw_legion.rc>
 )
 
 # qt_add_qml_module() doesn't parse QML_FILES contents for `pragma Singleton`

@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Muonic
+
+// Native Win32 icon + version resource for kw_legion.exe. QGuiApplication::setWindowIcon()
+// in main.cpp only sets the icon on the live window - Explorer, the NSIS
+// installer's shortcuts, and the taskbar's cold/shortcut-based icon all read
+// this resource instead. The VERSIONINFO block below is what Task Manager's
+// Name column and Explorer's Details tab read for the process's friendly
+// name and version - without it both fall back to the bare "kw_legion.exe"
+// filename.
+//
+// Generated from kw_legion.rc.in by configure_file() - see kwlegion_ui/CMakeLists.txt.
+// FILEVERSION/PRODUCTVERSION must be 4 numeric WORDs, so they can't carry
+// KW_LEGION_VERSION_PRERELEASE or KW_LEGION_GIT_HASH (see root CMakeLists.txt) -
+// that detail is folded into the FileVersion/ProductVersion strings below instead.
+
+#include <winver.h>
+
+IDI_ICON1 ICON "@KW_LEGION_ICON_PATH@"
+
+VS_VERSION_INFO VERSIONINFO
+    FILEVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+    PRODUCTVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+    FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+    FILEFLAGS 0x0L
+    FILEOS VOS_NT_WINDOWS32
+    FILETYPE VFT_APP
+    FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "Muonic"
+            VALUE "FileDescription", "KWLEGION"
+            VALUE "FileVersion", "@KW_LEGION_VERSION_SEMVER@+@KW_LEGION_GIT_HASH@"
+            VALUE "InternalName", "kw_legion"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Muonic"
+            VALUE "OriginalFilename", "kw_legion.exe"
+            VALUE "ProductName", "KWLEGION"
+            VALUE "ProductVersion", "@KW_LEGION_VERSION_SEMVER@"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END
