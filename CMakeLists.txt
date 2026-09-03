@@ -7,7 +7,7 @@ project(kw_legion
 
 # CMake's project(VERSION) accepts only numeric components, so keep it numeric
 # and derive a SemVer pre-release label separately for packaging/display.
-set(KW_LEGION_VERSION_PRERELEASE "alpha.2")
+set(KW_LEGION_VERSION_PRERELEASE "alpha.3")
 if (KW_LEGION_VERSION_PRERELEASE STREQUAL "") 
 set(KW_LEGION_VERSION_SEMVER "${PROJECT_VERSION}")
 else()
