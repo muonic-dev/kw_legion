@@ -5,6 +5,7 @@ add_executable(kwlegion_core_tests
     deferred_tests.cpp
     prospector_tests.cpp
     queries_tests.cpp
+    replayfilterquery_tests.cpp
     replayfilterqueryparser_tests.cpp
     replaystore_tests.cpp
     transaction_tests.cpp
@@ -25,9 +26,18 @@ target_compile_definitions(kwlegion_core_tests
 # queries.h/exception.h are private headers that live alongside queries.cpp
 # rather than under kwlegion_core's public include/ directory, so the test
 # target needs this path explicitly to exercise Queries directly.
+#
+# include/kwlegion_core mirrors kwlegion_core's own PRIVATE include dir of
+# the same name (see kwlegion_core/CMakeLists.txt) -- src/ headers like
+# replayfilterquery.h include "replaystoremodel.h" unprefixed, relying on
+# that directory being flattened onto the include search path. It's not
+# part of kwlegion::core's PUBLIC include interface, so consumers (this test
+# target included) need to add it themselves to include those src/ headers
+# directly.
 target_include_directories(kwlegion_core_tests
     PRIVATE
         ${CMAKE_SOURCE_DIR}/kwlegion_core/src
+        ${CMAKE_SOURCE_DIR}/kwlegion_core/include/kwlegion_core
 )
 
 add_custom_command(TARGET kwlegion_core_tests POST_BUILD

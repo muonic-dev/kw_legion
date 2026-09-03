@@ -57,7 +57,25 @@ class StringListContainsReplayFilterQuery : public FilterQuery {
     QString m_needle;
 };
 
-// Matches if any of matchTitle/mapName/patch contains the needle.
+class RelativeDateTimeQuery : public FilterQuery {
+    Q_OBJECT
+   public:
+    enum class Comparison : std::uint8_t { BEFORE, AFTER };
+    RelativeDateTimeQuery(ReplayStoreModel::Roles role, QDateTime compareTo,
+                          Comparison comp, QObject* parent = nullptr);
+
+    [[nodiscard]] bool acceptRow(const QAbstractItemModel& source, int row,
+                                 const QModelIndex& parent) const override;
+
+    [[nodiscard]] QString repr() const override;
+
+   private:
+    ReplayStoreModel::Roles m_role;
+    QDateTime m_compareTo;
+    Comparison m_comparison;
+};
+
+// Matches if any of matchTitle/mapName/patch/players contains the needle.
 class AnyTextReplayFilterQuery : public DisjunctionFilterQuery {
     Q_OBJECT
    public:

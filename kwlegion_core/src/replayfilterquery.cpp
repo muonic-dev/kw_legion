@@ -16,6 +16,9 @@
 #include "replaystoremodel.h"
 
 namespace KWLegionCore {
+// Memory management is by qobject hierarchy
+// NOLINTBEGIN(cppcoreguidelines-owning-memory)
+
 TextFieldReplayFilterQuery::TextFieldReplayFilterQuery(
     ReplayStoreModel::Roles role, QString needle, QObject* parent)
     : FilterQuery(parent), m_role(role), m_needle(std::move(needle)) {}
@@ -41,8 +44,6 @@ QString TextFieldReplayFilterQuery::repr() const {
         m_needle);
 }
 
-// Memory management is by qobject hierarchy
-// NOLINTBEGIN(cppcoreguidelines-owning-memory)
 TextFieldReplayFilterQuery* TextFieldReplayFilterQuery::matchTitle(
     QString needle, QObject* parent) {
     return new TextFieldReplayFilterQuery(
@@ -60,7 +61,6 @@ TextFieldReplayFilterQuery* TextFieldReplayFilterQuery::patch(QString needle,
     return new TextFieldReplayFilterQuery(ReplayStoreModel::Roles::PatchRole,
                                           std::move(needle), parent);
 }
-// NOLINTEND(cppcoreguidelines-owning-memory)
 
 StringListContainsReplayFilterQuery::StringListContainsReplayFilterQuery(
     ReplayStoreModel::Roles role, QString needle, QObject* parent)
@@ -90,11 +90,53 @@ StringListContainsReplayFilterQuery::player(QString needle, QObject* parent) {
         ReplayStoreModel::Roles::PlayersRole, std::move(needle), parent);
 }
 
+RelativeDateTimeQuery::RelativeDateTimeQuery(ReplayStoreModel::Roles role,
+                                             QDateTime compareTo,
+                                             Comparison comparison,
+                                             QObject* parent)
+    : FilterQuery(parent),
+      m_role(role),
+      m_compareTo(std::move(compareTo)),
+      m_comparison(comparison) {}
+
+bool RelativeDateTimeQuery::acceptRow(const QAbstractItemModel& source, int row,
+                                      const QModelIndex& parent) const {
+    const QVariant value =
+        source.data(source.index(row, 0, parent), static_cast<int>(m_role));
+    if (value.typeId() != QMetaType::QDateTime) {
+        return false;
+    }
+    const auto date = value.toDateTime();
+    if (!date.isValid()) {
+        return false;
+    }
+    switch (m_comparison) {
+        case Comparison::BEFORE:
+            return date < m_compareTo;
+        case Comparison::AFTER:
+            return m_compareTo < date;
+    }
+    return false;
+}
+
+QString RelativeDateTimeQuery::repr() const {
+    const QMetaEnum roleEnum = QMetaEnum::fromType<ReplayStoreModel::Roles>();
+    return QStringLiteral("%1%2%3").arg(
+        QString::fromUtf8(roleEnum.valueToKey(static_cast<int>(m_role))),
+        m_comparison == RelativeDateTimeQuery::Comparison::BEFORE
+            ? QStringLiteral("<")
+            : QStringLiteral(">"),
+        m_compareTo.toString(Qt::ISODate));
+}
+
 AnyTextReplayFilterQuery::AnyTextReplayFilterQuery(QString needle,
                                                    QObject* parent)
     : DisjunctionFilterQuery(parent) {
     addQuery(TextFieldReplayFilterQuery::matchTitle(needle));
     addQuery(TextFieldReplayFilterQuery::mapName(needle));
-    addQuery(TextFieldReplayFilterQuery::patch(std::move(needle)));
+    addQuery(TextFieldReplayFilterQuery::patch(needle));
+    addQuery(StringListContainsReplayFilterQuery::player(std::move(needle)));
 }
+// NOLINTEND(cppcoreguidelines-owning-memory)
+
 }  // namespace KWLegionCore
