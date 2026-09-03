@@ -118,10 +118,10 @@ class FieldQueryParser {
 
     bool matches(QStringView fieldLabel) { return m_fieldLabel == fieldLabel; }
 
-    // Parse the string, returning the remaining input
-    [[nodiscard]] virtual QStringView parse(QStringView input) = 0;
-    // Build a query from the parsed input if parse did not throw
-    [[nodiscard]] virtual FilterQuery* parsed() const = 0;
+    // Parse the field's value out of input, returning the constructed query
+    // alongside the remaining unconsumed input.
+    [[nodiscard]] virtual std::tuple<FilterQuery*, QStringView> parse(
+        QStringView input) = 0;
 
    private:
     QString m_fieldLabel;
@@ -132,32 +132,41 @@ class TextQueryParser : public FieldQueryParser {
     TextQueryParser(QString fieldLabel, ReplayStoreModel::Roles role)
         : FieldQueryParser(std::move(fieldLabel)), m_role(role) {}
 
-    [[nodiscard]] QStringView parse(QStringView input) override {
+    [[nodiscard]] std::tuple<FilterQuery*, QStringView> parse(
+        QStringView input) override {
         const auto [word, rest] = nextWord(input);
-        m_text = word;
-        return rest;
-    }
-
-    [[nodiscard]] FilterQuery* parsed() const override {
-        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-        return new TextFieldReplayFilterQuery(m_role, m_text.toString());
+        return {new TextFieldReplayFilterQuery(m_role, word.toString()), rest};
     }
 
    private:
     ReplayStoreModel::Roles m_role;
-
-    QStringView m_text;
 };
+
+// The field dispatch table, shared by every CompoundQueryParser instead of
+// rebuilt per parse. Safe only because TextQueryParser (and any future
+// subparser added here) is stateless after construction, and dispatch runs
+// synchronously with no reentrancy on the single GUI thread -- a subparser
+// that needed to stash state across its own parse() call would have to own
+// that state some other way (e.g. locally within parse()) rather than as a
+// member, since it is now a long-lived shared instance.
+const std::vector<std::unique_ptr<FieldQueryParser>>& fieldParsers() {
+    static const std::vector<std::unique_ptr<FieldQueryParser>> PARSERS = [] {
+        std::vector<std::unique_ptr<FieldQueryParser>> v;
+        v.emplace_back(std::make_unique<TextQueryParser>(
+            "map", ReplayStoreModel::Roles::MapNameRole));
+        v.emplace_back(std::make_unique<TextQueryParser>(
+            "title", ReplayStoreModel::Roles::MatchTitleRole));
+        return v;
+    }();
+    return PARSERS;
+}
 
 class CompoundQueryParser final {
    public:
     CompoundQueryParser(QStringView text)
-        : m_text(text), m_conj(new ConjunctionFilterQuery()) {
-        m_subparsers.emplace_back(std::make_unique<TextQueryParser>(
-            "map", ReplayStoreModel::Roles::MapNameRole));
-        m_subparsers.emplace_back(std::make_unique<TextQueryParser>(
-            "title", ReplayStoreModel::Roles::MatchTitleRole));
-    }
+        : m_text(text),
+          m_conj(new ConjunctionFilterQuery()),
+          m_subparsers(fieldParsers()) {}
 
     CompoundQueryParser(const CompoundQueryParser&) = delete;
     CompoundQueryParser(CompoundQueryParser&&) = delete;
@@ -194,8 +203,9 @@ class CompoundQueryParser final {
             m_text = rest.sliced(1);
             for (const auto& subparser : m_subparsers) {
                 if (subparser->matches(word)) {
-                    m_text = subparser->parse(m_text);
-                    m_conj->addQuery(subparser->parsed());
+                    auto [query, remaining] = subparser->parse(m_text);
+                    m_text = remaining;
+                    m_conj->addQuery(query);
                     return true;
                 }
             }
@@ -213,7 +223,7 @@ class CompoundQueryParser final {
     // are destroyed we free it
     ConjunctionFilterQuery* m_conj;
 
-    std::vector<std::unique_ptr<FieldQueryParser>> m_subparsers;
+    const std::vector<std::unique_ptr<FieldQueryParser>>& m_subparsers;
 };
 
 // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
