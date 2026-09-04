@@ -12,6 +12,8 @@ I use this for my own replays but the program is very new and I keep backups. Ma
 have backups of anything you value as well.
 
 
+A brief [how to on YouTube](https://youtu.be/MydTAPTrVQY)
+
 | Light | Dark |
 |---|---|
 | ![Replay screen](docs/Replay%20Screen.png) | ![Replay screen (dark)](docs/Replay%20Screen-Dark.png) |
