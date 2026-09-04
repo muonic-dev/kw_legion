@@ -14,7 +14,6 @@
 #include <QLoggingCategory>
 #include <QSqlQuery>
 #include <QString>
-#include <array>
 #include <optional>
 
 namespace KWLegionCore {
