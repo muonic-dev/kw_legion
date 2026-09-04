@@ -9,7 +9,10 @@
 #include <QByteArrayView>
 #include <QIODevice>
 #include <QString>
+#include <Qt>
+#include <QtTypes>
 #include <array>
+#include <concepts>
 #include <utility>
 
 namespace LegionParser {
@@ -17,7 +20,7 @@ namespace LegionParser {
 template <typename T>
 concept ByteSized = std::is_trivially_copyable_v<T> && sizeof(T) == 1;
 
-constexpr std::size_t MAX_STRING_LENGTH = static_cast<std::size_t>(4096 * 16);
+constexpr qsizetype MAX_STRING_LENGTH = static_cast<qsizetype>(4096 * 16);
 
 // Provides read utility methods while tracking offsets
 class Reader {
@@ -31,24 +34,26 @@ class Reader {
 
     virtual ~Reader() = default;
 
-    [[nodiscard]] size_t offset() const { return m_offsetMgr.offset(); }
+    [[nodiscard]] qsizetype offset() const { return m_offsetMgr.offset(); }
 
     // The offset prior to the last read operation
     // Useful for when you want to throw an exception based on the value of
     // something you have already read
-    [[nodiscard]] size_t lastOffset() const { return m_offsetMgr.lastOffset(); }
+    [[nodiscard]] qsizetype lastOffset() const {
+        return m_offsetMgr.lastOffset();
+    }
 
-    [[nodiscard]] size_t mark() const { return m_offsetMgr.mark(); }
+    [[nodiscard]] qsizetype mark() const { return m_offsetMgr.mark(); }
 
-    [[nodiscard]] size_t mark() { return m_offsetMgr.mark(); }
+    [[nodiscard]] qsizetype mark() { return m_offsetMgr.mark(); }
 
     void setMark() { m_offsetMgr.setMark(); }
 
     QString readUtf16String();
 
-    QString readFixedUtf16String(std::size_t length);
+    QString readFixedUtf16String(qsizetype length);
 
-    template <std::integral T = uint32_t>
+    template <std::integral T = quint32>
     QString readFixedUtf16String() {
         const auto length = readIntegral<T>();
         if (std::cmp_greater(length, MAX_STRING_LENGTH)) {
@@ -60,10 +65,10 @@ class Reader {
     }
 
     // Read a fixed length string where the length is known ahead of time
-    QString readFixedCharString(std::size_t length);
+    QString readFixedCharString(qsizetype length);
 
     // Read a fixed string prefixed by a specific length prefix
-    template <std::integral T = uint32_t>
+    template <std::integral T = quint32>
     QString readFixedCharString() {
         const auto length = readIntegral<T>();
         if (std::cmp_greater(length, MAX_STRING_LENGTH)) {
@@ -74,7 +79,7 @@ class Reader {
         return readFixedCharString(length);
     }
 
-    QByteArray readBlock(size_t length);
+    QByteArray readBlock(qsizetype length);
 
     // Reads the remainder of the device in bounded chunks, invoking
     // fn(chunk) once per chunk read, until EOF. Lets callers process a
@@ -101,7 +106,7 @@ class Reader {
         int next = 0;
 
         for (;;) {
-            const qint64 bytesRead =
+            const qsizetype bytesRead =
                 m_replayFile.read(buffers.at(next).data(), chunkSize);
             if (bytesRead < 0) {
                 throw CorruptDataException(
@@ -111,7 +116,7 @@ class Reader {
             if (bytesRead == 0) {
                 break;
             }
-            m_offsetMgr.increment(static_cast<size_t>(bytesRead));
+            m_offsetMgr.increment(bytesRead);
             sizes.at(next) = static_cast<qsizetype>(bytesRead);
             fn(QByteArrayView(buffers.at(next).constData(), bytesRead));
             next = 1 - next;
@@ -181,25 +186,26 @@ class Reader {
     }
 
    private:
-    // A utility class for managing the offsets
-    // This exists here for inline so that there is no risk of mismanaging
-    // offsets by forgetting to do the entire set of offset manipulatino
-    // somewhere
+    // TODO: Deal with the fact that size_t disagrees with qsizetype (which is
+    // signed)
+    // A utility class for managing the offsets This exists here for
+    // inline so that there is no risk of mismanaging offsets by forgetting to
+    // do the entire set of offset manipulatino somewhere
     class OffsetManager {
        public:
         OffsetManager() = default;
 
         // Get the current offset, the furthest that the reader has read
-        [[nodiscard]] size_t offset() const { return m_offset; }
+        [[nodiscard]] qsizetype offset() const { return m_offset; }
         // Get the last offset. The position of the offset prior to the last
         // increment call This is useful for callers to query when they have
         // completed a read and the resulting data does not pass validation
         // checks for formatting exceptions.
-        [[nodiscard]] size_t lastOffset() const { return m_lastOffset; }
+        [[nodiscard]] qsizetype lastOffset() const { return m_lastOffset; }
         // Get the current mark, useful for tracking specific offsets
-        [[nodiscard]] size_t mark() const { return m_mark; }
+        [[nodiscard]] qsizetype mark() const { return m_mark; }
 
-        void increment(size_t delta) {
+        void increment(qsizetype delta) {
             m_lastOffset = m_offset;
             m_offset += delta;
         }
@@ -207,9 +213,9 @@ class Reader {
         void setMark() { m_mark = m_offset; }
 
        private:
-        size_t m_offset = 0;
-        size_t m_lastOffset = 0;
-        size_t m_mark = 0;
+        qsizetype m_offset = 0;
+        qsizetype m_lastOffset = 0;
+        qsizetype m_mark = 0;
     };
 
     QIODevice& m_replayFile;

@@ -4,7 +4,6 @@
 #pragma once
 
 #include <QString>
-#include <exception>
 #include <stdexcept>
 
 namespace LegionParser {
@@ -16,24 +15,24 @@ class ReplayParseException : public std::runtime_error {
 
 class LimitExceededException : public ReplayParseException {
    public:
-    LimitExceededException(const QString& what, size_t offset, size_t limit,
-                           size_t actual);
+    LimitExceededException(const QString& what, qsizetype offset,
+                           qsizetype limit, qsizetype actual);
 
    private:
     QString m_what;
-    size_t m_offset;
-    size_t m_limit;
-    size_t m_actual;
+    qsizetype m_offset;
+    qsizetype m_limit;
+    qsizetype m_actual;
 };
 
 class CorruptDataException : public ReplayParseException {
    public:
-    CorruptDataException(const QString& what, size_t offset);
+    CorruptDataException(const QString& what, qsizetype offset);
 };
 
 class TornDataException : public ReplayParseException {
    public:
-    TornDataException(size_t offset);
+    TornDataException(qsizetype offset);
 };
 
 class IOException : public ReplayParseException {

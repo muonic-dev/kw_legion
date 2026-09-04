@@ -19,13 +19,13 @@
 #include <QUrl>
 #include <QVariant>
 #include <QtLogging>
-#include <cstddef>
 #include <optional>
 #include <stdexcept>
 #include <utility>
 
 #include "deferred.h"
 #include "exception.h"
+#include "legionparser/exception.h"
 #include "legionparser/replay.h"
 #include "queries.h"
 #include "transaction.h"
@@ -35,8 +35,8 @@ Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
 namespace KWLegionCore {
 
 // The poll itself is only a stat per deferred path, and since
-// SynopsisParser::looksComplete rejects an unfinished file from its tail, a poll that
-// sees a change no longer costs a whole-payload hash either.
+// SynopsisParser::looksComplete rejects an unfinished file from its tail, a
+// poll that sees a change no longer costs a whole-payload hash either.
 constexpr int RECHECK_INTERVAL_MS = 5000;
 
 // How many times in a row a path may fail to open before it stops being
@@ -175,8 +175,8 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     // it from the paths we actually find.
     emit inboxReset();
 
-    // Bracket synopsizeReplayFile so that we don't constantly emit the individual
-    // load action
+    // Bracket synopsizeReplayFile so that we don't constantly emit the
+    // individual load action
     const auto guard = m_initialSweep.enter();
     // Ingest every path that we have
     for (const auto& path : paths) {
@@ -436,8 +436,7 @@ void ReplayStore::performReplaySynopsis(const QString& path) {
     if (!LegionParser::SynopsisParser::looksComplete(replayFile)) {
         // Reported at the end of the file - that's where the footer we
         // didn't find would have been.
-        throw LegionParser::TornDataException(
-            static_cast<size_t>(replayFile.size()));
+        throw LegionParser::TornDataException(replayFile.size());
     }
 
     // TODO: In theory there is a short race condition here where the file

@@ -5,9 +5,12 @@
 
 #include <QByteArray>
 #include <QDateTime>
+#include <QLatin1String>
 #include <QList>
 #include <QString>
+#include <QtTypes>
 #include <cstdint>
+#include <limits>
 
 namespace LegionParser {
 
@@ -131,5 +134,13 @@ struct ReplaySynopsis {
      * fingerprint/compare replay content.
      */
     QByteArray checksum;
+
+    /**
+     * The offset in the replay file where the body begins.
+     *
+     * Detected by scanning the header and can be re-used to perform
+     * on demand analysis without walking the entire replay.
+     */
+    qsizetype bodyOffset;
 };
 }  // namespace LegionParser

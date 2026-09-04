@@ -8,7 +8,6 @@
 #include <QLatin1StringView>
 #include <QObject>
 #include <QtTypes>
-#include <cstddef>
 #include <utility>
 
 namespace LegionParser {
@@ -41,23 +40,23 @@ QString Reader::readUtf16String() {
     return result;
 }
 
-QString Reader::readFixedUtf16String(std::size_t length) {
+QString Reader::readFixedUtf16String(qsizetype length) {
     QDataStream stream(&m_replayFile);
     stream.setByteOrder(QDataStream::LittleEndian);
     QString result;
 
-    for (size_t i = 0; i < length; i++) {
+    for (qsizetype i = 0; i < length; i++) {
         const auto codeUnit = readIntegral<quint16>(stream);
         result.append(QChar(codeUnit));
     }
     return result;
 }
 
-QString Reader::readFixedCharString(std::size_t length) {
+QString Reader::readFixedCharString(qsizetype length) {
     return QString::fromLatin1(readBlock(length));
 }
 
-QByteArray Reader::readBlock(size_t length) {
+QByteArray Reader::readBlock(qsizetype length) {
     const QByteArray raw = m_replayFile.read(static_cast<qint64>(length));
     if (std::cmp_not_equal(raw.size(), length)) {
         throw CorruptDataException(QLatin1String("Unexpected EOF"),

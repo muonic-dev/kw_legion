@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <legionparser/exception.h>
 #include <legionparser/replay.h>
 
 #include <QByteArrayView>
@@ -11,8 +10,8 @@
 #include <QDateTime>
 #include <QIODevice>
 #include <QString>
-#include <concepts>
-#include <type_traits>
+#include <QtTypes>
+#include <memory>
 
 namespace LegionParser {
 
@@ -62,7 +61,7 @@ class SynopsisParser {
    private:
     explicit SynopsisParser(QIODevice&);
 
-    [[nodiscard]] const ReplaySynopsis& metadata() const { return m_metadata; }
+    [[nodiscard]] const ReplaySynopsis& metadata() const { return m_synopsis; }
 
     void parse();
 
@@ -87,12 +86,12 @@ class SynopsisParser {
 
     // Extracts the "M=" map reference from the start of the header's
     // GameInfo text - a path-like reference into the game's .big archives -
-    // and stores it in m_metadata.mapReference.
+    // and stores it in m_synopsis.mapReference.
     void parseMapReference(QStringView header);
 
     // Extracts the ";S=" player-slot list from the header text and assigns
     // each slot's name (where present) and faction onto the corresponding
-    // entry in m_metadata.players, matched positionally in slot order.
+    // entry in m_synopsis.players, matched positionally in slot order.
     void parsePlayerSlots(QStringView header);
 
     void parseBody();
@@ -105,10 +104,10 @@ class SynopsisParser {
     void verifyFooter(QByteArrayView lastChunk) const;
 
     std::unique_ptr<Reader> m_reader;
-    ReplaySynopsis m_metadata;
+    ReplaySynopsis m_synopsis;
 
     // Used during parsing to describe the length of the header starting at the
     // magic string CNC3RPL\0
-    size_t m_offset;
+    qsizetype m_offset;
 };
 }  // namespace LegionParser

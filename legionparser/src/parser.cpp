@@ -131,7 +131,7 @@ std::optional<QByteArrayView> footerFromTail(QByteArrayView tail) {
 
 SynopsisParser::SynopsisParser(QIODevice& replayFile)
     : m_reader(std::make_unique<Reader>(replayFile)),
-      m_metadata{},
+      m_synopsis{},
       m_offset{0} {}
 
 SynopsisParser::~SynopsisParser() = default;
@@ -169,22 +169,25 @@ void SynopsisParser::parseHeader() {
                 .arg(m_offset),
             m_reader->offset());
     }
+    // The current reader position is now the location that the body begins
+    // Record is for use elsewhere
+    m_synopsis.bodyOffset = m_reader->offset();
 }
 
 void SynopsisParser::parseGameType() {
     // Immediately following the magic is a header that appears to signify
     // skirmish (0x04) or multiplayer (0x05)
-    m_metadata.gameType = gameTypeFromUInt8(m_reader->readByte<std::uint8_t>());
+    m_synopsis.gameType = gameTypeFromUInt8(m_reader->readByte<std::uint8_t>());
 }
 
 void SynopsisParser::parseVersions() {
     // Following the match type there are a series of build sequences
     // These are all basically the same always, but worth tracking
     m_reader->withDataStream([this](QDataStream& stream) {
-        m_metadata.versionMajor = m_reader->readIntegral<std::uint32_t>(stream);
-        m_metadata.versionMinor = m_reader->readIntegral<std::uint32_t>(stream);
-        m_metadata.buildMajor = m_reader->readIntegral<std::uint32_t>(stream);
-        m_metadata.buildMinor = m_reader->readIntegral<std::uint32_t>(stream);
+        m_synopsis.versionMajor = m_reader->readIntegral<std::uint32_t>(stream);
+        m_synopsis.versionMinor = m_reader->readIntegral<std::uint32_t>(stream);
+        m_synopsis.buildMajor = m_reader->readIntegral<std::uint32_t>(stream);
+        m_synopsis.buildMinor = m_reader->readIntegral<std::uint32_t>(stream);
     });
 }
 
@@ -195,16 +198,16 @@ void SynopsisParser::parseCommentaryFlag() {
     const auto hnum2 = m_reader->readByte<uint8_t>();
     switch (hnum2) {
         case 0x06:
-            m_metadata.hasCommentary = false;
+            m_synopsis.hasCommentary = false;
             break;
         case 0x1E:
-            m_metadata.hasCommentary = true;
+            m_synopsis.hasCommentary = true;
             break;
         default:
             // TODO: signal this as a warning once ParserEventListener grows
             // a warning-level callback; an unrecognized value here isn't
             // fatal enough to treat as an error via onError.
-            m_metadata.hasCommentary = false;
+            m_synopsis.hasCommentary = false;
     }
 
     const auto zero1 = m_reader->readByte<uint8_t>();
@@ -215,10 +218,10 @@ void SynopsisParser::parseCommentaryFlag() {
 }
 
 void SynopsisParser::parseMatchStrings() {
-    m_metadata.matchTitle = m_reader->readUtf16String();
-    m_metadata.matchDescription = m_reader->readUtf16String();
-    m_metadata.mapName = m_reader->readUtf16String();
-    m_metadata.mapId = m_reader->readUtf16String();
+    m_synopsis.matchTitle = m_reader->readUtf16String();
+    m_synopsis.matchDescription = m_reader->readUtf16String();
+    m_synopsis.mapName = m_reader->readUtf16String();
+    m_synopsis.mapId = m_reader->readUtf16String();
 }
 
 void SynopsisParser::parsePlayers() {
@@ -233,16 +236,16 @@ void SynopsisParser::parsePlayers() {
             m_reader->lastOffset());
     }
     for (uint8_t i = 0; i < playerCount; i++) {
-        m_metadata.players.append(parseOnePlayer());
+        m_synopsis.players.append(parseOnePlayer());
     }
     // Parse the final commentator player that always appears to exist
-    m_metadata.players.append(parseOnePlayer());
+    m_synopsis.players.append(parseOnePlayer());
 }
 
 Player SynopsisParser::parseOnePlayer() {
     const auto id = m_reader->readIntegral<std::uint32_t>();
     const QString name = m_reader->readUtf16String();
-    if (m_metadata.gameType == GameType::Multiplayer) {
+    if (m_synopsis.gameType == GameType::Multiplayer) {
         // This byte exists here in multiplayer replays, but team is sourced
         // entirely from the S= slot text instead (see parsePlayerSlots): the
         // only replays that let us confirm real team semantics are 1v1
@@ -288,7 +291,7 @@ void SynopsisParser::parseMapReference(const QStringView header) {
             m_reader->lastOffset());
     }
 
-    m_metadata.mapReference =
+    m_synopsis.mapReference =
         header.sliced(mapStart, mapEnd - mapStart).toString();
 }
 
@@ -310,12 +313,12 @@ void SynopsisParser::parsePlayerSlots(const QStringView header) {
     // Move past the starting token
     slotStart += slotMarker.size();
 
-    for (auto player = m_metadata.players.begin();
+    for (auto player = m_synopsis.players.begin();
          // TODO: breaking due to slotStart running off the end before we've
          // marked all the players should be tracked/warned
-         slotStart < header.size() && player < m_metadata.players.end();
+         slotStart < header.size() && player < m_synopsis.players.end();
          player++) {
-        const qsizetype playerIdx{player - m_metadata.players.begin()};
+        const qsizetype playerIdx{player - m_synopsis.players.begin()};
 
         // find the end of the current slot. This is either the following ':',
         // the next ';', or the end of the header.
@@ -332,7 +335,7 @@ void SynopsisParser::parsePlayerSlots(const QStringView header) {
         // We only ever get 8 players, the synthetic +1 player
         // just doesn't get parsed in this case
         if (slotView.isEmpty()) {
-            if (playerIdx == m_metadata.players.size() - 1) {
+            if (playerIdx == m_synopsis.players.size() - 1) {
                 // The synthetic commentator has no slot entry when the lobby is
                 // full
                 break;
@@ -433,7 +436,7 @@ void SynopsisParser::parseOffsetAndMagic() {
 void SynopsisParser::parseHeaderTail() {
     // no mod_info in kw
     const auto ts = m_reader->readIntegral<uint32_t>();
-    m_metadata.timestamp = QDateTime::fromSecsSinceEpoch(
+    m_synopsis.timestamp = QDateTime::fromSecsSinceEpoch(
         static_cast<qint64>(ts), QTimeZone(QTimeZone::UTC));
 
     // read and discard the unknown1 block
@@ -445,8 +448,8 @@ void SynopsisParser::parseHeaderTail() {
     parsePlayerSlots(header);
 
     const auto replaySaver = m_reader->readByte<uint8_t>();
-    if (replaySaver < m_metadata.players.size()) {
-        (m_metadata.players.begin() + replaySaver)->isReplaySaver = true;
+    if (replaySaver < m_synopsis.players.size()) {
+        (m_synopsis.players.begin() + replaySaver)->isReplaySaver = true;
     }
     // TODO: else warn here, not worth throwing on corruption
 
@@ -454,7 +457,7 @@ void SynopsisParser::parseHeaderTail() {
     m_reader->discardZero<uint32_t>();
     m_reader->discardZero<uint32_t>();
 
-    m_metadata.filename = m_reader->readFixedUtf16String<uint32_t>();
+    m_synopsis.filename = m_reader->readFixedUtf16String<uint32_t>();
 
     // Read and discard the datetime field
     // The replay timestamp has what we want and this one doesn't make sense
@@ -499,7 +502,7 @@ void SynopsisParser::parseBody() {
 
     verifyFooter(tail);
 
-    m_metadata.checksum = hash.result();
+    m_synopsis.checksum = hash.result();
 }
 
 void SynopsisParser::verifyFooter(QByteArrayView lastChunk) const {
