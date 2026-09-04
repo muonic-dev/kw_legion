@@ -11,12 +11,15 @@
 #include <QByteArray>
 #include <QDateTime>
 #include <QList>
+#include <QLoggingCategory>
 #include <QSqlQuery>
 #include <QString>
 #include <array>
 #include <optional>
 
 namespace KWLegionCore {
+
+Q_DECLARE_LOGGING_CATEGORY(logQueries);
 
 // Helper utility class for dispatching queries. Kept alongside MIGRATIONS so
 // the DDL and the statements that reference it stay adjacent.

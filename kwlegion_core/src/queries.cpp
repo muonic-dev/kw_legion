@@ -19,6 +19,8 @@
 
 namespace KWLegionCore {
 
+Q_LOGGING_CATEGORY(logQueries, "kwlegion.queries");
+
 constexpr std::array MIGRATIONS{
     // Store the replay here
     // Note: we use the checksum to compute a stored local state path
@@ -132,7 +134,7 @@ bool Queries::migrate() {
     // when there are no pending migrations to run.
     m_query.finish();
 
-    qDebug() << "Current schema version is: " << currentVersion;
+    qDebug(logQueries) << "Current schema version is: " << currentVersion;
 
     // The behavior of PRAGMA user_version starts at 0 so this is always the
     // next thing to execute
