@@ -92,7 +92,34 @@ constexpr std::array MIGRATIONS{
     // desync from what was actually on disk. Dismissal becomes
     // session-scoped as a result, which is what we want given the game's
     // rolling "Last Replay.KWReplay" path.
-    "DROP TABLE broken_replays;"
+    "DROP TABLE broken_replays;",
+
+    // Split the user-editable override columns out of replays and into
+    // their own table, mirroring the eventual split with a body-derived
+    // analysis table below. A missing row means "no override", the same
+    // meaning the empty-string default on the old column used to carry, so
+    // there is no default here - see Queries::updateOverrideTitle.
+    "CREATE TABLE replay_overrides"
+    "    ( replay_checksum BLOB PRIMARY KEY"
+    "    , override_match_title TEXT NOT NULL"
+    "    ) STRICT, WITHOUT ROWID;",
+
+    // Only carry forward replays that actually have an override - an empty
+    // string on the old column means the same thing as no row at all here,
+    // so there is nothing worth preserving for the rest.
+    "INSERT INTO replay_overrides (replay_checksum, override_match_title) "
+    "SELECT checksum, override_match_title FROM replays "
+    "WHERE override_match_title != '';",
+
+    "ALTER TABLE replays DROP COLUMN override_match_title;",
+
+    // Holds facts derived from walking the replay's action stream and/or
+    // synposis. Currently, body_offset is recorded from the header and marks a
+    // place that can be seeked to to start the body stream
+    "CREATE TABLE replay_analysis"
+    "    ( replay_checksum BLOB PRIMARY KEY"
+    "    , body_offset INT NOT NULL"
+    "    ) STRICT, WITHOUT ROWID;"
 
 };
 
@@ -182,10 +209,25 @@ void Queries::insertReplay(const LegionParser::ReplaySynopsis& metadata) {
 
 void Queries::updateOverrideTitle(const QByteArray& checksum,
                                   const QString& overrideTitle) {
+    if (overrideTitle.isEmpty()) {
+        // No override is represented as an absent row rather than a stored
+        // empty string, so a missing row is the only "no override" case the
+        // read side has to handle.
+        prepare(
+            "DELETE FROM replay_overrides WHERE replay_checksum = :checksum");
+        m_query.bindValue(":checksum", checksum);
+        exec();
+        return;
+    }
     prepare(
-        "UPDATE replays "
-        "SET override_match_title = :override "
-        "WHERE checksum = :checksum");
+        "INSERT INTO replay_overrides"
+        "    ( replay_checksum"
+        "    , override_match_title )"
+        " VALUES"
+        "    ( :checksum"
+        "    , :override )"
+        " ON CONFLICT(replay_checksum) DO UPDATE"
+        "    SET override_match_title = excluded.override_match_title;");
     m_query.bindValue(":checksum", checksum);
     m_query.bindValue(":override", overrideTitle);
     exec();
@@ -294,18 +336,19 @@ void Queries::forgetMissingReplays(const QList<QString>& knownPaths) {
 
 QList<Replay> Queries::selectReplays() {
     prepare(
-        "SELECT checksum"
-        "    , timestamp"
-        "    , match_title"
-        "    , match_description"
-        "    , map_name"
-        "    , map_reference"
+        "SELECT r.checksum"
+        "    , r.timestamp"
+        "    , r.match_title"
+        "    , r.match_description"
+        "    , r.map_name"
+        "    , r.map_reference"
         "    , EXISTS ("
         "        SELECT 1 FROM replay_external_paths"
-        "        WHERE replay_checksum = replays.checksum"
+        "        WHERE replay_checksum = r.checksum"
         "      ) AS has_external_path"
-        "    , override_match_title"
-        " FROM replays");
+        "    , COALESCE(o.override_match_title, '') AS override_match_title"
+        " FROM replays r"
+        " LEFT JOIN replay_overrides o ON o.replay_checksum = r.checksum");
     exec();
 
     QList<Replay> replays;
@@ -320,19 +363,20 @@ QList<Replay> Queries::selectReplays() {
 
 std::optional<Replay> Queries::selectReplay(const QByteArray& checksum) {
     prepare(
-        "SELECT checksum"
-        "    , timestamp"
-        "    , match_title"
-        "    , match_description"
-        "    , map_name"
-        "    , map_reference"
+        "SELECT r.checksum"
+        "    , r.timestamp"
+        "    , r.match_title"
+        "    , r.match_description"
+        "    , r.map_name"
+        "    , r.map_reference"
         "    , EXISTS ("
         "        SELECT 1 FROM replay_external_paths"
-        "        WHERE replay_checksum = replays.checksum"
+        "        WHERE replay_checksum = r.checksum"
         "      ) AS has_external_path"
-        "    , override_match_title"
-        " FROM replays"
-        " WHERE checksum = :checksum");
+        "    , COALESCE(o.override_match_title, '') AS override_match_title"
+        " FROM replays r"
+        " LEFT JOIN replay_overrides o ON o.replay_checksum = r.checksum"
+        " WHERE r.checksum = :checksum");
     m_query.bindValue(":checksum", checksum);
 
     exec();
