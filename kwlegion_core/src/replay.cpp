@@ -9,7 +9,7 @@
 #include <QList>
 
 namespace KWLegionCore {
-Replay Replay::fromReplay(const LegionParser::ReplayMetadata& replay,
+Replay Replay::fromSynopsis(const LegionParser::ReplaySynopsis& replay,
                           bool hasExternalPath) {
     QList<Player> players;
     players.reserve(replay.players.size());

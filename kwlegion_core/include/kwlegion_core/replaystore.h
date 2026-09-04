@@ -43,9 +43,9 @@ class ReplayStore : public QObject {
      * directory will be received from the prospector
      *
      * Subsequently, each new file will come in via an
-     * analyzeReplayFile/removeReplayFileLink
+     * synopsizeReplayFile/removeReplayFileLink
      *
-     * Internally, performReplayAnalysis does the parsing
+     * Internally, performReplaySynopsis does the parsing
      * This is used both on initial load and on periodic
      * updates. The m_initialSweep is a gate to control
      * whether periodic emission happens. This prevents
@@ -75,7 +75,7 @@ class ReplayStore : public QObject {
     /**
      * A replay file definitely just appeared
      */
-    void analyzeReplayFile(const QString& path);
+    void synopsizeReplayFile(const QString& path);
     /**
      * A replay file has disappeared
      * This is seperate from removeReplayFileLink so that we can clear any
@@ -138,14 +138,14 @@ class ReplayStore : public QObject {
     void ensureDb();
     void ensureDirectories();
 
-    // Perform the actual replay analysis
+    // Perform the actual replay synopsis
     // This is the happy path for parsing and ingestion
     // It can throw ReplayParseException or StorageException
     // It is provided here because we want a slot entrypoint
-    // from the prospector (analyzeReplayFile)
+    // from the prospector (synopsizeReplayFile)
     // But we also want an entrypoint for the deferred retry logic
     // that will share the logic
-    void performReplayAnalysis(const QString& path);
+    void performReplaySynopsis(const QString& path);
 
     // observed is the state of the file sampled before the parse attempt
     // that came back torn - the path goes back into the deferred set to be
@@ -171,7 +171,7 @@ class ReplayStore : public QObject {
     // Returns the checksums that were impacted by the ingestion
     // This is guaranteed to contain metadata.checksum
     QList<QByteArray> ingestReplay(
-        QFile& file, const LegionParser::ReplayMetadata& metadata);
+        QFile& file, const LegionParser::ReplaySynopsis& metadata);
     // The replay file at the path is gone or otherwise corrupt so we should
     // remove it
     std::optional<QByteArray> removeReplayAtPath(const QString& path);
@@ -193,8 +193,8 @@ class ReplayStore : public QObject {
 
     static void hideReplay(Queries& queries, const QByteArray& checksum);
 
-    // We want to wait until full analysis is done on all replays before we
-    // emit the first event instead of trickling them in with analyze
+    // We want to wait until the full synopsis pass is done on all replays
+    // before we emit the first event instead of trickling them in
     // Allow suppressing the emission on the initial sweeep
     ActionScope m_initialSweep;
 

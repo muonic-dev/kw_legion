@@ -35,9 +35,9 @@ QSqlDatabase openMigratedDb(const QString& connectionName) {
 
 // The checksum only needs to be unique per test, not a real SHA-256 - a
 // short literal tag is enough to identify a row.
-LegionParser::ReplayMetadata makeMetadata(const QByteArray& checksum,
+LegionParser::ReplaySynopsis makeMetadata(const QByteArray& checksum,
                                           const QString& mapName = "Test Map") {
-    return LegionParser::ReplayMetadata{
+    return LegionParser::ReplaySynopsis{
         .versionMajor = 1,
         .versionMinor = 0,
         .buildMajor = 1,
@@ -128,7 +128,7 @@ TEST_CASE("Queries selectReplay returns the stored fields") {
     const QByteArray checksum = "checksum-select";
     const QDateTime timestamp =
         QDateTime::fromSecsSinceEpoch(1700000000, QTimeZone(QTimeZone::UTC));
-    LegionParser::ReplayMetadata metadata =
+    LegionParser::ReplaySynopsis metadata =
         makeMetadata(checksum, "Sample Map");
     metadata.timestamp = timestamp;
     metadata.matchTitle = "Stored Match Title";
@@ -423,14 +423,14 @@ TEST_CASE("Queries selectReplays reports hasExternalPath per replay") {
 
     const QByteArray withPath = "checksum-with-path";
     const QByteArray withoutPath = "checksum-without-path";
-    LegionParser::ReplayMetadata withPathMetadata =
+    LegionParser::ReplaySynopsis withPathMetadata =
         makeMetadata(withPath, "Map A");
     withPathMetadata.matchTitle = "Match A";
     withPathMetadata.matchDescription = "Description A";
     withPathMetadata.mapReference = "Reference A";
     queries.insertReplay(withPathMetadata);
 
-    LegionParser::ReplayMetadata withoutPathMetadata =
+    LegionParser::ReplaySynopsis withoutPathMetadata =
         makeMetadata(withoutPath, "Map B");
     withoutPathMetadata.matchTitle = "Match B";
     withoutPathMetadata.matchDescription = "Description B";

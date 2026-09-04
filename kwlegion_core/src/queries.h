@@ -38,7 +38,7 @@ class Queries final {
 
     bool isReplayKnown(const QByteArray& checksum);
 
-    void insertReplay(const LegionParser::ReplayMetadata& metadata);
+    void insertReplay(const LegionParser::ReplaySynopsis& metadata);
 
     void updateOverrideTitle(const QByteArray& checksum,
                              const QString& overrideTitle);

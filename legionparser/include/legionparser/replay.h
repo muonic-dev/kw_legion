@@ -67,7 +67,7 @@ struct Player {
     std::uint32_t id = std::numeric_limits<std::uint32_t>::max();
     QString name = QLatin1String("");
     // Sourced entirely from the S= slot text (see
-    // Parser::parsePlayerSlots), for both skirmish and multiplayer
+    // SynopsisParser::parsePlayerSlots), for both skirmish and multiplayer
     // replays, using 1-based numbering matching the lobby UI. Multiplayer
     // replays also carry a binary team_number byte, but real network
     // matches confirmed so far are all 1v1, where that byte's behavior
@@ -84,7 +84,7 @@ struct Player {
     bool isReplaySaver = false;
 };
 
-struct ReplayMetadata {
+struct ReplaySynopsis {
     std::uint32_t versionMajor;
     std::uint32_t versionMinor;
     std::uint32_t buildMajor;

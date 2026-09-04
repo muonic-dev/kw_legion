@@ -131,7 +131,7 @@ bool Queries::isReplayKnown(const QByteArray& checksum) {
     return m_query.value(0).toInt() != 0;
 }
 
-void Queries::insertReplay(const LegionParser::ReplayMetadata& metadata) {
+void Queries::insertReplay(const LegionParser::ReplaySynopsis& metadata) {
     prepare(
         "INSERT INTO replays"
         "    ( checksum"

@@ -176,7 +176,7 @@ int main(int argc, char* argv[]) {
                      &ReplayProspector::initialSweepCompleted, &replayStore,
                      &ReplayStore::receiveInitialReplayPaths);
     QObject::connect(&replayProspector, &ReplayProspector::replayFileChanged,
-                     &replayStore, &ReplayStore::analyzeReplayFile);
+                     &replayStore, &ReplayStore::synopsizeReplayFile);
     QObject::connect(&replayProspector, &ReplayProspector::replayFileRemoved,
                      &replayStore, &ReplayStore::removeReplayFile);
 

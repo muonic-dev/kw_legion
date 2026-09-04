@@ -129,20 +129,20 @@ std::optional<QByteArrayView> footerFromTail(QByteArrayView tail) {
 }
 }  // namespace
 
-Parser::Parser(QIODevice& replayFile)
+SynopsisParser::SynopsisParser(QIODevice& replayFile)
     : m_reader(std::make_unique<Reader>(replayFile)),
       m_metadata{},
       m_offset{0} {}
 
-Parser::~Parser() = default;
+SynopsisParser::~SynopsisParser() = default;
 
-void Parser::parse() {
+void SynopsisParser::parse() {
     checkMagic();
     parseHeader();
     parseBody();
 }
 
-void Parser::checkMagic() {
+void SynopsisParser::checkMagic() {
     const QByteArray magic = m_reader->readBlock(MAGIC_SIZE);
     if (magic != QByteArray(CNC_MAGIC, MAGIC_SIZE)) {
         throw CorruptDataException(QLatin1String("replay magic"),
@@ -150,7 +150,7 @@ void Parser::checkMagic() {
     }
 }
 
-void Parser::parseHeader() {
+void SynopsisParser::parseHeader() {
     parseGameType();
     parseVersions();
     parseCommentaryFlag();
@@ -171,13 +171,13 @@ void Parser::parseHeader() {
     }
 }
 
-void Parser::parseGameType() {
+void SynopsisParser::parseGameType() {
     // Immediately following the magic is a header that appears to signify
     // skirmish (0x04) or multiplayer (0x05)
     m_metadata.gameType = gameTypeFromUInt8(m_reader->readByte<std::uint8_t>());
 }
 
-void Parser::parseVersions() {
+void SynopsisParser::parseVersions() {
     // Following the match type there are a series of build sequences
     // These are all basically the same always, but worth tracking
     m_reader->withDataStream([this](QDataStream& stream) {
@@ -188,7 +188,7 @@ void Parser::parseVersions() {
     });
 }
 
-void Parser::parseCommentaryFlag() {
+void SynopsisParser::parseCommentaryFlag() {
     // Following the build numbers is a byte indicating whether the replay
     // includes commentary (0x06 no commentary, 0x1E with commentary),
     // followed by a reserved byte that is always 0x00
@@ -214,14 +214,14 @@ void Parser::parseCommentaryFlag() {
     }
 }
 
-void Parser::parseMatchStrings() {
+void SynopsisParser::parseMatchStrings() {
     m_metadata.matchTitle = m_reader->readUtf16String();
     m_metadata.matchDescription = m_reader->readUtf16String();
     m_metadata.mapName = m_reader->readUtf16String();
     m_metadata.mapId = m_reader->readUtf16String();
 }
 
-void Parser::parsePlayers() {
+void SynopsisParser::parsePlayers() {
     const auto playerCount = m_reader->readByte<uint8_t>();
     if (playerCount == 0) {
         throw CorruptDataException(QLatin1String("Player count is 0"),
@@ -239,7 +239,7 @@ void Parser::parsePlayers() {
     m_metadata.players.append(parseOnePlayer());
 }
 
-Player Parser::parseOnePlayer() {
+Player SynopsisParser::parseOnePlayer() {
     const auto id = m_reader->readIntegral<std::uint32_t>();
     const QString name = m_reader->readUtf16String();
     if (m_metadata.gameType == GameType::Multiplayer) {
@@ -257,7 +257,7 @@ Player Parser::parseOnePlayer() {
     return Player{.id = id, .name = name};
 }
 
-void Parser::parseMapReference(const QStringView header) {
+void SynopsisParser::parseMapReference(const QStringView header) {
     // The header's GameInfo text begins with "M=" followed by a numeric
     // (short-range, hex-encoded per the format doc) unknown value of
     // variable width - it can contain hex letters (e.g. a trailing 'b'),
@@ -292,7 +292,7 @@ void Parser::parseMapReference(const QStringView header) {
         header.sliced(mapStart, mapEnd - mapStart).toString();
 }
 
-void Parser::parsePlayerSlots(const QStringView header) {
+void SynopsisParser::parsePlayerSlots(const QStringView header) {
     // The header's ";S=" key holds a colon-separated list of player slots,
     // e.g. "S=HMuonic,0,0,TT,4,10,-1,-1,0,1,-1,:CB,-1,11,-1,-1,0,4:X:X:...;"
     // Each slot starts with a type letter: H (human), C (computer), or X
@@ -407,7 +407,7 @@ void Parser::parsePlayerSlots(const QStringView header) {
     }
 }
 
-void Parser::parseOffsetAndMagic() {
+void SynopsisParser::parseOffsetAndMagic() {
     m_offset = m_reader->readIntegral<uint32_t>();
     // Read this manually since we want to mark mid-read so we track it
     const auto strReplLength = m_reader->readIntegral<uint32_t>();
@@ -430,7 +430,7 @@ void Parser::parseOffsetAndMagic() {
     }
 }
 
-void Parser::parseHeaderTail() {
+void SynopsisParser::parseHeaderTail() {
     // no mod_info in kw
     const auto ts = m_reader->readIntegral<uint32_t>();
     m_metadata.timestamp = QDateTime::fromSecsSinceEpoch(
@@ -473,7 +473,7 @@ void Parser::parseHeaderTail() {
     m_reader->readBlock(U2_SIZE * sizeof(std::uint32_t));
 }
 
-void Parser::parseBody() {
+void SynopsisParser::parseBody() {
     // The payload isn't parsed at this time; just fingerprint it so callers
     // can cheaply compare/identify replay content. Read in bounded chunks
     // rather than the whole remaining file at once, so a corrupt or
@@ -502,7 +502,7 @@ void Parser::parseBody() {
     m_metadata.checksum = hash.result();
 }
 
-void Parser::verifyFooter(QByteArrayView lastChunk) const {
+void SynopsisParser::verifyFooter(QByteArrayView lastChunk) const {
     const std::optional<QByteArrayView> maybeFooter = footerFromTail(lastChunk);
     if (!maybeFooter) {
         throw TornDataException(m_reader->offset());
@@ -556,7 +556,7 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
     }
 }
 
-bool Parser::looksComplete(QIODevice& replayFile) {
+bool SynopsisParser::looksComplete(QIODevice& replayFile) {
     // Every "can't tell" path here answers true. This check exists only to
     // rule a file out cheaply - anything it can't inspect falls through to a
     // full parse, which is the authority on the result either way.
@@ -590,8 +590,8 @@ bool Parser::looksComplete(QIODevice& replayFile) {
     return footerFromTail(tail).has_value();
 }
 
-ReplayMetadata Parser::parse(QIODevice& replayFile) {
-    Parser parser{replayFile};
+ReplaySynopsis SynopsisParser::parse(QIODevice& replayFile) {
+    SynopsisParser parser{replayFile};
     parser.parse();
     return parser.metadata();
 }

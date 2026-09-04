@@ -35,7 +35,7 @@ Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
 namespace KWLegionCore {
 
 // The poll itself is only a stat per deferred path, and since
-// Parser::looksComplete rejects an unfinished file from its tail, a poll that
+// SynopsisParser::looksComplete rejects an unfinished file from its tail, a poll that
 // sees a change no longer costs a whole-payload hash either.
 constexpr int RECHECK_INTERVAL_MS = 5000;
 
@@ -83,9 +83,9 @@ ReplayStore::ReplayStore(QString replayDir, const QString& statePath,
       m_replayDir(std::move(replayDir)),
       m_deferred(new Deferred(this)) {
     m_deferred->setRecheckIntervalMs(RECHECK_INTERVAL_MS);
-    // Send it back throught the analyze replay file
+    // Send it back through the synopsize replay file slot
     QObject::connect(m_deferred, &Deferred::pathChanged, this,
-                     &ReplayStore::analyzeReplayFile);
+                     &ReplayStore::synopsizeReplayFile);
 }
 
 void ReplayStore::stop() {
@@ -175,7 +175,7 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     // it from the paths we actually find.
     emit inboxReset();
 
-    // Bracket analyzeReplayFile so that we don't constantly emit the individual
+    // Bracket synopsizeReplayFile so that we don't constantly emit the individual
     // load action
     const auto guard = m_initialSweep.enter();
     // Ingest every path that we have
@@ -183,7 +183,7 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
         // TODO: Maybe we can avoid making this a ton of transactions
         // We ignore the return value here because its the initial startup.
         // We're emitting everythign at the end
-        analyzeReplayFile(path);
+        synopsizeReplayFile(path);
     }
 
     // Now that we've done all the initial processing we will emit the query
@@ -212,7 +212,7 @@ void ReplayStore::removeReplayFile(const QString& path) {
     emit inboxItemRemoved(path);
 }
 
-void ReplayStore::analyzeReplayFile(const QString& path) {
+void ReplayStore::synopsizeReplayFile(const QString& path) {
     // We were waiting but also a file notification happened
     m_deferred->removeWaitForChange(path);
 
@@ -232,7 +232,7 @@ void ReplayStore::analyzeReplayFile(const QString& path) {
     }
 
     try {
-        performReplayAnalysis(path);
+        performReplaySynopsis(path);
         // Success = not pending
         m_storageRetries.remove(path);
         emit inboxItemRemoved(path);
@@ -419,8 +419,8 @@ void ReplayStore::acknowledgeItem(const QString& path) {
     emit inboxItemRemoved(path);
 }
 
-void ReplayStore::performReplayAnalysis(const QString& path) {
-    qDebug(logStore) << "Analyzing replay: " << path;
+void ReplayStore::performReplaySynopsis(const QString& path) {
+    qDebug(logStore) << "Synopsizing replay: " << path;
     QFile replayFile(path);
     if (!replayFile.open(QIODevice::ReadOnly)) {
         // We may need to figure out how to recover from this such as by locked
@@ -433,7 +433,7 @@ void ReplayStore::performReplayAnalysis(const QString& path) {
     // reject it. Checking the tail first turns that into two small reads.
     // Only ever a short-circuit: a file it doesn't rule out still goes
     // through the parser, which stays the authority on torn vs corrupt.
-    if (!LegionParser::Parser::looksComplete(replayFile)) {
+    if (!LegionParser::SynopsisParser::looksComplete(replayFile)) {
         // Reported at the end of the file - that's where the footer we
         // didn't find would have been.
         throw LegionParser::TornDataException(
@@ -442,8 +442,8 @@ void ReplayStore::performReplayAnalysis(const QString& path) {
 
     // TODO: In theory there is a short race condition here where the file
     // is overwritten before we can analyze and copy it, but meh
-    const LegionParser::ReplayMetadata metadata =
-        LegionParser::Parser::parse(replayFile);
+    const LegionParser::ReplaySynopsis metadata =
+        LegionParser::SynopsisParser::parse(replayFile);
 
     // Ingest the replay and determine all the checksums that changed
     const QList<QByteArray> impacted = ingestReplay(replayFile, metadata);
@@ -451,7 +451,7 @@ void ReplayStore::performReplayAnalysis(const QString& path) {
 }
 
 QList<QByteArray> ReplayStore::ingestReplay(
-    QFile& file, const LegionParser::ReplayMetadata& metadata) {
+    QFile& file, const LegionParser::ReplaySynopsis& metadata) {
     SqlTransactionGuard tx(m_db);
     Queries queries{QSqlQuery(m_db)};
 

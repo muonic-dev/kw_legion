@@ -16,19 +16,19 @@ using namespace LegionParser;
 
 namespace {
 
-ReplayMetadata parseReplay(const QString& filename) {
+ReplaySynopsis parseReplay(const QString& filename) {
     const QString replayPath =
         QDir(QString::fromUtf8(REPLAY_TEST_DATA_DIR)).filePath(filename);
     QFile replayFile(replayPath);
     REQUIRE(replayFile.open(QIODevice::ReadOnly));
-    return LegionParser::Parser::parse(replayFile);
+    return LegionParser::SynopsisParser::parse(replayFile);
 }
 
 // Each test_<faction>s.KWReplay is a skirmish where Muonic played a mirror
 // match against a Hard AI opponent, so both players' declared factions
 // should agree.
 void checkMirrorMatchFaction(const QString& filename, Faction faction) {
-    const ReplayMetadata metadata = parseReplay(filename);
+    const ReplaySynopsis metadata = parseReplay(filename);
 
     REQUIRE(metadata.players.size() == 3);
 
@@ -81,7 +81,7 @@ TEST_CASE("looksComplete accepts every replay the parser accepts",
 
         bool accepted = true;
         try {
-            const ReplayMetadata metadata = Parser::parse(replayFile);
+            const ReplaySynopsis metadata = SynopsisParser::parse(replayFile);
             CHECK_FALSE(metadata.checksum.isEmpty());
         } catch (const ReplayParseException&) {
             // e.g. the deliberately torn fixture - nothing to agree about.
@@ -91,7 +91,7 @@ TEST_CASE("looksComplete accepts every replay the parser accepts",
         if (accepted) {
             REQUIRE(replayFile.seek(0));
             INFO("fixture: " << filename.toStdString());
-            CHECK(Parser::looksComplete(replayFile));
+            CHECK(SynopsisParser::looksComplete(replayFile));
         }
     }
 }
@@ -103,7 +103,7 @@ TEST_CASE("looksComplete rejects a footer cut off mid-write",
         dir.filePath(QString::fromUtf8("test_torn_footer.KWReplay")));
     REQUIRE(replayFile.open(QIODevice::ReadOnly));
 
-    CHECK_FALSE(Parser::looksComplete(replayFile));
+    CHECK_FALSE(SynopsisParser::looksComplete(replayFile));
 }
 
 TEST_CASE("looksComplete leaves the device position untouched",
@@ -116,7 +116,7 @@ TEST_CASE("looksComplete leaves the device position untouched",
     REQUIRE(replayFile.open(QIODevice::ReadOnly));
     REQUIRE(replayFile.seek(37));
 
-    CHECK(Parser::looksComplete(replayFile));
+    CHECK(SynopsisParser::looksComplete(replayFile));
     CHECK(replayFile.pos() == 37);
 }
 
@@ -126,7 +126,7 @@ TEST_CASE("looksComplete rejects a file too small to hold a footer",
     QBuffer buffer(&tiny);
     REQUIRE(buffer.open(QIODevice::ReadOnly));
 
-    CHECK_FALSE(Parser::looksComplete(buffer));
+    CHECK_FALSE(SynopsisParser::looksComplete(buffer));
 }
 
 TEST_CASE("looksComplete defers on a device it cannot seek",
@@ -138,11 +138,11 @@ TEST_CASE("looksComplete defers on a device it cannot seek",
     SequentialBuffer buffer(&bytes);
     REQUIRE(buffer.open(QIODevice::ReadOnly));
 
-    CHECK(Parser::looksComplete(buffer));
+    CHECK(SynopsisParser::looksComplete(buffer));
 }
 
 TEST_CASE("parses muonic v branston game 1", "[legionparser][metadata]") {
-    const ReplayMetadata metadata =
+    const ReplaySynopsis metadata =
         parseReplay(QString::fromUtf8("muonic v branston game 1.KWReplay"));
 
     CHECK(metadata.gameType == GameType::Multiplayer);
@@ -213,7 +213,7 @@ TEST_CASE("faction: Traveler mirror match", "[legionparser][faction]") {
 }
 
 // Skirmish replays carry no binary team_number field, so team membership is
-// inferred from the S= slot text instead (see Parser::parsePlayerSlots).
+// inferred from the S= slot text instead (see SynopsisParser::parsePlayerSlots).
 // These replays were purpose-built to pin that inference down: each sets up
 // a known, deliberately configured team split so the inferred grouping can
 // be checked against ground truth.
@@ -223,7 +223,7 @@ TEST_CASE("team inference: implicit skirmish alliance",
     // 4-player skirmish.KWReplay: 1 human + 3 Brutal AI, allied via the
     // in-game diplomacy UI (no explicit numeric team chosen). Muonic and the
     // second bot are on one side; the first and third bots are on the other.
-    const ReplayMetadata metadata =
+    const ReplaySynopsis metadata =
         parseReplay(QString::fromUtf8("4-player skirmish.KWReplay"));
 
     REQUIRE(metadata.players.size() == 5);
@@ -242,7 +242,7 @@ TEST_CASE("team inference: alliance across different AI difficulties",
     // each slot an unambiguous identity independent of S= ordering. Muonic
     // is allied with the Easy bot; Medium and Hard are allied with each
     // other.
-    const ReplayMetadata metadata =
+    const ReplaySynopsis metadata =
         parseReplay(QString::fromUtf8("4-player different versions.KWReplay"));
 
     REQUIRE(metadata.players.size() == 5);
@@ -265,7 +265,7 @@ TEST_CASE("team inference: explicit numeric team assignment",
     // Easy bot were explicitly put on lobby "team 4", and Medium/Hard on
     // lobby "team 2". The S= value is 0-based (UI team - 1), so this also
     // pins down that +1 conversion back to the number shown in the UI.
-    const ReplayMetadata metadata =
+    const ReplaySynopsis metadata =
         parseReplay(QString::fromUtf8("4-player team 4.KWReplay"));
 
     REQUIRE(metadata.players.size() == 5);
@@ -288,7 +288,7 @@ TEST_CASE("team inference: FFA slots are never treated as allied",
     // team, since they'd all share that -1; each must instead get a
     // distinct placeholder so ReplayModel's equality-based grouping doesn't
     // merge unrelated FFA players.
-    const ReplayMetadata metadata =
+    const ReplaySynopsis metadata =
         parseReplay(QString::fromUtf8("4-player ffa.KWReplay"));
 
     REQUIRE(metadata.players.size() == 5);
@@ -309,9 +309,9 @@ TEST_CASE(
     // 8-player all random ffa.KWReplay: all 8 real slots are filled, so
     // there's no leftover ;S= entry for the trailing synthetic commentator
     // player - this is the replay that originally surfaced
-    // Parser::parsePlayerSlots() indexing into an empty slot view once the
+    // SynopsisParser::parsePlayerSlots() indexing into an empty slot view once the
     // header ran out of slot text before the player list did.
-    const ReplayMetadata metadata =
+    const ReplaySynopsis metadata =
         parseReplay(QString::fromUtf8("8-player all random ffa.KWReplay"));
 
     REQUIRE(metadata.players.size() == 9);

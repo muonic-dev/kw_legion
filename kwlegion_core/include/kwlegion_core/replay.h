@@ -13,7 +13,7 @@
 #include <QString>
 
 namespace LegionParser {
-class ReplayMetadata;
+class ReplaySynopsis;
 }
 
 namespace KWLegionCore {
@@ -43,7 +43,7 @@ struct Replay {
     QList<Player> players;
 
     // Static so it remains an aggregate type
-    static Replay fromReplay(const LegionParser::ReplayMetadata&,
+    static Replay fromSynopsis(const LegionParser::ReplaySynopsis&,
                              bool hasExternalPath);
 };
 }  // namespace KWLegionCore

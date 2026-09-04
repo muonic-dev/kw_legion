@@ -116,7 +116,7 @@ TEST_CASE(
     CHECK(replays.at(0).hasExternalPath);
 }
 
-TEST_CASE("ReplayStore ingests a replay reported live via analyzeReplayFile") {
+TEST_CASE("ReplayStore ingests a replay reported live via synopsizeReplayFile") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -129,7 +129,7 @@ TEST_CASE("ReplayStore ingests a replay reported live via analyzeReplayFile") {
         copyFixtureReplay(root, "Source/replay.KWReplay");
 
     QSignalSpy changedSpy(&store, &ReplayStore::replaysChanged);
-    store.analyzeReplayFile(replayPath);
+    store.synopsizeReplayFile(replayPath);
 
     REQUIRE(changedSpy.count() == 1);
     const QList<Replay> replays = changedSpy.at(0).at(0).value<QList<Replay>>();
@@ -156,7 +156,7 @@ TEST_CASE("ReplayStore ignores a corrupt file that was never tracked") {
     corrupt.close();
 
     QSignalSpy changedSpy(&store, &ReplayStore::replaysChanged);
-    store.analyzeReplayFile(corruptPath);
+    store.synopsizeReplayFile(corruptPath);
 
     CHECK(changedSpy.count() == 0);
 }
@@ -173,7 +173,7 @@ TEST_CASE(
 
     const QString replayPath =
         copyFixtureReplay(root, "Source/replay.KWReplay");
-    store.analyzeReplayFile(replayPath);
+    store.synopsizeReplayFile(replayPath);
 
     QSignalSpy changedSpy(&store, &ReplayStore::replaysChanged);
     store.removeReplayFile(replayPath);

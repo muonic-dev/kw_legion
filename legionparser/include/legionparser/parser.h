@@ -18,14 +18,14 @@ namespace LegionParser {
 
 class Reader;
 
-class Parser {
+class SynopsisParser {
    public:
-    Parser(const Parser&) = delete;
-    Parser& operator=(const Parser&) = delete;
-    Parser(Parser&&) = delete;
-    Parser& operator=(Parser&&) = delete;
+    SynopsisParser(const SynopsisParser&) = delete;
+    SynopsisParser& operator=(const SynopsisParser&) = delete;
+    SynopsisParser(SynopsisParser&&) = delete;
+    SynopsisParser& operator=(SynopsisParser&&) = delete;
 
-    virtual ~Parser();
+    virtual ~SynopsisParser();
 
     /**
      * @brief Parse a replay file from the given QIODevice and record the
@@ -39,7 +39,7 @@ class Parser {
      * @throws ReplayParseException describing the parsing failure
      *
      */
-    static ReplayMetadata parse(QIODevice& replayFile);
+    static ReplaySynopsis parse(QIODevice& replayFile);
 
     /**
      * @brief Cheaply test whether replayFile ends in a replay footer.
@@ -60,9 +60,9 @@ class Parser {
     static bool looksComplete(QIODevice& replayFile);
 
    private:
-    explicit Parser(QIODevice&);
+    explicit SynopsisParser(QIODevice&);
 
-    [[nodiscard]] const ReplayMetadata& metadata() const { return m_metadata; }
+    [[nodiscard]] const ReplaySynopsis& metadata() const { return m_metadata; }
 
     void parse();
 
@@ -105,7 +105,7 @@ class Parser {
     void verifyFooter(QByteArrayView lastChunk) const;
 
     std::unique_ptr<Reader> m_reader;
-    ReplayMetadata m_metadata;
+    ReplaySynopsis m_metadata;
 
     // Used during parsing to describe the length of the header starting at the
     // magic string CNC3RPL\0
