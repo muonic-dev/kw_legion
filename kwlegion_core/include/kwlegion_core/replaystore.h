@@ -9,6 +9,7 @@
 
 #include <QDir>
 #include <QHash>
+#include <QList>
 #include <QLoggingCategory>
 #include <QObject>
 #include <QSet>
@@ -17,7 +18,7 @@
 #include <QString>
 #include <QTimer>
 #include <QUrl>
-#include <tuple>
+#include <optional>
 
 Q_DECLARE_LOGGING_CATEGORY(logStore);
 
@@ -147,6 +148,8 @@ class ReplayStore : public QObject {
     // that will share the logic
     void performReplaySynopsis(const QString& path);
 
+    void performReplayReanalysis();
+
     // observed is the state of the file sampled before the parse attempt
     // that came back torn - the path goes back into the deferred set to be
     // retried once the bytes on disk move past it.
@@ -171,13 +174,27 @@ class ReplayStore : public QObject {
     // Returns the checksums that were impacted by the ingestion
     // This is guaranteed to contain metadata.checksum
     QList<QByteArray> ingestReplay(
-        QFile& file, const LegionParser::ReplaySynopsis& metadata);
+        QFile& file, const LegionParser::ReplaySynopsis& synopsis);
+
+    // Ingest a known replay
+    // This may insert aot replay analysis such as the body offset if it hasn't
+    // been done yet
+    QList<QByteArray> ingestKnownReplay(
+        Queries& queries, QFile& file,
+        const LegionParser::ReplaySynopsis& synopsis);
+
+    QList<QByteArray> ingestUnknownReplay(
+        Queries& queries, QFile& file,
+        const LegionParser::ReplaySynopsis& synopsis);
+
     // The replay file at the path is gone or otherwise corrupt so we should
     // remove it
     std::optional<QByteArray> removeReplayAtPath(const QString& path);
 
     // Handles dealing with any existing checksums at a given path (which can
     // occur on multiple branches in ingestReplay)
+    // The replay at path was ingested previously but has been overwritten by
+    // something new
     static void handleExistingReplayAtPath(Queries& queries,
                                            const QString& path,
                                            QList<QByteArray>& checksums);

@@ -28,7 +28,7 @@ QSqlDatabase openMigratedDb(const QString& connectionName) {
     REQUIRE(db.open());
 
     Queries migrator{QSqlQuery(db)};
-    REQUIRE(migrator.migrate());
+    migrator.migrate();
 
     return db;
 }
@@ -89,7 +89,7 @@ TEST_CASE("Queries migrate creates the schema and is idempotent") {
 
     // Calling migrate() again once the schema is already current should be
     // a harmless no-op rather than trying to re-run already-applied DDL.
-    CHECK(queries.migrate());
+    CHECK_NOTHROW(queries.migrate());
 
     QSqlQuery check(db);
     REQUIRE(check.exec(
@@ -176,6 +176,104 @@ TEST_CASE("Queries insertReplay throws on a duplicate checksum") {
 
     db = QSqlDatabase();
     QSqlDatabase::removeDatabase("queries_insert_duplicate");
+}
+
+TEST_CASE("Queries doesReplayNeedAnalysis reflects insertReplayAnalysis") {
+    QSqlDatabase db = openMigratedDb("queries_needs_analysis");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-needs-analysis";
+    LegionParser::ReplaySynopsis metadata = makeMetadata(checksum);
+    metadata.bodyOffset = 512;
+    queries.insertReplay(metadata);
+
+    // insertReplay alone no longer writes replay_analysis - that's now a
+    // separate step - so a freshly-inserted replay still needs analysis.
+    CHECK(queries.doesReplayNeedAnalysis(checksum));
+
+    queries.insertReplayAnalysis(metadata);
+
+    CHECK_FALSE(queries.doesReplayNeedAnalysis(checksum));
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_needs_analysis");
+}
+
+TEST_CASE("Queries insertReplayAnalysis stores the body offset") {
+    QSqlDatabase db = openMigratedDb("queries_insert_analysis");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-insert-analysis";
+    LegionParser::ReplaySynopsis metadata = makeMetadata(checksum);
+    metadata.bodyOffset = 4096;
+    queries.insertReplay(metadata);
+    queries.insertReplayAnalysis(metadata);
+
+    QSqlQuery check(db);
+    REQUIRE(check.prepare(
+        "SELECT body_offset FROM replay_analysis WHERE replay_checksum = "
+        ":checksum"));
+    check.bindValue(":checksum", checksum);
+    REQUIRE(check.exec());
+    REQUIRE(check.next());
+    CHECK(check.value(0).toLongLong() == 4096);
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_insert_analysis");
+}
+
+TEST_CASE("Queries insertReplayAnalysis throws on a duplicate checksum") {
+    QSqlDatabase db = openMigratedDb("queries_insert_analysis_dup");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-analysis-dup";
+    LegionParser::ReplaySynopsis metadata = makeMetadata(checksum);
+    queries.insertReplay(metadata);
+    queries.insertReplayAnalysis(metadata);
+
+    CHECK_THROWS_AS(queries.insertReplayAnalysis(metadata), StorageException);
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_insert_analysis_dup");
+}
+
+TEST_CASE(
+    "Queries selectReplaysNeedingAnalysis lists only replays missing an "
+    "analysis row") {
+    QSqlDatabase db = openMigratedDb("queries_needs_analysis_list");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray analyzed = "checksum-analyzed";
+    const QByteArray pending = "checksum-pending";
+    queries.insertReplay(makeMetadata(analyzed));
+    queries.insertReplayAnalysis(makeMetadata(analyzed));
+    queries.insertReplay(makeMetadata(pending));
+
+    const QList<QByteArray> needsAnalysis =
+        queries.selectReplaysNeedingAnalysis();
+
+    CHECK(needsAnalysis.size() == 1);
+    CHECK(needsAnalysis.contains(pending));
+    CHECK_FALSE(needsAnalysis.contains(analyzed));
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_needs_analysis_list");
+}
+
+TEST_CASE(
+    "Queries selectReplaysNeedingAnalysis is empty once every replay has "
+    "analysis") {
+    QSqlDatabase db = openMigratedDb("queries_needs_analysis_none");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-fully-analyzed";
+    queries.insertReplay(makeMetadata(checksum));
+    queries.insertReplayAnalysis(makeMetadata(checksum));
+
+    CHECK(queries.selectReplaysNeedingAnalysis().isEmpty());
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_needs_analysis_none");
 }
 
 TEST_CASE("Queries insertReplayPlayers stores every player for a replay") {

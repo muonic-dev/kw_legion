@@ -198,8 +198,49 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
         }
 
         emit replaysLoaded(replays);
+
+        // We've done startup, so lets do any pending analysis that we need.
+        // In the future we may need to do re-emission of individual replays
+        // but this is fine
     } catch (StorageException& ex) {
         qCritical(logStore) << "Unable to access the replays " << ex.what();
+    }
+
+    // And finally, analyze any replays that need analysis
+    try {
+        performReplayReanalysis();
+    } catch (StorageException& ex) {
+        qCritical(logStore) << "Failed to re-analyze replays " << ex.what();
+    }
+}
+
+void ReplayStore::performReplayReanalysis() {
+    Queries queries{QSqlQuery(m_db)};
+    const auto needsAnalysis = queries.selectReplaysNeedingAnalysis();
+
+    for (const auto& checksum : needsAnalysis) {
+        const QString internalPath = computeIngestionPath(checksum);
+        qDebug(logStore) << "Reanalyzing replay at: " << internalPath;
+        SqlTransactionGuard guard(m_db);
+
+        QFile replayFile(internalPath);
+        if (!replayFile.open(QIODevice::ReadOnly)) {
+            qCritical(logStore) << "Failed to open " << internalPath << " "
+                                << replayFile.errorString();
+            continue;
+        }
+
+        // It should be complete if its internally parsed
+        try {
+            const auto synopsis =
+                LegionParser::SynopsisParser::parse(replayFile);
+            queries.insertReplayAnalysis(synopsis);
+            guard.commit();
+        } catch (LegionParser::ReplayParseException& ex) {
+            qCritical(logStore)
+                << "Failed to parse previously ingested replay: "
+                << internalPath;
+        }
     }
 }
 
@@ -454,42 +495,59 @@ QList<QByteArray> ReplayStore::ingestReplay(
     SqlTransactionGuard tx(m_db);
     Queries queries{QSqlQuery(m_db)};
 
-    QList<QByteArray> impactedChecksums{{metadata.checksum}};
-
+    QList<QByteArray> checksums;
     if (queries.isReplayKnown(metadata.checksum)) {
-        // If the replay has been seen before then we need to add a path to it
-        qDebug(logStore) << "Existing replay being ingested: "
-                         << file.fileName();
-
-        handleExistingReplayAtPath(queries, file.fileName(), impactedChecksums);
-
-        if (!queries.insertExternalFilename(metadata.checksum,
-                                            file.fileName())) {
-            qDebug(logStore)
-                << "Existing replay was already tracked" << file.fileName();
-        }
-
+        checksums = ingestKnownReplay(queries, file, metadata);
     } else {
-        qInfo(logStore) << "New replay being ingested: " << file.fileName();
-        // This is the first time the replay has been seen so
-        // we need to perform to insert everything
-        queries.insertReplay(metadata);
-        queries.insertReplayPlayers(metadata.checksum, metadata.players);
-
-        handleExistingReplayAtPath(queries, file.fileName(), impactedChecksums);
-
-        queries.insertExternalFilename(metadata.checksum, file.fileName());
-
-        // Before committing we should copy to the canonical path
-        if (!file.copy(computeIngestionPath(metadata.checksum))) {
-            qCritical(logStore)
-                << "Failed to copy the replay file to the store";
-            throw StorageException("failed to copy");
-        }
+        checksums = ingestUnknownReplay(queries, file, metadata);
     }
 
     tx.commit();
 
+    return checksums;
+}
+
+QList<QByteArray> ReplayStore::ingestKnownReplay(
+    Queries& queries, QFile& file,
+    const LegionParser::ReplaySynopsis& metadata) {
+    QList<QByteArray> impactedChecksums{{metadata.checksum}};
+
+    if (queries.doesReplayNeedAnalysis(metadata.checksum)) {
+        queries.insertReplayAnalysis(metadata);
+    }
+    // If the replay has been seen before then we need to add a path to it
+    qDebug(logStore) << "Existing replay being ingested: " << file.fileName();
+
+    handleExistingReplayAtPath(queries, file.fileName(), impactedChecksums);
+
+    if (!queries.insertExternalFilename(metadata.checksum, file.fileName())) {
+        qDebug(logStore) << "Existing replay was already tracked"
+                         << file.fileName();
+    }
+
+    return impactedChecksums;
+}
+
+QList<QByteArray> ReplayStore::ingestUnknownReplay(
+    Queries& queries, QFile& file,
+    const LegionParser::ReplaySynopsis& metadata) {
+    QList<QByteArray> impactedChecksums{{metadata.checksum}};
+    qInfo(logStore) << "New replay being ingested: " << file.fileName();
+    // This is the first time the replay has been seen so
+    // we need to perform to insert everything
+    queries.insertReplay(metadata);
+    queries.insertReplayAnalysis(metadata);
+    queries.insertReplayPlayers(metadata.checksum, metadata.players);
+
+    handleExistingReplayAtPath(queries, file.fileName(), impactedChecksums);
+
+    queries.insertExternalFilename(metadata.checksum, file.fileName());
+
+    // Before committing we should copy to the canonical path
+    if (!file.copy(computeIngestionPath(metadata.checksum))) {
+        qCritical(logStore) << "Failed to copy the replay file to the store";
+        throw StorageException("failed to copy");
+    }
     return impactedChecksums;
 }
 
@@ -571,10 +629,7 @@ void ReplayStore::ensureDb() {
         // Outside a transaction so that we do as much as we can
         // if we ever ship a broken migration this means there is less to do
         Queries queries{QSqlQuery(m_db)};
-        if (!queries.migrate()) {
-            qCritical(logStore)
-                << "Failed to migrate database: " << m_db.lastError().text();
-        }
+        queries.migrate();
     } catch (const StorageException& ex) {
         qCritical(logStore) << "Failed to migrate database: " << ex.what();
     }

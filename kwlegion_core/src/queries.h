@@ -15,6 +15,7 @@
 #include <QSqlQuery>
 #include <QString>
 #include <optional>
+#include <utility>
 
 namespace KWLegionCore {
 
@@ -34,13 +35,19 @@ class Queries final {
     Queries& operator=(const Queries&) = delete;
     Queries& operator=(Queries&&) = delete;
 
-    // Returns false on failure. Caller should inspect the db for whatever the
-    // error was
-    bool migrate();
+    // Runs any pending migrations. Throws StorageException on failure.
+    void migrate();
 
     bool isReplayKnown(const QByteArray& checksum);
 
+    bool doesReplayNeedAnalysis(const QByteArray& checksum);
+
+    QList<QByteArray> selectReplaysNeedingAnalysis();
+
     void insertReplay(const LegionParser::ReplaySynopsis& metadata);
+
+    // Handle when the replay is already known
+    void insertReplayAnalysis(const LegionParser::ReplaySynopsis& metadata);
 
     void updateOverrideTitle(const QByteArray& checksum,
                              const QString& overrideTitle);

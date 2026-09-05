@@ -116,16 +116,19 @@ constexpr std::array MIGRATIONS{
     "ALTER TABLE replays DROP COLUMN override_match_title;",
 
     // Holds facts derived from walking the replay's action stream and/or
-    // synposis. Currently, body_offset is recorded from the header and marks a
-    // place that can be seeked to to start the body stream
+    // synposis. Currently, body_offset is recorded from the header and
+    // marks a place that can be seeked to to start the body stream
     "CREATE TABLE replay_analysis"
     "    ( replay_checksum BLOB PRIMARY KEY"
     "    , body_offset INT NOT NULL"
-    "    ) STRICT, WITHOUT ROWID;"
+    "    ) STRICT, WITHOUT ROWID;",
 
+    // replay_external_paths checksum is queries so optimize here
+    "CREATE INDEX idx_replay_external_paths_checksum"
+    "    ON replay_external_paths(replay_checksum);",
 };
 
-bool Queries::migrate() {
+void Queries::migrate() {
     m_query.exec("PRAGMA user_version");
     m_query.next();
     const size_t currentVersion = m_query.value(0).toULongLong();
@@ -141,15 +144,17 @@ bool Queries::migrate() {
     for (size_t nextExec = currentVersion; nextExec < MIGRATIONS.size();
          nextExec++) {
         if (!m_query.exec(MIGRATIONS.at(nextExec))) {
-            return false;
+            throwLast();
         }
         if (!m_query.exec(QStringLiteral("PRAGMA user_version = %1;")
                               .arg(nextExec + 1))) {
-            return false;
+            // The migration itself already ran (SQLite DDL isn't wrapped in
+            // our own transaction here), so this is a real inconsistent
+            // state, not just a no-op to bail out of - throw either way,
+            // since there is nothing else useful to fall back to.
+            throwLast();
         }
     }
-
-    return true;
 }
 
 bool Queries::isReplayKnown(const QByteArray& checksum) {
@@ -160,7 +165,32 @@ bool Queries::isReplayKnown(const QByteArray& checksum) {
     return m_query.value(0).toInt() != 0;
 }
 
-void Queries::insertReplay(const LegionParser::ReplaySynopsis& metadata) {
+bool Queries::doesReplayNeedAnalysis(const QByteArray& checksum) {
+    prepare(
+        "SELECT count(*) FROM replay_analysis "
+        "WHERE replay_checksum = :checksum");
+    m_query.bindValue(":checksum", checksum);
+    exec();
+    m_query.next();  // it's a count, there must be 1 row
+    return m_query.value(0).toInt() == 0;
+}
+
+QList<QByteArray> Queries::selectReplaysNeedingAnalysis() {
+    prepare(
+        "SELECT r.checksum "
+        "FROM replays r LEFT OUTER JOIN replay_analysis ra "
+        "   ON r.checksum = ra.replay_checksum "
+        "WHERE ra.body_offset IS NULL");
+    exec();
+    QList<QByteArray> result;
+    while (m_query.next()) {
+        result.append(m_query.value(0).toByteArray());
+    }
+    throwLastIfFailed();
+    return result;
+}
+
+void Queries::insertReplay(const LegionParser::ReplaySynopsis& synopsis) {
     prepare(
         "INSERT INTO replays"
         "    ( checksum"
@@ -192,20 +222,30 @@ void Queries::insertReplay(const LegionParser::ReplaySynopsis& metadata) {
         "    , :version_minor"
         "    , :build_major"
         "    , :build_minor);");
-    m_query.bindValue(":checksum", metadata.checksum);
-    m_query.bindValue(":match_title", metadata.matchTitle);
-    m_query.bindValue(":match_description", metadata.matchDescription);
-    m_query.bindValue(":map_name", metadata.mapName);
-    m_query.bindValue(":map_id", metadata.mapId);
-    m_query.bindValue(":game_type", LegionParser::toUInt8(metadata.gameType));
-    m_query.bindValue(":timestamp", metadata.timestamp.toSecsSinceEpoch());
-    m_query.bindValue(":has_commentary", metadata.hasCommentary);
-    m_query.bindValue(":filename", metadata.filename);
-    m_query.bindValue(":map_reference", metadata.mapReference);
-    m_query.bindValue(":version_major", metadata.versionMajor);
-    m_query.bindValue(":version_minor", metadata.versionMinor);
-    m_query.bindValue(":build_major", metadata.buildMajor);
-    m_query.bindValue(":build_minor", metadata.buildMinor);
+    m_query.bindValue(":checksum", synopsis.checksum);
+    m_query.bindValue(":match_title", synopsis.matchTitle);
+    m_query.bindValue(":match_description", synopsis.matchDescription);
+    m_query.bindValue(":map_name", synopsis.mapName);
+    m_query.bindValue(":map_id", synopsis.mapId);
+    m_query.bindValue(":game_type", LegionParser::toUInt8(synopsis.gameType));
+    m_query.bindValue(":timestamp", synopsis.timestamp.toSecsSinceEpoch());
+    m_query.bindValue(":has_commentary", synopsis.hasCommentary);
+    m_query.bindValue(":filename", synopsis.filename);
+    m_query.bindValue(":map_reference", synopsis.mapReference);
+    m_query.bindValue(":version_major", synopsis.versionMajor);
+    m_query.bindValue(":version_minor", synopsis.versionMinor);
+    m_query.bindValue(":build_major", synopsis.buildMajor);
+    m_query.bindValue(":build_minor", synopsis.buildMinor);
+    exec();
+}
+
+void Queries::insertReplayAnalysis(
+    const LegionParser::ReplaySynopsis& synopsis) {
+    prepare(
+        "INSERT INTO replay_analysis (replay_checksum, body_offset) "
+        "VALUES (:checksum, :offset)");
+    m_query.bindValue(":checksum", synopsis.checksum);
+    m_query.bindValue(":offset", synopsis.bodyOffset);
     exec();
 }
 
@@ -216,7 +256,8 @@ void Queries::updateOverrideTitle(const QByteArray& checksum,
         // empty string, so a missing row is the only "no override" case the
         // read side has to handle.
         prepare(
-            "DELETE FROM replay_overrides WHERE replay_checksum = :checksum");
+            "DELETE FROM replay_overrides WHERE replay_checksum = "
+            ":checksum");
         m_query.bindValue(":checksum", checksum);
         exec();
         return;
@@ -285,11 +326,11 @@ std::optional<QByteArray> Queries::checksumForExternalPath(
 bool Queries::insertExternalFilename(const QByteArray& checksum,
                                      const QString& path) {
     // external_path is the sole key, so a conflict means either this exact
-    // (checksum, path) pair is already tracked (the WHERE guard makes that a
-    // no-op) or the path is re-appearing under a new checksum (e.g. the
+    // (checksum, path) pair is already tracked (the WHERE guard makes that
+    // a no-op) or the path is re-appearing under a new checksum (e.g. the
     // game's rolling "Last Replay.KWReplay" being overwritten with a new
-    // match) - in which case the row is reassigned to the new checksum right
-    // here, atomically.
+    // match) - in which case the row is reassigned to the new checksum
+    // right here, atomically.
     prepare(
         "INSERT INTO replay_external_paths"
         "    ( replay_checksum"
@@ -386,7 +427,8 @@ std::optional<Replay> Queries::selectReplay(const QByteArray& checksum) {
     if (m_query.next()) {
         Replay result = readReplay();
         // We aren't draining so call finish explicitly - otherwise the
-        // statement stays active and blocks the caller's transaction commit.
+        // statement stays active and blocks the caller's transaction
+        // commit.
         m_query.finish();
         return result;
     }
@@ -430,7 +472,8 @@ QList<Player> Queries::selectReplayPlayers(const QByteArray& checksum) {
 
 QList<QString> Queries::selectExternalPaths(const QByteArray& checksum) {
     prepare(
-        "SELECT external_path FROM replay_external_paths WHERE replay_checksum "
+        "SELECT external_path FROM replay_external_paths WHERE "
+        "replay_checksum "
         "= :checksum");
     m_query.bindValue(":checksum", checksum);
 
