@@ -292,30 +292,27 @@ void ReplayStore::synopsizeReplayFile(const QString& path) {
 }
 
 void ReplayStore::handleTornFailure(const QString& path,
-                                    const Watermark& observed) noexcept {
+                                    const Watermark& observed) {
     // If the replay cannot be parsed then whatever then
     // the link to an existing replay needs to be broken
     qDebug(logStore) << "path " << path << " is incomplete";
     // No throw since we get external calls
     removeReplayFileLink(path);
-
     // The parser is the authority on whether the file is complete, and it
-    // just said no - so there is nothing to learn until the bytes on disk
+    // just said no. So there is nothing to learn until the bytes on disk
     // actually move.
     m_deferred->waitForChange(path, observed);
     emit inboxItemObserved(makeInboxItem(path, InboxType::TORN));
 }
 
 void ReplayStore::handleParseFailure(
-    const LegionParser::ReplayParseException& ex,
-    const QString& path) noexcept {
+    const LegionParser::ReplayParseException& ex, const QString& path) {
     // The replay is terminally invalid, so just remove it. Unlike a torn
     // replay this doesn't go back into the deferred set - nothing is going
     // to un-corrupt the file, so retrying only burns reads.
     // TODO: ReplayParseException includes potential IO failures which may
     // be transient in addition to CorruptDataException
     qInfo(logStore) << "unable to parse " << ex.what();
-    // No throw since we get external calls
     removeReplayFileLink(path);
     emit inboxItemObserved(makeInboxItem(path, InboxType::CORRUPT));
 }
@@ -352,6 +349,10 @@ void ReplayStore::handleStorageFailure(const QString& path,
     //
     // So retry against something no existing file can match, which asks the
     // only question that matters: can we open it yet.
+    // QHash::operator[] default-constructs (0) a missing key rather than
+    // being UB/throwing like a sequential container's operator[] - the
+    // bounds-safety concern the linter is flagging doesn't apply here.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     const int attempts = ++m_storageRetries[path];
     if (attempts <= MAX_FAST_STORAGE_RETRIES) {
         m_deferred->waitForChange(path, unmatchableWatermark());

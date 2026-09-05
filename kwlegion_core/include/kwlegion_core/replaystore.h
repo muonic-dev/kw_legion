@@ -153,11 +153,11 @@ class ReplayStore : public QObject {
     // observed is the state of the file sampled before the parse attempt
     // that came back torn - the path goes back into the deferred set to be
     // retried once the bytes on disk move past it.
-    void handleTornFailure(const QString& path,
-                           const Watermark& observed) noexcept;
+    // This also
+    void handleTornFailure(const QString& path, const Watermark& observed);
     // Assumes that ReplayParseException is disjoint from TornDataException
     void handleParseFailure(const LegionParser::ReplayParseException& ex,
-                            const QString& path) noexcept;
+                            const QString& path);
 
     // We could not read the file, or could not record what we read. Unlike
     // the two above, this says nothing about the file's contents, so the path
