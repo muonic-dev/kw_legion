@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Muonic
 
 #include <legionparser/exception.h>
-#include <legionparser/parser.h>
+#include <legionparser/synopsisparser.h>
 
 #include <QByteArrayView>
 #include <QCryptographicHash>
@@ -15,7 +15,6 @@
 #include <QtEndian>
 #include <QtMinMax>
 #include <QtTypes>
-#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -27,13 +26,13 @@
 namespace LegionParser {
 
 constinit const char* const CNC_MAGIC = "C&C3 REPLAY HEADER";
-constexpr std::size_t MAGIC_SIZE = 18;
-constexpr std::size_t U1_SIZE = 33;
-constexpr std::size_t U2_SIZE = 19;
-constexpr std::size_t DATETIME_STRING_LENGTH = 8;
+constexpr qsizetype MAGIC_SIZE = 18;
+constexpr qsizetype U1_SIZE = 33;
+constexpr qsizetype U2_SIZE = 19;
+constexpr qsizetype DATETIME_STRING_LENGTH = 8;
 constexpr char MAX_PLAYERS = 8;
 constexpr const char* const REPL_MAGIC = "CNC3RPL";
-constexpr std::size_t REPL_MAGIC_SIZE = 8;
+constexpr qsizetype REPL_MAGIC_SIZE = 8;
 
 //  The S= string has the faction field at 6 and the computer has it at 3
 constexpr qsizetype HUMAN_FACTION_SLOT_FIELD = 5;
@@ -63,8 +62,8 @@ constexpr std::uint32_t UNALLIED_TEAM_BASE = 100;
 // The largest valid replay is a few MB at most; this bounds how much of a
 // corrupt/malicious file we'll read while fingerprinting the payload,
 // rather than trusting the device to eventually hit a real EOF.
-constexpr qint64 BODY_READ_CHUNK_SIZE = static_cast<qint64>(16 * 1024);
-constexpr size_t MAX_BODY_SIZE = static_cast<size_t>(32 * 1024 * 1024);
+constexpr qsizetype BODY_READ_CHUNK_SIZE = static_cast<qsizetype>(16 * 1024);
+constexpr qsizetype MAX_BODY_SIZE = static_cast<qsizetype>(32 * 1024 * 1024);
 
 // Footer format, per
 // https://github.com/louisdx/cnc-replayreaders/blob/master/eareplay.html :
@@ -159,9 +158,9 @@ void SynopsisParser::parseHeader() {
     parseOffsetAndMagic();
     parseHeaderTail();
 
-    const size_t actualOffset = m_reader->offset() - m_reader->mark();
+    const qsizetype actualOffset = m_reader->offset() - m_reader->mark();
     // Validate that we read the correct length
-    if (m_offset != actualOffset) {
+    if (std::cmp_not_equal(m_offset, actualOffset)) {
         throw CorruptDataException(
             QString("header length did not match recorded offset: was %1 "
                     "expected %2")
@@ -482,7 +481,7 @@ void SynopsisParser::parseBody() {
     // rather than the whole remaining file at once, so a corrupt or
     // maliciously oversized file can't force unbounded memory use.
     QCryptographicHash hash(QCryptographicHash::Sha256);
-    size_t totalSize = 0;
+    qsizetype totalSize = 0;
     // The footer lives in the last handful of bytes of the file, but isn't
     // guaranteed to fall entirely within the very last chunk read - e.g. if
     // the file size puts the footer's start right at a chunk boundary.
@@ -490,7 +489,7 @@ void SynopsisParser::parseBody() {
     // the footer's bytes are guaranteed complete somewhere within it.
     const QByteArray tail = m_reader->readRemainingChunked(
         [&](QByteArrayView chunk) {
-            totalSize += static_cast<size_t>(chunk.size());
+            totalSize += chunk.size();
             if (totalSize > MAX_BODY_SIZE) {
                 throw LimitExceededException(QLatin1String("replay payload"),
                                              m_reader->offset(), MAX_BODY_SIZE,

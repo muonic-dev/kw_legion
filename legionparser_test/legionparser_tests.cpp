@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Muonic
 
 #include <legionparser/exception.h>
-#include <legionparser/parser.h>
+#include <legionparser/synopsisparser.h>
 
 #include <QBuffer>
 #include <QDir>
@@ -71,8 +71,8 @@ TEST_CASE("looksComplete accepts every replay the parser accepts",
     // window smaller than the one verifyFooter gets would silently strand
     // any replay whose footer landed in the gap.
     const QDir dir(QString::fromUtf8(REPLAY_TEST_DATA_DIR));
-    const QStringList fixtures =
-        dir.entryList(QStringList{QString::fromUtf8("*.KWReplay")}, QDir::Files);
+    const QStringList fixtures = dir.entryList(
+        QStringList{QString::fromUtf8("*.KWReplay")}, QDir::Files);
     REQUIRE_FALSE(fixtures.isEmpty());
 
     for (const QString& filename : fixtures) {
@@ -213,10 +213,10 @@ TEST_CASE("faction: Traveler mirror match", "[legionparser][faction]") {
 }
 
 // Skirmish replays carry no binary team_number field, so team membership is
-// inferred from the S= slot text instead (see SynopsisParser::parsePlayerSlots).
-// These replays were purpose-built to pin that inference down: each sets up
-// a known, deliberately configured team split so the inferred grouping can
-// be checked against ground truth.
+// inferred from the S= slot text instead (see
+// SynopsisParser::parsePlayerSlots). These replays were purpose-built to pin
+// that inference down: each sets up a known, deliberately configured team split
+// so the inferred grouping can be checked against ground truth.
 
 TEST_CASE("team inference: implicit skirmish alliance",
           "[legionparser][team]") {
@@ -309,8 +309,8 @@ TEST_CASE(
     // 8-player all random ffa.KWReplay: all 8 real slots are filled, so
     // there's no leftover ;S= entry for the trailing synthetic commentator
     // player - this is the replay that originally surfaced
-    // SynopsisParser::parsePlayerSlots() indexing into an empty slot view once the
-    // header ran out of slot text before the player list did.
+    // SynopsisParser::parsePlayerSlots() indexing into an empty slot view once
+    // the header ran out of slot text before the player list did.
     const ReplaySynopsis metadata =
         parseReplay(QString::fromUtf8("8-player all random ffa.KWReplay"));
 

@@ -1,7 +1,7 @@
 find_package(Qt6 REQUIRED COMPONENTS Core)
 
 add_library(legionparser STATIC
-    src/parser.cpp
+    src/synopsisparser.cpp
     src/reader.cpp
     src/exception.cpp
 )

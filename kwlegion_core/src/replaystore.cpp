@@ -3,7 +3,7 @@
 
 #include <kwlegion_core/inboxitem.h>
 #include <kwlegion_core/replaystore.h>
-#include <legionparser/parser.h>
+#include <legionparser/synopsisparser.h>
 
 #include <QDateTime>
 #include <QDebug>

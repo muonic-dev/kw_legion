@@ -4,6 +4,7 @@
 #pragma once
 
 #include <QString>
+#include <QtTypes>
 #include <stdexcept>
 
 namespace LegionParser {
