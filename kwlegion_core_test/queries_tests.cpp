@@ -222,6 +222,29 @@ TEST_CASE("Queries insertReplayAnalysis stores the body offset") {
     QSqlDatabase::removeDatabase("queries_insert_analysis");
 }
 
+TEST_CASE("Queries insertReplayAnalysis stores the engine ticks") {
+    QSqlDatabase db = openMigratedDb("queries_insert_analysis_ticks");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-insert-analysis-ticks";
+    LegionParser::ReplaySynopsis metadata = makeMetadata(checksum);
+    metadata.engineTicks = 12345;
+    queries.insertReplay(metadata);
+    queries.insertReplayAnalysis(metadata);
+
+    QSqlQuery check(db);
+    REQUIRE(check.prepare(
+        "SELECT engine_ticks FROM replay_analysis WHERE replay_checksum = "
+        ":checksum"));
+    check.bindValue(":checksum", checksum);
+    REQUIRE(check.exec());
+    REQUIRE(check.next());
+    CHECK(check.value(0).toLongLong() == 12345);
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_insert_analysis_ticks");
+}
+
 TEST_CASE("Queries insertReplayAnalysis throws on a duplicate checksum") {
     QSqlDatabase db = openMigratedDb("queries_insert_analysis_dup");
     Queries queries{QSqlQuery(db)};

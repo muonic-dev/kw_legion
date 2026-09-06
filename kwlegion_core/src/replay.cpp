@@ -10,7 +10,7 @@
 
 namespace KWLegionCore {
 Replay Replay::fromSynopsis(const LegionParser::ReplaySynopsis& replay,
-                          bool hasExternalPath) {
+                            bool hasExternalPath) {
     QList<Player> players;
     players.reserve(replay.players.size());
     for (const auto& player : replay.players) {
@@ -26,6 +26,7 @@ Replay Replay::fromSynopsis(const LegionParser::ReplaySynopsis& replay,
                   .matchDescription = replay.matchDescription,
                   .mapName = replay.mapName,
                   .mapReference = replay.mapReference,
-                  .hasExternalPath = hasExternalPath};
+                  .hasExternalPath = hasExternalPath,
+                  .engineTicks = replay.engineTicks};
 }
 }  // namespace KWLegionCore

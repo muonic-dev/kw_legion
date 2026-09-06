@@ -9,8 +9,10 @@
 
 #include <QByteArray>
 #include <QDateTime>
+#include <QList>
 #include <QMetaType>
 #include <QString>
+#include <QtTypes>
 
 namespace LegionParser {
 class ReplaySynopsis;
@@ -21,8 +23,8 @@ using GameType = LegionParser::GameType;
 using Faction = LegionParser::Faction;
 
 struct Player {
-    std::uint32_t id;
-    std::uint32_t teamNumber;
+    quint32 id;
+    quint32 teamNumber;
     Faction faction;
     QString name;
     bool isComputer;
@@ -39,12 +41,13 @@ struct Replay {
     bool hasExternalPath = false;
 
     QString overrideMatchTitle;
+    quint32 engineTicks;
 
     QList<Player> players;
 
     // Static so it remains an aggregate type
     static Replay fromSynopsis(const LegionParser::ReplaySynopsis&,
-                             bool hasExternalPath);
+                               bool hasExternalPath);
 };
 }  // namespace KWLegionCore
 

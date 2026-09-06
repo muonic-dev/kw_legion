@@ -11,6 +11,7 @@
 #include <QIODevice>
 #include <QString>
 #include <QtTypes>
+#include <memory>
 
 namespace LegionParser {
 

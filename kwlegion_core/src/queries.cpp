@@ -5,6 +5,7 @@
 
 #include <QHashFunctions>
 #include <QList>
+#include <QLoggingCategory>
 #include <QSqlError>
 #include <QTimeZone>
 #include <QVariantList>
@@ -126,6 +127,10 @@ constexpr std::array MIGRATIONS{
     // replay_external_paths checksum is queries so optimize here
     "CREATE INDEX idx_replay_external_paths_checksum"
     "    ON replay_external_paths(replay_checksum);",
+
+    "DELETE FROM replay_analysis",
+
+    "ALTER TABLE replay_analysis ADD COLUMN engine_ticks INT NOT NULL",
 };
 
 void Queries::migrate() {
@@ -242,10 +247,12 @@ void Queries::insertReplay(const LegionParser::ReplaySynopsis& synopsis) {
 void Queries::insertReplayAnalysis(
     const LegionParser::ReplaySynopsis& synopsis) {
     prepare(
-        "INSERT INTO replay_analysis (replay_checksum, body_offset) "
-        "VALUES (:checksum, :offset)");
+        "INSERT INTO replay_analysis (replay_checksum, body_offset, "
+        "engine_ticks) "
+        "VALUES (:checksum, :offset, :ticks)");
     m_query.bindValue(":checksum", synopsis.checksum);
     m_query.bindValue(":offset", synopsis.bodyOffset);
+    m_query.bindValue(":ticks", synopsis.engineTicks);
     exec();
 }
 
@@ -377,21 +384,25 @@ void Queries::forgetMissingReplays(const QList<QString>& knownPaths) {
     exec();
 }
 
+constexpr const char* const BASE_SELECT_QUERY =
+    "SELECT r.checksum"
+    "    , r.timestamp"
+    "    , r.match_title"
+    "    , r.match_description"
+    "    , r.map_name"
+    "    , r.map_reference"
+    "    , EXISTS ("
+    "        SELECT 1 FROM replay_external_paths"
+    "        WHERE replay_checksum = r.checksum"
+    "      ) AS has_external_path"
+    "    , COALESCE(o.override_match_title, '') AS override_match_title"
+    "    , COALESCE(a.engine_ticks, 0) as engine_ticks"
+    " FROM replays r"
+    " LEFT JOIN replay_overrides o ON o.replay_checksum = r.checksum"
+    " LEFT JOIN replay_analysis a ON a.replay_checksum = r.checksum";
+
 QList<Replay> Queries::selectReplays() {
-    prepare(
-        "SELECT r.checksum"
-        "    , r.timestamp"
-        "    , r.match_title"
-        "    , r.match_description"
-        "    , r.map_name"
-        "    , r.map_reference"
-        "    , EXISTS ("
-        "        SELECT 1 FROM replay_external_paths"
-        "        WHERE replay_checksum = r.checksum"
-        "      ) AS has_external_path"
-        "    , COALESCE(o.override_match_title, '') AS override_match_title"
-        " FROM replays r"
-        " LEFT JOIN replay_overrides o ON o.replay_checksum = r.checksum");
+    prepare(BASE_SELECT_QUERY);
     exec();
 
     QList<Replay> replays;
@@ -405,21 +416,7 @@ QList<Replay> Queries::selectReplays() {
 }
 
 std::optional<Replay> Queries::selectReplay(const QByteArray& checksum) {
-    prepare(
-        "SELECT r.checksum"
-        "    , r.timestamp"
-        "    , r.match_title"
-        "    , r.match_description"
-        "    , r.map_name"
-        "    , r.map_reference"
-        "    , EXISTS ("
-        "        SELECT 1 FROM replay_external_paths"
-        "        WHERE replay_checksum = r.checksum"
-        "      ) AS has_external_path"
-        "    , COALESCE(o.override_match_title, '') AS override_match_title"
-        " FROM replays r"
-        " LEFT JOIN replay_overrides o ON o.replay_checksum = r.checksum"
-        " WHERE r.checksum = :checksum");
+    prepare(QString(BASE_SELECT_QUERY) + " WHERE r.checksum = :checksum");
     m_query.bindValue(":checksum", checksum);
 
     exec();
@@ -498,6 +495,7 @@ Replay Queries::readReplay() const {
         .mapReference = m_query.value(5).toString(),
         .hasExternalPath = m_query.value(6).toBool(),
         .overrideMatchTitle = m_query.value(7).toString(),
+        .engineTicks = m_query.value(8).toUInt(),
     };
 }
 

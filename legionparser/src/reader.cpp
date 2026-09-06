@@ -3,6 +3,7 @@
 
 #include "reader.h"
 
+#include <legionparser/analyzer.h>
 #include <legionparser/exception.h>
 
 #include <QLatin1StringView>

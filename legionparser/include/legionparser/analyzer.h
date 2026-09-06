@@ -10,7 +10,6 @@
 #include <cstdint>
 
 namespace LegionParser {
-
 /**
  * @brief The frame type of a replay chunk
  *
@@ -22,8 +21,6 @@ namespace LegionParser {
  * </ul>
  */
 enum class ChunkType : std::uint8_t { Command = 1, Camera, Type3, Type4 };
-
-ChunkType chunkTypeFromByte(std::byte byte);
 
 /**
  * Interface for receiving chunks

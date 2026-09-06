@@ -146,6 +146,6 @@ struct ReplaySynopsis {
     /**
      * The number of ticks in the replay
      */
-    qsizetype engineTicks;
+    quint32 engineTicks;
 };
 }  // namespace LegionParser

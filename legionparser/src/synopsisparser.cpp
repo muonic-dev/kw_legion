@@ -20,7 +20,6 @@
 #include <optional>
 #include <utility>
 
-#include "legionparser/analyzer.h"
 #include "legionparser/replay.h"
 #include "reader.h"
 #include "teedevice.h"

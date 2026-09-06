@@ -5,7 +5,10 @@
 
 #pragma once
 
+#include <QByteArrayView>
 #include <QIODevice>
+#include <QtTypes>
+#include <concepts>
 #include <functional>
 #include <optional>
 

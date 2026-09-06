@@ -12,8 +12,9 @@
 #include <QString>
 #include <Qt>
 #include <QtTypes>
-#include <array>
 #include <concepts>
+#include <cstddef>
+#include <optional>
 #include <utility>
 
 namespace LegionParser {
