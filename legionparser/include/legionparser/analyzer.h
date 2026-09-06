@@ -9,7 +9,6 @@
 #include <QtTypes>
 #include <cstdint>
 
-
 namespace LegionParser {
 
 /**
@@ -22,7 +21,9 @@ namespace LegionParser {
  * <li>Type 4 - Unknown
  * </ul>
  */
-enum class ChunkType : std::uint8_t { Comman = 1, Camera, Type3, Type4 };
+enum class ChunkType : std::uint8_t { Command = 1, Camera, Type3, Type4 };
+
+ChunkType chunkTypeFromByte(std::byte byte);
 
 /**
  * Interface for receiving chunks

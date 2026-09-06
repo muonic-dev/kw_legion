@@ -142,5 +142,10 @@ struct ReplaySynopsis {
      * on demand analysis without walking the entire replay.
      */
     qsizetype bodyOffset;
+
+    /**
+     * The number of ticks in the replay
+     */
+    qsizetype engineTicks;
 };
 }  // namespace LegionParser

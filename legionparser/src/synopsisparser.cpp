@@ -20,6 +20,7 @@
 #include <optional>
 #include <utility>
 
+#include "legionparser/analyzer.h"
 #include "legionparser/replay.h"
 #include "reader.h"
 #include "teedevice.h"
@@ -478,38 +479,43 @@ void SynopsisParser::parseHeaderTail() {
 }
 
 void SynopsisParser::parseBody() {
-    // Defend against 'malicious' replay
-    qsizetype totalSize = 0;
     // At this point, we want to turn on hashing so that we can capture the
     // checksum
     QCryptographicHash hash(QCryptographicHash::Sha256);
     m_tee->setSink([&hash](QByteArrayView bs) { hash.addData(bs); });
-    // The footer lives in the last handful of bytes of the file, but isn't
-    // guaranteed to fall entirely within the very last chunk read - e.g. if
-    // the file size puts the footer's start right at a chunk boundary.
-    // readRemainingChunked hands back the last two chunks concatenated so
-    // the footer's bytes are guaranteed complete somewhere within it.
-    const QByteArray tail = m_reader->readRemainingChunked(
-        [&](QByteArrayView chunk) {
-            totalSize += chunk.size();
-            if (totalSize > MAX_BODY_SIZE) {
-                throw LimitExceededException(QLatin1String("replay payload"),
-                                             m_reader->offset(), MAX_BODY_SIZE,
-                                             totalSize);
-            }
-        },
-        BODY_READ_CHUNK_SIZE);
+    // These are seperate so we can skip the end marker timecode
 
-    verifyFooter(tail);
+    qint32 maxTimeCode = 0;
+    std::optional<BodyChunk> chunk = m_reader->readBodyChunk();
+    while (chunk.has_value()) {
+        if (m_reader->offset() > MAX_BODY_SIZE) {
+            throw LimitExceededException(QLatin1String("replay payload"),
+                                         m_reader->offset(), MAX_BODY_SIZE,
+                                         m_reader->offset());
+        }
+        // Assumes for sanity sake that the replay timecodes are monotonically
+        // increasing
+        maxTimeCode = chunk->timeCode;
+        chunk = m_reader->readBodyChunk();
+    }
+
+    // The chunk stream has been walked precisely, so whatever the device has
+    // left to give us should be exactly the footer - one bounded read gets
+    // it in full without paging through it a chunk at a time like the body
+    // itself.
+    const QByteArray footerPayload = m_reader->readRemaining(MAX_BODY_SIZE);
+    verifyFooter(footerPayload, maxTimeCode);
     // We shouldn't ever read any more after this point, but since hash is going
     // out of scope do it for safety
     m_tee->clearSink();
 
     m_synopsis.checksum = hash.result();
+    m_synopsis.engineTicks = maxTimeCode;
 }
 
-void SynopsisParser::verifyFooter(QByteArrayView lastChunk) const {
-    const std::optional<QByteArrayView> maybeFooter = footerFromTail(lastChunk);
+void SynopsisParser::verifyFooter(QByteArrayView payload,
+                                  qint32 maxTimeCode) const {
+    const std::optional<QByteArrayView> maybeFooter = footerFromTail(payload);
     if (!maybeFooter) {
         throw TornDataException(m_reader->offset());
     }
@@ -518,6 +524,27 @@ void SynopsisParser::verifyFooter(QByteArrayView lastChunk) const {
     // Once we have read the FOOTER_MAGIC the likelihood that further validation
     // errors are the result of a torn read are vanishingly unlikely so we
     // switch back to throwing CorruptDataException from here on
+
+    // The chunk stream was walked precisely via readBodyChunk, so payload
+    // should be nothing but the footer - any leftover bytes before or after
+    // it mean the walk didn't actually land where the footer starts.
+    if (footer.size() != payload.size()) {
+        throw CorruptDataException(
+            QLatin1String("replay footer does not fill the remaining payload"),
+            m_reader->offset());
+    }
+
+    // final_time_code immediately follows the magic string, and should agree
+    // with the highest time code seen while walking the body - if it
+    // doesn't, the chunk walk and the footer disagree about where the
+    // replay actually ended.
+    const quint32 finalTimeCode = readLE32(footer.sliced(FOOTER_MAGIC_SIZE));
+    if (std::cmp_not_equal(finalTimeCode, maxTimeCode)) {
+        throw CorruptDataException(
+            QLatin1String("replay footer final time code does not match the "
+                          "last observed chunk"),
+            m_reader->offset());
+    }
 
     // data sits between final_time_code and footer_length (the trailing 4
     // bytes, whose value is footer.size() itself); it's either {0x02}, or

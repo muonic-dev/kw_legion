@@ -5,4 +5,4 @@
 
 #include <legionparser/analyzer.h>
 
-namespace LegionParser {}
+namespace LegionParser {}  // namespace LegionParser

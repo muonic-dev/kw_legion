@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <legionparser/analyzer.h>
 #include <legionparser/exception.h>
 
 #include <QByteArray>
@@ -21,6 +22,13 @@ template <typename T>
 concept ByteSized = std::is_trivially_copyable_v<T> && sizeof(T) == 1;
 
 constexpr qsizetype MAX_STRING_LENGTH = static_cast<qsizetype>(4096 * 16);
+constexpr qsizetype MAX_CHUNK_SIZE = static_cast<qsizetype>(4096 * 16);
+
+struct BodyChunk {
+    qint32 timeCode = 0;
+    ChunkType type = ChunkType::Command;  // Make init happy
+    QByteArray data;
+};
 
 /**
  * @brief A utility for reading various primitive structures from the file
@@ -85,58 +93,14 @@ class Reader {
 
     QByteArray readBlock(qsizetype length);
 
-    // Reads the remainder of the device in bounded chunks, invoking
-    // fn(chunk) once per chunk read, until EOF. Lets callers process a
-    // large/unbounded remaining payload without ever buffering the whole
-    // thing in memory at once.
-    //
-    // Returns the last two chunks read, concatenated in file order (or
-    // fewer/none, if the payload was smaller than that) - letting callers
-    // validate trailing structure (e.g. a footer) that might straddle a
-    // chunk boundary, without every chunk needing to be copied out on the
-    // chance it turns out to be one of the final two.
-    QByteArray readRemainingChunked(std::invocable<QByteArrayView> auto&& fn,
-                                    qint64 chunkSize = 16384) {
-        // Fixed at chunkSize bytes for their whole lifetime - a short read
-        // doesn't shrink them, so buffers.at(i).size() is never the valid
-        // byte count. Track that separately in sizes below; Uninitialized
-        // avoids zero-filling bytes that a short read leaves untouched and
-        // that we then never look at.
-        std::array<QByteArray, 2> buffers{
-            QByteArray(static_cast<qsizetype>(chunkSize), Qt::Uninitialized),
-            QByteArray(static_cast<qsizetype>(chunkSize), Qt::Uninitialized)};
-        std::array<qsizetype, 2> sizes{0, 0};
-        // The slot that the next successful read will land in.
-        int next = 0;
-
-        for (;;) {
-            const qsizetype bytesRead =
-                m_replayFile.read(buffers.at(next).data(), chunkSize);
-            if (bytesRead < 0) {
-                throw CorruptDataException(
-                    QLatin1String("Error reading payload"),
-                    m_offsetMgr.offset());
-            }
-            if (bytesRead == 0) {
-                break;
-            }
-            m_offsetMgr.increment(bytesRead);
-            sizes.at(next) = static_cast<qsizetype>(bytesRead);
-            fn(QByteArrayView(buffers.at(next).constData(), bytesRead));
-            next = 1 - next;
-        }
-
-        // `next` now names the slot holding the older of the last two
-        // chunks (or an untouched, zero-sized slot if fewer than two
-        // chunks were read); the other slot holds the most recent chunk.
-        const int older = next;
-        const int newer = 1 - next;
-        QByteArray tail;
-        tail.reserve(sizes.at(older) + sizes.at(newer));
-        tail.append(buffers.at(older).constData(), sizes.at(older));
-        tail.append(buffers.at(newer).constData(), sizes.at(newer));
-        return tail;
-    }
+    // Reads everything remaining in the device in a single call, bounded by
+    // maxSize - an absolute ceiling on this Reader's total offset, matching
+    // the convention offset()-based limit checks already use elsewhere in
+    // this class (e.g. readBodyChunk's caller checking offset() against
+    // MAX_BODY_SIZE per iteration). Guards against buffering an unbounded
+    // amount of memory for a corrupt/malicious tail without needing to page
+    // through it the way readRemainingChunked does.
+    QByteArray readRemaining(qsizetype maxSize);
 
     // Read a single integral value via QDataStream
     template <std::integral T>
@@ -153,8 +117,7 @@ class Reader {
             T value{};
             stream >> value;
             if (stream.status() != QDataStream::Ok) {
-                throw CorruptDataException(QLatin1String("Unexpected EOF"),
-                                           m_offsetMgr.offset());
+                throw TornDataException(m_offsetMgr.offset());
             }
             m_offsetMgr.increment(sizeof(T));
             return value;
@@ -169,12 +132,11 @@ class Reader {
         return std::forward<decltype(fn)>(fn)(stream);
     }
 
-    template <ByteSized T>
+    template <ByteSized T = std::byte>
     T readByte() {
         char value = 0x0;
         if (!m_replayFile.getChar(&value)) {
-            throw CorruptDataException(QLatin1String("Unexpected EOF"),
-                                       m_offsetMgr.offset());
+            throw TornDataException(m_offsetMgr.offset());
         }
         m_offsetMgr.increment(1);
         return std::bit_cast<T>(value);
@@ -189,12 +151,13 @@ class Reader {
         }
     }
 
+    std::optional<BodyChunk> readBodyChunk();
+
    private:
-    // TODO: Deal with the fact that size_t disagrees with qsizetype (which is
-    // signed)
-    // A utility class for managing the offsets This exists here for
-    // inline so that there is no risk of mismanaging offsets by forgetting to
-    // do the entire set of offset manipulatino somewhere
+    // TODO: Deal with the fact that size_t disagrees with qsizetype (which
+    // is signed) A utility class for managing the offsets This exists here
+    // for inline so that there is no risk of mismanaging offsets by
+    // forgetting to do the entire set of offset manipulatino somewhere
     class OffsetManager {
        public:
         OffsetManager() = default;

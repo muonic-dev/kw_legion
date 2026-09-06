@@ -96,12 +96,16 @@ class SynopsisParser {
 
     void parseBody();
 
-    // Validates that lastChunk - the final chunk read while fingerprinting
-    // the body - ends with a semantically valid "C&C3 REPLAY FOOTER"
-    // structure. This lets us distinguish a torn read (e.g. parsing a
-    // replay the game is still actively writing, which truncates the file
-    // before the footer is appended) from other forms of corruption.
-    void verifyFooter(QByteArrayView lastChunk) const;
+    // Validates that payload - everything left in the file once the body's
+    // chunk stream has been walked to its end marker - is itself a
+    // semantically valid "C&C3 REPLAY FOOTER" structure with nothing extra
+    // before or after it, and that the footer's own final_time_code field
+    // agrees with maxTimeCode, the highest real chunk time code observed
+    // while walking the body. This lets us distinguish a torn read (e.g.
+    // parsing a replay the game is still actively writing, which truncates
+    // the file before the footer is appended) from other forms of
+    // corruption.
+    void verifyFooter(QByteArrayView payload, qint32 maxTimeCode) const;
 
     // The TeeDevice allows transparently hashing at specific known points
     // We enable/disable hashing so that a replay's identity is only its body
