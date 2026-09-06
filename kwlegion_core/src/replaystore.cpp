@@ -206,7 +206,8 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
         qCritical(logStore) << "Unable to access the replays " << ex.what();
     }
 
-    // And finally, analyze any replays that need analysis
+    // And finally, analyze any replays that need analysis, avoid blocking
+    // startup on full reanalysis
     try {
         performReplayReanalysis();
     } catch (StorageException& ex) {
@@ -241,6 +242,15 @@ void ReplayStore::performReplayReanalysis() {
                 << "Failed to parse previously ingested replay: "
                 << internalPath;
         }
+
+        // Now we should re-emit
+        const std::optional<Replay> replay = queries.selectReplay(checksum);
+        if (!replay.has_value()) {
+            qWarning(logStore) << "Replay disappeared during reanalysis path: "
+                               << QString(checksum.toHex());
+            continue;
+        }
+        emit replaysChanged(QList{*replay});
     }
 }
 
@@ -619,6 +629,7 @@ void ReplayStore::ensureDb() {
 
     m_db = QSqlDatabase::addDatabase("QSQLITE", "kwlegion_store");
     m_db.setDatabaseName(m_dbPath);
+    m_db.setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000"));
     if (!m_db.open()) {
         qCCritical(logStore)
             << "Failed to open database: " << m_db.lastError().text();

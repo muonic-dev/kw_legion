@@ -306,6 +306,7 @@ Page {
             required property bool selected
             required property var timestamp
             required property var teams
+            required property string duration
 
             // The width of the left zone containing textual data
             readonly property int fieldColumnWidth: 220
@@ -386,11 +387,25 @@ Page {
                         }
                     }
 
-                    Label {
+                    RowLayout {
                         width: parent.width
-                        text: delegateRoot.timestamp.toLocaleString(Qt.locale(), Locale.ShortFormat)
-                        elide: Text.ElideRight
-                        color: Theme.lightMode ? Theme.dark : Theme.light
+                        Label {
+                            Layout.fillWidth: true
+                            text: delegateRoot.timestamp.toLocaleString(Qt.locale(), Locale.ShortFormat)
+                            elide: Text.ElideRight
+                            color: Theme.lightMode ? Theme.dark : Theme.light
+                        }
+                        TintedIcon {
+                            height: 16
+                            width: 16
+                            source: "qrc:/qt/qml/KWLegionUI/ico/timer-svgrepo-com.svg"
+                            sourceSize: Qt.size(width, height)
+                        }
+                        Label {
+                            text: delegateRoot.duration
+                            elide: Text.ElideRight
+                            color: Theme.lightMode ? Theme.dark : Theme.light
+                        }
                     }
 
                     RowLayout {

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.3.0
+
+### Added
+
+Replay time is now inserted
+
 ## 0.2.0
 
 ### Added

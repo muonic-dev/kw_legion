@@ -39,6 +39,7 @@ class ReplayStoreModel : public QAbstractListModel {
         PatchRole,    // We guess the patch based on the suffix of the
                       // map_reference
         PlayersRole,  // All players from all teams, utility for search
+        DurationRole,
         SelectedRole
     };
 

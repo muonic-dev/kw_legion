@@ -6,7 +6,9 @@
 #pragma once
 
 #include <QDateTime>
+#include <QList>
 #include <QObject>
+
 
 namespace KWLegionCore {
 class Replay;
@@ -68,6 +70,8 @@ class ReplayModel : public QObject {
 
     [[nodiscard]] QList<QObject*> teams() const { return m_teams; }
 
+    [[nodiscard]] quint32 engineTicks() const { return m_engineTicks; };
+
     [[nodiscard]] QString inferPatch() const;
 
     static QString inferPatch(QStringView);
@@ -81,6 +85,7 @@ class ReplayModel : public QObject {
     QString m_mapName;
     QString m_mapReference;
     bool m_hasExternalPath;
+    quint32 m_engineTicks;
     QList<QObject*> m_teams;
 };
 }  // namespace KWLegionCore

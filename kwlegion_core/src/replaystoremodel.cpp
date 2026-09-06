@@ -50,6 +50,8 @@ ReplayStoreModel::ReplayStoreModel(QObject* parent)
           {static_cast<int>(Roles::TeamsRole), QByteArrayLiteral("teams")},
           {static_cast<int>(Roles::PlayersRole), QByteArrayLiteral("players")},
           {static_cast<int>(Roles::PatchRole), QByteArrayLiteral("patch")},
+          {static_cast<int>(Roles::DurationRole),
+           QByteArrayLiteral("duration")},
           {static_cast<int>(Roles::SelectedRole),
            QByteArrayLiteral("selected")},
       } {}
@@ -292,6 +294,12 @@ int ReplayStoreModel::rowCount(const QModelIndex& parent) const {
     return static_cast<int>(m_replays.size());
 }
 
+QString formatDuration(quint32 engineTicks) {
+    QLocale locale = QLocale::system();
+    // For now tick rate is 30, but this may become dynamic
+    return QTime(0, 0).addSecs(engineTicks / 30).toString("m:ss");
+}
+
 QVariant ReplayStoreModel::data(const QModelIndex& index, int role) const {
     if (!index.isValid() ||
         std::cmp_greater_equal(index.row(), m_replays.size())) {
@@ -328,6 +336,8 @@ QVariant ReplayStoreModel::data(const QModelIndex& index, int role) const {
             return m_selections.contains(replay->checksum());
         case Roles::PatchRole:
             return replay->inferPatch();
+        case Roles::DurationRole:
+            return formatDuration(replay->engineTicks());
         default:
             return {};
     }

@@ -27,7 +27,8 @@ ReplayModel::ReplayModel(const Replay& replay, QObject* parent)
       m_matchDescription(replay.matchDescription),
       m_mapName(replay.mapName),
       m_mapReference(replay.mapReference),
-      m_hasExternalPath(replay.hasExternalPath) {
+      m_hasExternalPath(replay.hasExternalPath),
+      m_engineTicks(replay.engineTicks) {
     // Build the teams by scanning for players
     QList<TeamModel*> teams;
 
@@ -68,6 +69,10 @@ QList<int> ReplayModel::updateFromReplay(const Replay& replay) {
     if (m_overrideMatchTitle != replay.overrideMatchTitle) {
         m_overrideMatchTitle = replay.overrideMatchTitle;
         roles.append(static_cast<int>(ReplayStoreModel::Roles::MatchTitleRole));
+    }
+    if (m_engineTicks != replay.engineTicks) {
+        m_engineTicks = replay.engineTicks;
+        roles.append(static_cast<int>(ReplayStoreModel::Roles::DurationRole));
     }
     return roles;
 }

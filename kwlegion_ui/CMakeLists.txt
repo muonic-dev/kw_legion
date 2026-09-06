@@ -71,6 +71,7 @@ qt_add_qml_module(kw_legion
         ico/close-lg-svgrepo-com.svg
         ico/close-sm-svgrepo-com.svg
         ico/arrow-reload-02-svgrepo-com.svg
+        ico/timer-svgrepo-com.svg
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
