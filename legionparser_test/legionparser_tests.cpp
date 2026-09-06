@@ -141,6 +141,66 @@ TEST_CASE("looksComplete defers on a device it cannot seek",
     CHECK(SynopsisParser::looksComplete(buffer));
 }
 
+TEST_CASE("checksum is unchanged across body-reader implementations",
+          "[legionparser][checksum]") {
+    // Captured against the pre-TeeDevice body reader (parseBody's
+    // readRemainingChunked + QCryptographicHash). The checksum is a
+    // cross-path replay identity key - ReplayStore joins replay_players and
+    // replay_external_paths on it - so any drift here would silently orphan
+    // every replay already indexed under its old checksum. test_torn_footer
+    // is excluded: it never reaches a checksum, see the "torn read" test.
+    static const struct {
+        const char* filename;
+        const char* expectedHex;
+    } fixtures[] = {
+        {"4-player different versions.KWReplay",
+         "a2ca205834b51286d32654dcb0244f6945b00405cba36968d097b0985883fef6"},
+        {"4-player ffa.KWReplay",
+         "2673a90896b4c76b125d2e88926c9f907609b7888fed6bc01a24ffe37d6f6d02"},
+        {"4-player skirmish.KWReplay",
+         "3d4fedb745189a6e3f0345be50f877306ff586d4a8ec60978e475904944396f4"},
+        {"4-player team 4.KWReplay",
+         "c749076559f87271ca6badd404ac073a4f0fd9f2185f7a7d0f32e1e4045ef290"},
+        {"8-player all random ffa.KWReplay",
+         "2c9e397bf646d11c56ac12a8f5f9191093e4b640197a3d1d06f3f1981d9acdcf"},
+        {"muonic v branston game 1.KWReplay",
+         "7cac36e6d548cad7c4a50c726eaeac71d3f2811eef19b3e1d6e2497aa84f2f47"},
+        {"muonic v branston game 2.KWReplay",
+         "86818c436dadc108f2f98f42e6906bdd179ffe867ad33478fbd532b1c0021ed0"},
+        {"muonic v branston game 3.KWReplay",
+         "c9fcce425fa470117993061e7bbb01e249381931955251c970945d92fee00eac"},
+        {"muonic v branston game 4.KWReplay",
+         "464a0a40450d87271b85b972edfbf13ba2e8094930f32cc39dc04d627d62765d"},
+        {"muonic v branston game 5.KWReplay",
+         "936de4db8ca28174606ea59e3b8d8b9f571bf500200644398af691525f5936ea"},
+        {"test_bhs.KWReplay",
+         "a4c065b83206c9ce00b399cdc41b04fe541c8b60d5669b11ea76467da33eaed8"},
+        {"test_gdis.KWReplay",
+         "f7acd175821314e173b7efdf954a05ef68e6a145695880ddbd4c7bd347d0ae8e"},
+        {"test_moks.KWReplay",
+         "919280bf2d2575f472c72e7bb8c2f1bb8b1d5ba68fb01f1ab84448d45320afac"},
+        {"test_nods.KWReplay",
+         "85e3d21a588226e321d9231f76de12a79111cc1ba1340aa244213e960f9dfb91"},
+        {"test_reapers.KWReplay",
+         "517881988a80d98c5d3eea9e548311d2e7bfa21c7228cae54ca07f01d7935b4c"},
+        {"test_scrins.KWReplay",
+         "59f023a151f7a0d5cc9d93153e0e43746e981cb81a5529fcd535b1c904d84e33"},
+        {"test_sts.KWReplay",
+         "4a9cd7e00860771e1ffd7cee721b0cfc1fbdb193d3e4d78e03e52b351f0a8a91"},
+        {"test_travelers.KWReplay",
+         "fea536a932459eb45064b0ba18cfa44027a356558c0451bf93b2751412759ae5"},
+        {"test_zocoms.KWReplay",
+         "e9c564e3285b93cea11feaed787a07995b96b04d2c3a3f1145faebd811ac75e0"},
+    };
+
+    for (const auto& fixture : fixtures) {
+        INFO("fixture: " << fixture.filename);
+        const ReplaySynopsis metadata =
+            parseReplay(QString::fromUtf8(fixture.filename));
+        CHECK(metadata.checksum.toHex() == QByteArray(fixture.expectedHex));
+    }
+}
+
 TEST_CASE("parses muonic v branston game 1", "[legionparser][metadata]") {
     const ReplaySynopsis metadata =
         parseReplay(QString::fromUtf8("muonic v branston game 1.KWReplay"));

@@ -22,6 +22,7 @@
 
 #include "legionparser/replay.h"
 #include "reader.h"
+#include "teedevice.h"
 
 namespace LegionParser {
 
@@ -129,7 +130,8 @@ std::optional<QByteArrayView> footerFromTail(QByteArrayView tail) {
 }  // namespace
 
 SynopsisParser::SynopsisParser(QIODevice& replayFile)
-    : m_reader(std::make_unique<Reader>(replayFile)),
+    : m_tee{std::make_unique<TeeDevice>(replayFile)},
+      m_reader(std::make_unique<Reader>(*m_tee)),
       m_synopsis{},
       m_offset{0} {}
 
@@ -476,12 +478,12 @@ void SynopsisParser::parseHeaderTail() {
 }
 
 void SynopsisParser::parseBody() {
-    // The payload isn't parsed at this time; just fingerprint it so callers
-    // can cheaply compare/identify replay content. Read in bounded chunks
-    // rather than the whole remaining file at once, so a corrupt or
-    // maliciously oversized file can't force unbounded memory use.
-    QCryptographicHash hash(QCryptographicHash::Sha256);
+    // Defend against 'malicious' replay
     qsizetype totalSize = 0;
+    // At this point, we want to turn on hashing so that we can capture the
+    // checksum
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    m_tee->setSink([&hash](QByteArrayView bs) { hash.addData(bs); });
     // The footer lives in the last handful of bytes of the file, but isn't
     // guaranteed to fall entirely within the very last chunk read - e.g. if
     // the file size puts the footer's start right at a chunk boundary.
@@ -495,11 +497,13 @@ void SynopsisParser::parseBody() {
                                              m_reader->offset(), MAX_BODY_SIZE,
                                              totalSize);
             }
-            hash.addData(chunk);
         },
         BODY_READ_CHUNK_SIZE);
 
     verifyFooter(tail);
+    // We shouldn't ever read any more after this point, but since hash is going
+    // out of scope do it for safety
+    m_tee->clearSink();
 
     m_synopsis.checksum = hash.result();
 }

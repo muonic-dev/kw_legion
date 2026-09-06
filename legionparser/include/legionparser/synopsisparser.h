@@ -11,11 +11,11 @@
 #include <QIODevice>
 #include <QString>
 #include <QtTypes>
-#include <memory>
 
 namespace LegionParser {
 
 class Reader;
+class TeeDevice;
 
 class SynopsisParser {
    public:
@@ -103,6 +103,10 @@ class SynopsisParser {
     // before the footer is appended) from other forms of corruption.
     void verifyFooter(QByteArrayView lastChunk) const;
 
+    // The TeeDevice allows transparently hashing at specific known points
+    // We enable/disable hashing so that a replay's identity is only its body
+    // content. We would like any header rewriting to not change identity
+    std::unique_ptr<TeeDevice> m_tee;
     std::unique_ptr<Reader> m_reader;
     ReplaySynopsis m_synopsis;
 

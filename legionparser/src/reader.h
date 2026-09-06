@@ -22,7 +22,11 @@ concept ByteSized = std::is_trivially_copyable_v<T> && sizeof(T) == 1;
 
 constexpr qsizetype MAX_STRING_LENGTH = static_cast<qsizetype>(4096 * 16);
 
-// Provides read utility methods while tracking offsets
+/**
+ * @brief A utility for reading various primitive structures from the file
+ *
+ * Additionally, provides some basic offset tracking for consistency.
+ */
 class Reader {
    public:
     Reader(QIODevice& replayFile);
