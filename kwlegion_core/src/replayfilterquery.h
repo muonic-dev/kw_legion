@@ -5,6 +5,10 @@
 
 #pragma once
 
+#include <QDateTime>
+#include <QString>
+#include <cstdint>
+
 #include "filterquery.h"
 #include "replaystoremodel.h"
 

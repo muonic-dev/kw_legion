@@ -129,6 +129,14 @@ QString RelativeDateTimeQuery::repr() const {
         m_compareTo.toString(Qt::ISODate));
 }
 
+DurationTimeQuery::DurationTimeQuery(
+    ReplayStoreModel::Roles role, QTime compareTo,
+    RelativeDateTimeQuery::Comparison comparison, QObject* parent)
+    : FilterQuery(parent),
+      m_role(role),
+      m_compareTo(compareTo),
+      m_comparison(comparison) {}
+
 bool DurationTimeQuery::acceptRow(const QAbstractItemModel& source, int row,
                                   const QModelIndex& parent) const {
     const QVariant value =

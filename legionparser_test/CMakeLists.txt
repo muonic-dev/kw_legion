@@ -23,3 +23,22 @@ add_custom_command(TARGET legionparser_tests POST_BUILD
 )
 
 catch_discover_tests(legionparser_tests)
+
+# Scratch tool, temporary - not part of the shipped product
+add_executable(legionparser_chunkdump
+    chunkdump_main.cpp
+)
+target_link_libraries(legionparser_chunkdump
+    PRIVATE
+        legionparser::legionparser
+)
+target_include_directories(legionparser_chunkdump
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../legionparser/src
+)
+add_custom_command(TARGET legionparser_chunkdump POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_RUNTIME_DLLS:legionparser_chunkdump>
+        $<TARGET_FILE_DIR:legionparser_chunkdump>
+    COMMAND_EXPAND_LISTS
+)

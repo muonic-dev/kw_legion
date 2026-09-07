@@ -388,7 +388,12 @@ class DurationQueryParser : public FieldQueryParser {
 
     [[nodiscard]] std::tuple<FilterQuery*, QStringView> parse(
         QStringView input) const override {
-        throw ParseError(QStringLiteral("unimplemented"));
+        std::optional next = nextTime(QLocale::system(), input);
+        if (!next) {
+            throw ParseError("expected time");
+        }
+        auto [time, rest] = next.value();
+        return {new DurationTimeQuery(m_role, time, m_comparison), rest};
     }
 
    private:
@@ -422,6 +427,12 @@ const std::vector<std::unique_ptr<FieldQueryParser>>& fieldParsers() {
         v.emplace_back(std::make_unique<ComparisonDateTimeQueryParser>(
             "after", ReplayStoreModel::Roles::TimestampRole,
             RelativeDateTimeQuery::Comparison::AFTER));
+        v.emplace_back(std::make_unique<DurationQueryParser>(
+            "longer", ReplayStoreModel::Roles::DurationRole,
+            RelativeDateTimeQuery::Comparison::AFTER));
+        v.emplace_back(std::make_unique<DurationQueryParser>(
+            "shorter", ReplayStoreModel::Roles::DurationRole,
+            RelativeDateTimeQuery::Comparison::BEFORE));
         return v;
     }();
     return PARSERS;
