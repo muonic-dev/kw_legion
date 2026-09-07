@@ -294,8 +294,30 @@ Page {
             }
         }
 
+        // Using scale isntead of height because height is a bound property
+        add: Transition {
+            ShortAnimation {
+                properties: "opacity"
+                from: 0
+                to: 1
+            }
+            ShortAnimation {
+                properties: "scale"
+                from: 0
+                to: 1
+            }
+        }
+
+        displaced: Transition {
+            ShortAnimation {
+                properties: "y"
+                easing.type: Easing.OutQuad
+            }
+        }
+
         delegate: Rectangle {
             id: delegateRoot
+            transformOrigin: Item.Top
 
             required property int index
             required property var checksum
