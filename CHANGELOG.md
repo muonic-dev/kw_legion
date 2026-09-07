@@ -4,7 +4,7 @@
 
 ### Added
 
-Replay time is now inserted
+- Replay time is now visible and can be filtered on using `longer:` and `shorter:` with the `m:ss` timecode
 
 ## 0.2.0
 
