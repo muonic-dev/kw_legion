@@ -113,6 +113,9 @@ if(WIN32)
     set(CPACK_GENERATOR "NSIS;ZIP")
     set(CPACK_NSIS_DISPLAY_NAME "KW Legion")
     set(CPACK_CREATE_DESKTOP_LINKS "kw_legion")
+    # Adds a "Run KW Legion" checkbox (checked by default) to the finish
+    # page.
+    set(CPACK_NSIS_MUI_FINISHPAGE_RUN "kw_legion")
     # kw_legion.exe now carries this same icon as a native Win32 resource
     # (see kwlegion_ui/cpp/kw_legion.rc.in) - this covers the installer.exe
     # itself and its uninstaller entry in Add/Remove Programs.
