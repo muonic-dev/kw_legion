@@ -118,6 +118,51 @@ if(WIN32)
     # itself and its uninstaller entry in Add/Remove Programs.
     set(CPACK_NSIS_MUI_ICON "${CMAKE_SOURCE_DIR}/kwlegion_ui/ico/kw_legion.ico")
     set(CPACK_NSIS_MUI_UNIICON "${CMAKE_SOURCE_DIR}/kwlegion_ui/ico/kw_legion.ico")
+
+    # If kw_legion is already running, ask it to quit over its
+    # SingleInstanceGuard local-socket pipe (see
+    # kwlegion_ui/cpp/singleinstanceguard.cpp) before overwriting its files.
+    # The app defaults to minimizing to tray on close, so window state can't
+    # tell us it actually exited - instead poll whether its exe file is
+    # still locked, which is what actually blocks the install.
+    set(CPACK_NSIS_EXTRA_PREINSTALL_COMMANDS [[
+      ; Send Request::Quit (value 1) to the app's local-socket pipe. If
+      ; nothing is listening, CreateFileW just fails and we fall through -
+      ; the poll below will find the exe already unlocked.
+      System::Call 'kernel32::CreateFileW(w "\\.\pipe\kw_legion", i 0x40000000, i 0, i 0, i 3, i 0, i 0) i .r0'
+      IntCmp $0 -1 legion_pipe_absent legion_pipe_connected legion_pipe_connected
+      legion_pipe_connected:
+        System::Call '*(&i1 1) i .r1'
+        System::Call 'kernel32::WriteFile(i r0, i r1, i 1, *i .r2, i 0) i .r3'
+        System::Free $1
+        System::Call 'kernel32::CloseHandle(i r0)'
+      legion_pipe_absent:
+
+      StrCpy $2 0
+      legion_wait_loop:
+        ClearErrors
+        Rename "$INSTDIR\kw_legion.exe" "$INSTDIR\kw_legion.exe"
+        IfErrors legion_wait_retry legion_wait_done
+      legion_wait_retry:
+        IntOp $2 $2 + 1
+        IntCmp $2 10 legion_wait_prompt legion_wait_sleep legion_wait_prompt
+      legion_wait_sleep:
+        Sleep 500
+        Goto legion_wait_loop
+
+      legion_wait_prompt:
+        ClearErrors
+        Rename "$INSTDIR\kw_legion.exe" "$INSTDIR\kw_legion.exe"
+        IfErrors legion_wait_ask legion_wait_done
+      legion_wait_ask:
+        MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION \
+          "KW Legion is still running and needs to close before installing.$\r$\n\
+          Please close it manually, then click Retry." \
+          IDRETRY legion_wait_prompt
+        Quit
+
+      legion_wait_done:
+    ]])
 else()
     set(CPACK_GENERATOR "TGZ")
 endif()
