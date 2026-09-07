@@ -4,7 +4,9 @@
 
 ### Added
 
-- Replay time is now visible and can be filtered on using `longer:` and `shorter:` with the `m:ss` timecode
+- Replay time is now visible and can be filtered on using `longer:` and `shorter:` with the `m:ss` format.
+- The installer will try and close the application, if this is not possible a dialog box will pop up.
+- The installer will offer to launch the application now.
 
 ## 0.2.0
 
