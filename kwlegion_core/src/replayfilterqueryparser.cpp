@@ -241,8 +241,8 @@ std::optional<std::tuple<QTime, QStringView>> nextTime(const QLocale& locale,
     if (isNextQuoted(current)) {
         const auto [word, rest] = requireWord(current);
         const auto time = locale.toTime(word.toString(), "m:ss");
-        if (time.isValid()) {
-            return std::nullopt;
+        if (!time.isValid()) {
+            throw ParseError(QStringLiteral("invalid quoted time"));
         }
         return std::make_tuple(time, rest);
     }
@@ -339,12 +339,9 @@ class OnDateQueryParser : public FieldQueryParser {
         }
 
         auto* conj = new ConjunctionFilterQuery();
-        conj->addQuery(new RelativeDateTimeQuery(
-            m_role,
-            // Sub 1 for poor mans >=
-            start.addMSecs(-1), RelativeDateTimeQuery::Comparison::AFTER));
-        conj->addQuery(new RelativeDateTimeQuery(
-            m_role, end, RelativeDateTimeQuery::Comparison::BEFORE));
+        conj->addQuery(
+            new RelativeDateTimeQuery(m_role, start, Comparison::AFTER));
+        conj->addQuery(new RelativeDateTimeQuery(m_role, end, Comparison::BEFORE));
         return {conj, rest};
     }
 
@@ -356,7 +353,7 @@ class ComparisonDateTimeQueryParser : public FieldQueryParser {
    public:
     ComparisonDateTimeQueryParser(QString fieldLabel,
                                   ReplayStoreModel::Roles role,
-                                  RelativeDateTimeQuery::Comparison comparison)
+                                  Comparison comparison)
         : FieldQueryParser(std::move(fieldLabel)),
           m_role(role),
           m_comparison(comparison) {}
@@ -375,13 +372,14 @@ class ComparisonDateTimeQueryParser : public FieldQueryParser {
 
    private:
     ReplayStoreModel::Roles m_role;
-    RelativeDateTimeQuery::Comparison m_comparison;
+    Comparison m_comparison;
 };
 
-class DurationQueryParser : public FieldQueryParser {
+class ComparisonDurationQueryParser : public FieldQueryParser {
    public:
-    DurationQueryParser(QString fieldLabel, ReplayStoreModel::Roles role,
-                        RelativeDateTimeQuery::Comparison comparison)
+    ComparisonDurationQueryParser(QString fieldLabel,
+                                  ReplayStoreModel::Roles role,
+                                  Comparison comparison)
         : FieldQueryParser(std::move(fieldLabel)),
           m_role(role),
           m_comparison(comparison) {}
@@ -393,12 +391,13 @@ class DurationQueryParser : public FieldQueryParser {
             throw ParseError("expected time");
         }
         auto [time, rest] = next.value();
-        return {new DurationTimeQuery(m_role, time, m_comparison), rest};
+        return {new RelativeDurationTimeQuery(m_role, time, m_comparison),
+                rest};
     }
 
    private:
     ReplayStoreModel::Roles m_role;
-    RelativeDateTimeQuery::Comparison m_comparison;
+    Comparison m_comparison;
 };
 
 // The field dispatch table, shared by every CompoundQueryParser instead of
@@ -423,16 +422,16 @@ const std::vector<std::unique_ptr<FieldQueryParser>>& fieldParsers() {
             "on", ReplayStoreModel::Roles::TimestampRole));
         v.emplace_back(std::make_unique<ComparisonDateTimeQueryParser>(
             "before", ReplayStoreModel::Roles::TimestampRole,
-            RelativeDateTimeQuery::Comparison::BEFORE));
+            Comparison::BEFORE));
         v.emplace_back(std::make_unique<ComparisonDateTimeQueryParser>(
             "after", ReplayStoreModel::Roles::TimestampRole,
-            RelativeDateTimeQuery::Comparison::AFTER));
-        v.emplace_back(std::make_unique<DurationQueryParser>(
+            Comparison::AFTER));
+        v.emplace_back(std::make_unique<ComparisonDurationQueryParser>(
             "longer", ReplayStoreModel::Roles::DurationRole,
-            RelativeDateTimeQuery::Comparison::AFTER));
-        v.emplace_back(std::make_unique<DurationQueryParser>(
+            Comparison::AFTER));
+        v.emplace_back(std::make_unique<ComparisonDurationQueryParser>(
             "shorter", ReplayStoreModel::Roles::DurationRole,
-            RelativeDateTimeQuery::Comparison::BEFORE));
+            Comparison::BEFORE));
         return v;
     }();
     return PARSERS;

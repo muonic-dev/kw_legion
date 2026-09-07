@@ -86,14 +86,16 @@ QString formatShort(const QDateTime& dateTime) {
 
 }  // namespace
 
-TEST_CASE("ReplayFilterQueryParser defaults to a tautology query") {
+TEST_CASE("ReplayFilterQueryParser defaults to a tautology query",
+         "[filter-parser]") {
     ReplayFilterQueryParser parser;
     REQUIRE(reprOf(parser) == "TRUE");
 }
 
 TEST_CASE(
     "a colon-less bare phrase splits into per-word AnyField clauses, ANDed "
-    "together") {
+    "together",
+    "[filter-parser][text]") {
     ReplayFilterQueryParser parser;
     parser.setQueryText("atacama canyon");
     REQUIRE(reprOf(parser) ==
@@ -101,7 +103,8 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "a colon inside a quoted bare word is not treated as a field separator") {
+    "a colon inside a quoted bare word is not treated as a field separator",
+    "[filter-parser][text]") {
     ReplayFilterQueryParser parser;
     parser.setQueryText(R"(atacama "canyon:overlook" ridge)");
     REQUIRE(reprOf(parser) ==
@@ -109,7 +112,8 @@ TEST_CASE(
                       anyTextRepr("ridge")}));
 }
 
-TEST_CASE("a known field prefix dispatches to that field's query") {
+TEST_CASE("a known field prefix dispatches to that field's query",
+         "[filter-parser][text]") {
     ReplayFilterQueryParser parser;
 
     parser.setQueryText("map:atacama");
@@ -120,14 +124,16 @@ TEST_CASE("a known field prefix dispatches to that field's query") {
             conjRepr({fieldRepr("MatchTitleRole", "showmatch")}));
 }
 
-TEST_CASE("field clauses and bare words combine into one conjunction") {
+TEST_CASE("field clauses and bare words combine into one conjunction",
+         "[filter-parser][text]") {
     ReplayFilterQueryParser parser;
     parser.setQueryText("atacama map:canyon");
     REQUIRE(reprOf(parser) == conjRepr({anyTextRepr("atacama"),
                                         fieldRepr("MapNameRole", "canyon")}));
 }
 
-TEST_CASE("a quoted field value keeps its whitespace as one needle") {
+TEST_CASE("a quoted field value keeps its whitespace as one needle",
+         "[filter-parser][text]") {
     ReplayFilterQueryParser parser;
     parser.setQueryText(R"(map:"Atacama Road")");
     REQUIRE(reprOf(parser) ==
@@ -136,7 +142,8 @@ TEST_CASE("a quoted field value keeps its whitespace as one needle") {
 
 TEST_CASE(
     "a field prefix with no value fails to parse rather than matching "
-    "everything") {
+    "everything",
+    "[filter-parser]") {
     // An empty needle would make QString::contains() true for every row, so
     // half-typing "map:" would briefly widen the filter to all replays.
     // nextWord throws instead, which keeps the last good query live.
@@ -152,7 +159,8 @@ TEST_CASE(
 
 TEST_CASE(
     "an unterminated quote fails to parse and leaves the previous query in "
-    "place") {
+    "place",
+    "[filter-parser]") {
     ReplayFilterQueryParser parser;
     parser.setQueryText("atacama");
     REQUIRE(reprOf(parser) == conjRepr({anyTextRepr("atacama")}));
@@ -166,7 +174,8 @@ TEST_CASE(
 
 TEST_CASE(
     "an unrecognized field name fails to parse and leaves the previous "
-    "query in place") {
+    "query in place",
+    "[filter-parser]") {
     ReplayFilterQueryParser parser;
     parser.setQueryText("atacama");
 
@@ -179,7 +188,8 @@ TEST_CASE(
 
 TEST_CASE(
     "setQueryText emits queryTextChanged and queryChanged on a successful "
-    "parse") {
+    "parse",
+    "[filter-parser]") {
     ReplayFilterQueryParser parser;
     QSignalSpy textSpy(&parser, &ReplayFilterQueryParser::queryTextChanged);
     QSignalSpy querySpy(&parser, &ReplayFilterQueryParser::queryChanged);
@@ -190,7 +200,8 @@ TEST_CASE(
     REQUIRE(querySpy.count() == 1);
 }
 
-TEST_CASE("a successful reparse replaces the previous query") {
+TEST_CASE("a successful reparse replaces the previous query",
+         "[filter-parser]") {
     ReplayFilterQueryParser parser;
     parser.setQueryText("atacama");
     parser.setQueryText("canyon");
@@ -198,7 +209,7 @@ TEST_CASE("a successful reparse replaces the previous query") {
     REQUIRE(reprOf(parser) == conjRepr({anyTextRepr("canyon")}));
 }
 
-TEST_CASE("clearing the query text reverts to a tautology") {
+TEST_CASE("clearing the query text reverts to a tautology", "[filter-parser]") {
     ReplayFilterQueryParser parser;
     parser.setQueryText("atacama");
     parser.setQueryText("");
@@ -206,7 +217,8 @@ TEST_CASE("clearing the query text reverts to a tautology") {
     REQUIRE(reprOf(parser) == "TRUE");
 }
 
-TEST_CASE("before: with an unquoted date-only value matches local midnight") {
+TEST_CASE("before: with an unquoted date-only value matches local midnight",
+         "[filter-parser][date]") {
     const QDate date(2026, 9, 3);
     const QDateTime midnight(date, QTime(0, 0));
 
@@ -217,7 +229,8 @@ TEST_CASE("before: with an unquoted date-only value matches local midnight") {
             conjRepr({relativeDateRepr("TimestampRole", "<", midnight)}));
 }
 
-TEST_CASE("after: with an unquoted date-only value matches local midnight") {
+TEST_CASE("after: with an unquoted date-only value matches local midnight",
+         "[filter-parser][date]") {
     const QDate date(2026, 9, 3);
     const QDateTime midnight(date, QTime(0, 0));
 
@@ -225,10 +238,10 @@ TEST_CASE("after: with an unquoted date-only value matches local midnight") {
     parser.setQueryText(QStringLiteral("after:%1").arg(formatShort(date)));
 
     REQUIRE(reprOf(parser) ==
-            conjRepr({relativeDateRepr("TimestampRole", ">", midnight)}));
+            conjRepr({relativeDateRepr("TimestampRole", ">=", midnight)}));
 }
 
-TEST_CASE("before: accepts a quoted date value") {
+TEST_CASE("before: accepts a quoted date value", "[filter-parser][date]") {
     const QDate date(2026, 9, 3);
     const QDateTime midnight(date, QTime(0, 0));
 
@@ -243,7 +256,8 @@ TEST_CASE("before: accepts a quoted date value") {
 TEST_CASE(
     "before: only ever consumes a date -- trailing text becomes its own "
     "bare-word clause rather than being folded into (or corrupting) the "
-    "date value") {
+    "date value",
+    "[filter-parser][date]") {
     const QDate date(2026, 9, 3);
     const QDateTime midnight(date, QTime(0, 0));
 
@@ -258,7 +272,8 @@ TEST_CASE(
 
 TEST_CASE(
     "on: with a date builds an inclusive-start, exclusive-end local day "
-    "range") {
+    "range",
+    "[filter-parser][date]") {
     const QDate date(2026, 9, 3);
     const QDateTime start(date, QTime(0, 0));
 
@@ -267,14 +282,15 @@ TEST_CASE(
 
     REQUIRE(reprOf(parser) ==
             conjRepr({conjRepr(
-                {relativeDateRepr("TimestampRole", ">", start.addMSecs(-1)),
+                {relativeDateRepr("TimestampRole", ">=", start),
                  relativeDateRepr("TimestampRole", "<",
                                   start.addDays(1))})}));
 }
 
 TEST_CASE(
     "an unparseable before: value fails to parse and leaves the previous "
-    "query in place") {
+    "query in place",
+    "[filter-parser][date]") {
     ReplayFilterQueryParser parser;
     parser.setQueryText("atacama");
 
@@ -287,7 +303,8 @@ TEST_CASE(
 
 TEST_CASE(
     "an unparseable on: value fails to parse and leaves the previous query "
-    "in place") {
+    "in place",
+    "[filter-parser][date]") {
     ReplayFilterQueryParser parser;
     parser.setQueryText("atacama");
 

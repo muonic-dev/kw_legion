@@ -56,7 +56,8 @@ void sweep(ReplayProspector& prospector) {
 
 }  // namespace
 
-TEST_CASE("ReplayProspector initial sweep finds nested replay files") {
+TEST_CASE("ReplayProspector initial sweep finds nested replay files",
+          "[prospector][filesystem][sweep]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -94,7 +95,8 @@ TEST_CASE("ReplayProspector initial sweep finds nested replay files") {
           expectedPaths);
 }
 
-TEST_CASE("ReplayProspector detects a fresh file added to the root") {
+TEST_CASE("ReplayProspector detects a fresh file added to the root",
+          "[prospector][filesystem][watch]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -116,7 +118,8 @@ TEST_CASE("ReplayProspector detects a fresh file added to the root") {
     }
 }
 
-TEST_CASE("ReplayProspector detects a fresh file added to a subdirectory") {
+TEST_CASE("ReplayProspector detects a fresh file added to a subdirectory",
+          "[prospector][filesystem][watch]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -140,54 +143,54 @@ TEST_CASE("ReplayProspector detects a fresh file added to a subdirectory") {
     }
 }
 
-// For whatever reason these 2 tests are quite flaky. I will come back to them
-// later. The actual code seems to be working correctly
+TEST_CASE("ReplayProspector detects a file modified at the root",
+          "[prospector][filesystem][watch]") {
+    QTemporaryDir tempDir;
+    REQUIRE(tempDir.isValid());
+    const QDir root(tempDir.path());
 
-// TEST_CASE("ReplayProspector detects a file modified at the root") {
-//     QTemporaryDir tempDir;
-//     REQUIRE(tempDir.isValid());
-//     const QDir root(tempDir.path());
+    createFile(root, "Last Replay.KWReplay");
+    const QString targetPath = root.filePath("Last Replay.KWReplay");
+    const QString expectedPath = QFileInfo(targetPath).canonicalFilePath();
 
-//     createFile(root, "Last Replay.KWReplay");
-//     const QString targetPath = root.filePath("Last Replay.KWReplay");
-//     const QString expectedPath = QFileInfo(targetPath).canonicalFilePath();
+    ReplayProspector prospector(tempDir.path());
+    sweep(prospector);
 
-//     ReplayProspector prospector(tempDir.path());
-//     sweep(prospector);
+    QSignalSpy spy(&prospector, &ReplayProspector::replayFileChanged);
 
-//     QSignalSpy spy(&prospector, &ReplayProspector::replayFileChanged);
+    modifyFile(targetPath);
 
-//     modifyFile(targetPath);
+    REQUIRE(spy.wait(WATCH_TIMEOUT_MS));
+    for (const QList<QVariant>& emission : spy) {
+        CHECK(emission.at(0).toString() == expectedPath);
+    }
+}
 
-//     REQUIRE(spy.wait(WATCH_TIMEOUT_MS));
-//     for (const QList<QVariant>& emission : spy) {
-//         CHECK(emission.at(0).toString() == expectedPath);
-//     }
-// }
+TEST_CASE("ReplayProspector detects a file modified in a subdirectory",
+          "[prospector][filesystem][watch]") {
+    QTemporaryDir tempDir;
+    REQUIRE(tempDir.isValid());
+    const QDir root(tempDir.path());
 
-// TEST_CASE("ReplayProspector detects a file modified in a subdirectory") {
-//     QTemporaryDir tempDir;
-//     REQUIRE(tempDir.isValid());
-//     const QDir root(tempDir.path());
+    createFile(root, "Skirmish/skirmish1.KWReplay");
+    const QString targetPath = root.filePath("Skirmish/skirmish1.KWReplay");
+    const QString expectedPath = QFileInfo(targetPath).canonicalFilePath();
 
-//     createFile(root, "Skirmish/skirmish1.KWReplay");
-//     const QString targetPath = root.filePath("Skirmish/skirmish1.KWReplay");
-//     const QString expectedPath = QFileInfo(targetPath).canonicalFilePath();
+    ReplayProspector prospector(tempDir.path());
+    sweep(prospector);
 
-//     ReplayProspector prospector(tempDir.path());
-//     sweep(prospector);
+    QSignalSpy spy(&prospector, &ReplayProspector::replayFileChanged);
 
-//     QSignalSpy spy(&prospector, &ReplayProspector::replayFileChanged);
+    modifyFile(targetPath);
 
-//     modifyFile(targetPath);
+    REQUIRE(spy.wait(WATCH_TIMEOUT_MS));
+    for (const QList<QVariant>& emission : spy) {
+        CHECK(emission.at(0).toString() == expectedPath);
+    }
+}
 
-//     REQUIRE(spy.wait(WATCH_TIMEOUT_MS));
-//     for (const QList<QVariant>& emission : spy) {
-//         CHECK(emission.at(0).toString() == expectedPath);
-//     }
-// }
-
-TEST_CASE("ReplayProspector detects a file removed from the root") {
+TEST_CASE("ReplayProspector detects a file removed from the root",
+          "[prospector][filesystem][watch]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -210,7 +213,8 @@ TEST_CASE("ReplayProspector detects a file removed from the root") {
 }
 
 TEST_CASE(
-    "ReplayProspector canonicalizes the directory given to its constructor") {
+    "ReplayProspector canonicalizes the directory given to its constructor",
+    "[prospector][filesystem][canonicalization]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -227,7 +231,8 @@ TEST_CASE(
 
 TEST_CASE(
     "ReplayProspector canonicalizes the directory given to "
-    "setReplayDirectory") {
+    "setReplayDirectory",
+    "[prospector][filesystem][canonicalization]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -244,7 +249,8 @@ TEST_CASE(
 
 TEST_CASE(
     "ReplayProspector picks up a replay file that arrives together with a "
-    "brand new subdirectory") {
+    "brand new subdirectory",
+    "[prospector][filesystem][watch]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -271,7 +277,8 @@ TEST_CASE(
 
 TEST_CASE(
     "ReplayProspector keeps watching a subdirectory discovered after the "
-    "initial sweep") {
+    "initial sweep",
+    "[prospector][filesystem][watch]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -304,7 +311,8 @@ TEST_CASE(
     }
 }
 
-TEST_CASE("ReplayProspector detects a file removed from a subdirectory") {
+TEST_CASE("ReplayProspector detects a file removed from a subdirectory",
+          "[prospector][filesystem][watch]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());

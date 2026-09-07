@@ -21,7 +21,7 @@ int countRows(QSqlQuery& query) {
 
 }  // namespace
 
-TEST_CASE("SqlTransactionGuard commits on success") {
+TEST_CASE("SqlTransactionGuard commits on success", "[transaction][sql]") {
     QSqlDatabase db =
         QSqlDatabase::addDatabase("QSQLITE", "transaction_commit");
     db.setDatabaseName(":memory:");
@@ -42,7 +42,8 @@ TEST_CASE("SqlTransactionGuard commits on success") {
     QSqlDatabase::removeDatabase("transaction_commit");
 }
 
-TEST_CASE("SqlTransactionGuard rolls back if never committed") {
+TEST_CASE("SqlTransactionGuard rolls back if never committed",
+         "[transaction][sql]") {
     QSqlDatabase db =
         QSqlDatabase::addDatabase("QSQLITE", "transaction_rollback");
     db.setDatabaseName(":memory:");
@@ -63,7 +64,8 @@ TEST_CASE("SqlTransactionGuard rolls back if never committed") {
     QSqlDatabase::removeDatabase("transaction_rollback");
 }
 
-TEST_CASE("SqlTransactionGuard second commit throws instead of recommitting") {
+TEST_CASE("SqlTransactionGuard second commit throws instead of recommitting",
+         "[transaction][sql]") {
     QSqlDatabase db =
         QSqlDatabase::addDatabase("QSQLITE", "transaction_double_commit");
     db.setDatabaseName(":memory:");

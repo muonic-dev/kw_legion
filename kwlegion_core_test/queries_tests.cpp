@@ -83,7 +83,8 @@ int countExternalPaths(QSqlDatabase& db, const QByteArray& checksum) {
 
 }  // namespace
 
-TEST_CASE("Queries migrate creates the schema and is idempotent") {
+TEST_CASE("Queries migrate creates the schema and is idempotent",
+         "[queries][sql][schema]") {
     QSqlDatabase db = openMigratedDb("queries_migrate_idempotent");
     Queries queries{QSqlQuery(db)};
 
@@ -105,7 +106,8 @@ TEST_CASE("Queries migrate creates the schema and is idempotent") {
     QSqlDatabase::removeDatabase("queries_migrate_idempotent");
 }
 
-TEST_CASE("Queries isReplayKnown reflects insertReplay") {
+TEST_CASE("Queries isReplayKnown reflects insertReplay",
+         "[queries][sql][replay-crud]") {
     QSqlDatabase db = openMigratedDb("queries_is_known");
     Queries queries{QSqlQuery(db)};
 
@@ -121,7 +123,8 @@ TEST_CASE("Queries isReplayKnown reflects insertReplay") {
     QSqlDatabase::removeDatabase("queries_is_known");
 }
 
-TEST_CASE("Queries selectReplay returns the stored fields") {
+TEST_CASE("Queries selectReplay returns the stored fields",
+         "[queries][sql][replay-crud]") {
     QSqlDatabase db = openMigratedDb("queries_select_replay");
     Queries queries{QSqlQuery(db)};
 
@@ -154,7 +157,8 @@ TEST_CASE("Queries selectReplay returns the stored fields") {
     QSqlDatabase::removeDatabase("queries_select_replay");
 }
 
-TEST_CASE("Queries selectReplay returns nullopt for an unknown checksum") {
+TEST_CASE("Queries selectReplay returns nullopt for an unknown checksum",
+         "[queries][sql][replay-crud]") {
     QSqlDatabase db = openMigratedDb("queries_select_replay_missing");
     Queries queries{QSqlQuery(db)};
 
@@ -164,7 +168,8 @@ TEST_CASE("Queries selectReplay returns nullopt for an unknown checksum") {
     QSqlDatabase::removeDatabase("queries_select_replay_missing");
 }
 
-TEST_CASE("Queries insertReplay throws on a duplicate checksum") {
+TEST_CASE("Queries insertReplay throws on a duplicate checksum",
+         "[queries][sql][replay-crud]") {
     QSqlDatabase db = openMigratedDb("queries_insert_duplicate");
     Queries queries{QSqlQuery(db)};
 
@@ -178,7 +183,8 @@ TEST_CASE("Queries insertReplay throws on a duplicate checksum") {
     QSqlDatabase::removeDatabase("queries_insert_duplicate");
 }
 
-TEST_CASE("Queries doesReplayNeedAnalysis reflects insertReplayAnalysis") {
+TEST_CASE("Queries doesReplayNeedAnalysis reflects insertReplayAnalysis",
+         "[queries][sql][analysis]") {
     QSqlDatabase db = openMigratedDb("queries_needs_analysis");
     Queries queries{QSqlQuery(db)};
 
@@ -199,7 +205,8 @@ TEST_CASE("Queries doesReplayNeedAnalysis reflects insertReplayAnalysis") {
     QSqlDatabase::removeDatabase("queries_needs_analysis");
 }
 
-TEST_CASE("Queries insertReplayAnalysis stores the body offset") {
+TEST_CASE("Queries insertReplayAnalysis stores the body offset",
+         "[queries][sql][analysis]") {
     QSqlDatabase db = openMigratedDb("queries_insert_analysis");
     Queries queries{QSqlQuery(db)};
 
@@ -222,7 +229,8 @@ TEST_CASE("Queries insertReplayAnalysis stores the body offset") {
     QSqlDatabase::removeDatabase("queries_insert_analysis");
 }
 
-TEST_CASE("Queries insertReplayAnalysis stores the engine ticks") {
+TEST_CASE("Queries insertReplayAnalysis stores the engine ticks",
+         "[queries][sql][analysis]") {
     QSqlDatabase db = openMigratedDb("queries_insert_analysis_ticks");
     Queries queries{QSqlQuery(db)};
 
@@ -245,7 +253,8 @@ TEST_CASE("Queries insertReplayAnalysis stores the engine ticks") {
     QSqlDatabase::removeDatabase("queries_insert_analysis_ticks");
 }
 
-TEST_CASE("Queries insertReplayAnalysis throws on a duplicate checksum") {
+TEST_CASE("Queries insertReplayAnalysis throws on a duplicate checksum",
+         "[queries][sql][analysis]") {
     QSqlDatabase db = openMigratedDb("queries_insert_analysis_dup");
     Queries queries{QSqlQuery(db)};
 
@@ -262,7 +271,8 @@ TEST_CASE("Queries insertReplayAnalysis throws on a duplicate checksum") {
 
 TEST_CASE(
     "Queries selectReplaysNeedingAnalysis lists only replays missing an "
-    "analysis row") {
+    "analysis row",
+    "[queries][sql][analysis]") {
     QSqlDatabase db = openMigratedDb("queries_needs_analysis_list");
     Queries queries{QSqlQuery(db)};
 
@@ -285,7 +295,8 @@ TEST_CASE(
 
 TEST_CASE(
     "Queries selectReplaysNeedingAnalysis is empty once every replay has "
-    "analysis") {
+    "analysis",
+    "[queries][sql][analysis]") {
     QSqlDatabase db = openMigratedDb("queries_needs_analysis_none");
     Queries queries{QSqlQuery(db)};
 
@@ -299,7 +310,8 @@ TEST_CASE(
     QSqlDatabase::removeDatabase("queries_needs_analysis_none");
 }
 
-TEST_CASE("Queries insertReplayPlayers stores every player for a replay") {
+TEST_CASE("Queries insertReplayPlayers stores every player for a replay",
+         "[queries][sql][players]") {
     QSqlDatabase db = openMigratedDb("queries_insert_players");
     Queries queries{QSqlQuery(db)};
 
@@ -342,7 +354,8 @@ TEST_CASE("Queries insertReplayPlayers stores every player for a replay") {
     QSqlDatabase::removeDatabase("queries_insert_players");
 }
 
-TEST_CASE("Queries insertReplayPlayers with an empty list inserts nothing") {
+TEST_CASE("Queries insertReplayPlayers with an empty list inserts nothing",
+         "[queries][sql][players]") {
     QSqlDatabase db = openMigratedDb("queries_insert_players_empty");
     Queries queries{QSqlQuery(db)};
 
@@ -357,7 +370,8 @@ TEST_CASE("Queries insertReplayPlayers with an empty list inserts nothing") {
     QSqlDatabase::removeDatabase("queries_insert_players_empty");
 }
 
-TEST_CASE("Queries insertExternalFilename reports whether the path is new") {
+TEST_CASE("Queries insertExternalFilename reports whether the path is new",
+         "[queries][sql][external-path]") {
     QSqlDatabase db = openMigratedDb("queries_insert_external");
     Queries queries{QSqlQuery(db)};
 
@@ -377,7 +391,8 @@ TEST_CASE("Queries insertExternalFilename reports whether the path is new") {
 
 TEST_CASE(
     "Queries insertExternalFilename reassigns a path claimed by a "
-    "different checksum") {
+    "different checksum",
+    "[queries][sql][external-path]") {
     QSqlDatabase db = openMigratedDb("queries_insert_external_reassign");
     Queries queries{QSqlQuery(db)};
 
@@ -406,7 +421,8 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "Queries checksumForExternalPath reflects the current owner of a path") {
+    "Queries checksumForExternalPath reflects the current owner of a path",
+    "[queries][sql][external-path]") {
     QSqlDatabase db = openMigratedDb("queries_checksum_for_path");
     Queries queries{QSqlQuery(db)};
 
@@ -427,7 +443,8 @@ TEST_CASE(
     QSqlDatabase::removeDatabase("queries_checksum_for_path");
 }
 
-TEST_CASE("Queries removeExternalFilename drops only the given path") {
+TEST_CASE("Queries removeExternalFilename drops only the given path",
+         "[queries][sql][external-path]") {
     QSqlDatabase db = openMigratedDb("queries_remove_external");
     Queries queries{QSqlQuery(db)};
 
@@ -458,7 +475,8 @@ TEST_CASE("Queries removeExternalFilename drops only the given path") {
 
 TEST_CASE(
     "Queries removeExternalFilename on an unregistered path is a harmless "
-    "no-op") {
+    "no-op",
+    "[queries][sql][external-path]") {
     QSqlDatabase db = openMigratedDb("queries_remove_external_missing");
     Queries queries{QSqlQuery(db)};
 
@@ -478,7 +496,8 @@ TEST_CASE(
 
 TEST_CASE(
     "Queries forgetMissingReplays drops paths absent from the current "
-    "listing") {
+    "listing",
+    "[queries][sql][external-path]") {
     QSqlDatabase db = openMigratedDb("queries_forget_missing");
     Queries queries{QSqlQuery(db)};
 
@@ -508,7 +527,8 @@ TEST_CASE(
 
 TEST_CASE(
     "Queries forgetMissingReplays handles more paths than SQLite's bound "
-    "parameter limit") {
+    "parameter limit",
+    "[queries][sql][external-path]") {
     QSqlDatabase db = openMigratedDb("queries_forget_missing_many");
     Queries queries{QSqlQuery(db)};
 
@@ -538,7 +558,8 @@ TEST_CASE(
     QSqlDatabase::removeDatabase("queries_forget_missing_many");
 }
 
-TEST_CASE("Queries selectReplays reports hasExternalPath per replay") {
+TEST_CASE("Queries selectReplays reports hasExternalPath per replay",
+         "[queries][sql][replay-crud]") {
     QSqlDatabase db = openMigratedDb("queries_select_replays");
     Queries queries{QSqlQuery(db)};
 
@@ -584,7 +605,8 @@ TEST_CASE("Queries selectReplays reports hasExternalPath per replay") {
     QSqlDatabase::removeDatabase("queries_select_replays");
 }
 
-TEST_CASE("Queries selectReplay defaults overrideMatchTitle to empty") {
+TEST_CASE("Queries selectReplay defaults overrideMatchTitle to empty",
+         "[queries][sql][override-title]") {
     QSqlDatabase db = openMigratedDb("queries_override_title_default");
     Queries queries{QSqlQuery(db)};
 
@@ -601,7 +623,8 @@ TEST_CASE("Queries selectReplay defaults overrideMatchTitle to empty") {
 
 TEST_CASE(
     "Queries updateOverrideTitle is reflected by selectReplay and "
-    "selectReplays") {
+    "selectReplays",
+    "[queries][sql][override-title]") {
     QSqlDatabase db = openMigratedDb("queries_override_title_update");
     Queries queries{QSqlQuery(db)};
 
@@ -622,7 +645,8 @@ TEST_CASE(
     QSqlDatabase::removeDatabase("queries_override_title_update");
 }
 
-TEST_CASE("Queries updateOverrideTitle overwrites a previous override") {
+TEST_CASE("Queries updateOverrideTitle overwrites a previous override",
+         "[queries][sql][override-title]") {
     QSqlDatabase db = openMigratedDb("queries_override_title_overwrite");
     Queries queries{QSqlQuery(db)};
 
@@ -641,7 +665,8 @@ TEST_CASE("Queries updateOverrideTitle overwrites a previous override") {
 }
 
 TEST_CASE(
-    "Queries updateOverrideTitle with an empty string clears the override") {
+    "Queries updateOverrideTitle with an empty string clears the override",
+    "[queries][sql][override-title]") {
     QSqlDatabase db = openMigratedDb("queries_override_title_clear");
     Queries queries{QSqlQuery(db)};
 

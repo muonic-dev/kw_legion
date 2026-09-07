@@ -61,10 +61,19 @@ class StringListContainsReplayFilterQuery : public FilterQuery {
     QString m_needle;
 };
 
+// Shared by RelativeDateTimeQuery and RelativeDurationTimeQuery, which are
+// otherwise unrelated sibling classes -- neither is privileged to own it as
+// a nested member of the other.
+//
+// AFTER is a closed (inclusive) bound: compareTo itself matches. BEFORE is
+// open (exclusive): compareTo itself does not match. This asymmetry is what
+// lets on:'s [start, end) day range be expressed as AFTER start / BEFORE
+// end with no separate epsilon adjustment.
+enum class Comparison : std::uint8_t { BEFORE, AFTER };
+
 class RelativeDateTimeQuery : public FilterQuery {
     Q_OBJECT
    public:
-    enum class Comparison : std::uint8_t { BEFORE, AFTER };
     RelativeDateTimeQuery(ReplayStoreModel::Roles role, QDateTime compareTo,
                           Comparison comp, QObject* parent = nullptr);
 
@@ -79,12 +88,11 @@ class RelativeDateTimeQuery : public FilterQuery {
     Comparison m_comparison;
 };
 
-class DurationTimeQuery : public FilterQuery {
+class RelativeDurationTimeQuery : public FilterQuery {
     Q_OBJECT
    public:
-    DurationTimeQuery(ReplayStoreModel::Roles role, QTime compareTo,
-                      RelativeDateTimeQuery::Comparison comp,
-                      QObject* parent = nullptr);
+    RelativeDurationTimeQuery(ReplayStoreModel::Roles role, QTime compareTo,
+                              Comparison comp, QObject* parent = nullptr);
 
     [[nodiscard]] bool acceptRow(const QAbstractItemModel& source, int row,
                                  const QModelIndex& parent) const override;
@@ -94,7 +102,7 @@ class DurationTimeQuery : public FilterQuery {
    private:
     ReplayStoreModel::Roles m_role;
     QTime m_compareTo;
-    RelativeDateTimeQuery::Comparison m_comparison;
+    Comparison m_comparison;
 };
 
 // Matches if any of matchTitle/mapName/patch/players contains the needle.

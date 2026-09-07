@@ -114,7 +114,7 @@ bool RelativeDateTimeQuery::acceptRow(const QAbstractItemModel& source, int row,
         case Comparison::BEFORE:
             return date < m_compareTo;
         case Comparison::AFTER:
-            return m_compareTo < date;
+            return date >= m_compareTo;
     }
     return false;
 }
@@ -123,22 +123,22 @@ QString RelativeDateTimeQuery::repr() const {
     const QMetaEnum roleEnum = QMetaEnum::fromType<ReplayStoreModel::Roles>();
     return QStringLiteral("%1%2%3").arg(
         QString::fromUtf8(roleEnum.valueToKey(static_cast<int>(m_role))),
-        m_comparison == RelativeDateTimeQuery::Comparison::BEFORE
-            ? QStringLiteral("<")
-            : QStringLiteral(">"),
+        m_comparison == Comparison::BEFORE ? QStringLiteral("<")
+                                           : QStringLiteral(">="),
         m_compareTo.toString(Qt::ISODate));
 }
 
-DurationTimeQuery::DurationTimeQuery(
-    ReplayStoreModel::Roles role, QTime compareTo,
-    RelativeDateTimeQuery::Comparison comparison, QObject* parent)
+RelativeDurationTimeQuery::RelativeDurationTimeQuery(
+    ReplayStoreModel::Roles role, QTime compareTo, Comparison comparison,
+    QObject* parent)
     : FilterQuery(parent),
       m_role(role),
       m_compareTo(compareTo),
       m_comparison(comparison) {}
 
-bool DurationTimeQuery::acceptRow(const QAbstractItemModel& source, int row,
-                                  const QModelIndex& parent) const {
+bool RelativeDurationTimeQuery::acceptRow(const QAbstractItemModel& source,
+                                          int row,
+                                          const QModelIndex& parent) const {
     const QVariant value =
         source.data(source.index(row, 0, parent), static_cast<int>(m_role));
     const auto time = value.toTime();
@@ -146,21 +146,20 @@ bool DurationTimeQuery::acceptRow(const QAbstractItemModel& source, int row,
         return false;
     }
     switch (m_comparison) {
-        case RelativeDateTimeQuery::Comparison::BEFORE:
+        case Comparison::BEFORE:
             return time < m_compareTo;
-        case RelativeDateTimeQuery::Comparison::AFTER:
-            return m_compareTo < time;
+        case Comparison::AFTER:
+            return time >= m_compareTo;
     }
     return false;
 }
 
-QString DurationTimeQuery::repr() const {
+QString RelativeDurationTimeQuery::repr() const {
     const QMetaEnum roleEnum = QMetaEnum::fromType<ReplayStoreModel::Roles>();
     return QStringLiteral("%1%2%3").arg(
         QString::fromUtf8(roleEnum.valueToKey(static_cast<int>(m_role))),
-        m_comparison == RelativeDateTimeQuery::Comparison::BEFORE
-            ? QStringLiteral("<")
-            : QStringLiteral(">"),
+        m_comparison == Comparison::BEFORE ? QStringLiteral("<")
+                                           : QStringLiteral(">="),
         m_compareTo.toString("mm:ss"));
 }
 

@@ -51,14 +51,20 @@ bool acceptsTimestamp(const FilterQuery& query, const QDateTime& timestamp) {
     return query.acceptRow(model, 0, QModelIndex());
 }
 
+bool acceptsDuration(const FilterQuery& query, const QTime& duration) {
+    SingleRowModel model(static_cast<int>(ReplayStoreModel::Roles::DurationRole),
+                         QVariant::fromValue(duration));
+    return query.acceptRow(model, 0, QModelIndex());
+}
+
 }  // namespace
 
 TEST_CASE(
-    "RelativeDateTimeQuery BEFORE accepts strictly earlier timestamps only") {
+    "RelativeDateTimeQuery BEFORE accepts strictly earlier timestamps only",
+    "[filter-query][date]") {
     const QDateTime boundary(QDate(2026, 9, 3), QTime(12, 0));
-    const RelativeDateTimeQuery query(
-        ReplayStoreModel::Roles::TimestampRole, boundary,
-        RelativeDateTimeQuery::Comparison::BEFORE);
+    const RelativeDateTimeQuery query(ReplayStoreModel::Roles::TimestampRole,
+                                      boundary, Comparison::BEFORE);
 
     REQUIRE(acceptsTimestamp(query, boundary.addSecs(-1)));
     REQUIRE_FALSE(acceptsTimestamp(query, boundary));
@@ -66,24 +72,25 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "RelativeDateTimeQuery AFTER accepts strictly later timestamps only") {
+    "RelativeDateTimeQuery AFTER accepts the boundary and later timestamps "
+    "-- it is a closed (inclusive) bound",
+    "[filter-query][date]") {
     const QDateTime boundary(QDate(2026, 9, 3), QTime(12, 0));
-    const RelativeDateTimeQuery query(
-        ReplayStoreModel::Roles::TimestampRole, boundary,
-        RelativeDateTimeQuery::Comparison::AFTER);
+    const RelativeDateTimeQuery query(ReplayStoreModel::Roles::TimestampRole,
+                                      boundary, Comparison::AFTER);
 
     REQUIRE_FALSE(acceptsTimestamp(query, boundary.addSecs(-1)));
-    REQUIRE_FALSE(acceptsTimestamp(query, boundary));
+    REQUIRE(acceptsTimestamp(query, boundary));
     REQUIRE(acceptsTimestamp(query, boundary.addSecs(1)));
 }
 
 TEST_CASE(
     "RelativeDateTimeQuery rejects a row whose role value isn't a "
-    "QDateTime") {
+    "QDateTime",
+    "[filter-query][date]") {
     const RelativeDateTimeQuery query(
         ReplayStoreModel::Roles::TimestampRole,
-        QDateTime(QDate(2026, 9, 3), QTime(0, 0)),
-        RelativeDateTimeQuery::Comparison::AFTER);
+        QDateTime(QDate(2026, 9, 3), QTime(0, 0)), Comparison::AFTER);
 
     SingleRowModel model(
         static_cast<int>(ReplayStoreModel::Roles::TimestampRole), QVariant());
@@ -92,45 +99,97 @@ TEST_CASE(
 
 TEST_CASE(
     "RelativeDateTimeQuery::repr()'s comparison symbol matches its actual "
-    "comparison direction") {
+    "comparison direction",
+    "[filter-query][date]") {
     const QDateTime boundary(QDate(2026, 9, 3), QTime(0, 0));
-    const RelativeDateTimeQuery before(
-        ReplayStoreModel::Roles::TimestampRole, boundary,
-        RelativeDateTimeQuery::Comparison::BEFORE);
-    const RelativeDateTimeQuery after(
-        ReplayStoreModel::Roles::TimestampRole, boundary,
-        RelativeDateTimeQuery::Comparison::AFTER);
+    const RelativeDateTimeQuery before(ReplayStoreModel::Roles::TimestampRole,
+                                       boundary, Comparison::BEFORE);
+    const RelativeDateTimeQuery after(ReplayStoreModel::Roles::TimestampRole,
+                                      boundary, Comparison::AFTER);
 
-    // BEFORE's acceptRow test is `date < compareTo`, AFTER's is
-    // `compareTo < date` (i.e. `date > compareTo`) -- repr()'s symbol is
-    // read as "TimestampRole <op> compareTo", so it must agree with those.
+    // BEFORE's acceptRow test is `date < compareTo` (open); AFTER's is
+    // `date >= compareTo` (closed) -- repr()'s symbol is read as
+    // "TimestampRole <op> compareTo", so it must agree with those.
     REQUIRE(before.repr().toStdString() ==
             "TimestampRole<2026-09-03T00:00:00");
     REQUIRE(after.repr().toStdString() ==
-            "TimestampRole>2026-09-03T00:00:00");
+            "TimestampRole>=2026-09-03T00:00:00");
 }
 
 TEST_CASE(
-    "the on: day-range shape (AFTER start-1ms, BEFORE start+1day) includes "
-    "local midnight and excludes the following midnight") {
+    "the on: day-range shape (AFTER start, BEFORE start+1day) includes "
+    "local midnight and excludes the following midnight",
+    "[filter-query][date]") {
     // Mirrors OnDateQueryParser's exact construction directly, independent
     // of the parser and locale, to pin down the boundary-inclusivity
     // semantics this was fixed for: a replay timestamped exactly at local
     // midnight of the queried day must match; one at the very next local
-    // midnight must not.
+    // midnight must not. AFTER is closed, so start needs no epsilon
+    // adjustment to be included.
     const QDateTime start(QDate(2026, 9, 3), QTime(0, 0));
     const QDateTime end = start.addDays(1);
 
     ConjunctionFilterQuery onDay;
     onDay.addQuery(new RelativeDateTimeQuery(
-        ReplayStoreModel::Roles::TimestampRole, start.addMSecs(-1),
-        RelativeDateTimeQuery::Comparison::AFTER));
+        ReplayStoreModel::Roles::TimestampRole, start, Comparison::AFTER));
     onDay.addQuery(new RelativeDateTimeQuery(
-        ReplayStoreModel::Roles::TimestampRole, end,
-        RelativeDateTimeQuery::Comparison::BEFORE));
+        ReplayStoreModel::Roles::TimestampRole, end, Comparison::BEFORE));
 
     REQUIRE(acceptsTimestamp(onDay, start));
     REQUIRE(acceptsTimestamp(onDay, start.addSecs(1)));
     REQUIRE_FALSE(acceptsTimestamp(onDay, start.addMSecs(-1)));
     REQUIRE_FALSE(acceptsTimestamp(onDay, end));
+}
+
+TEST_CASE(
+    "RelativeDurationTimeQuery BEFORE accepts strictly shorter durations "
+    "only",
+    "[filter-query][duration]") {
+    const QTime boundary(0, 5, 0);
+    const RelativeDurationTimeQuery query(
+        ReplayStoreModel::Roles::DurationRole, boundary, Comparison::BEFORE);
+
+    REQUIRE(acceptsDuration(query, boundary.addSecs(-1)));
+    REQUIRE_FALSE(acceptsDuration(query, boundary));
+    REQUIRE_FALSE(acceptsDuration(query, boundary.addSecs(1)));
+}
+
+TEST_CASE(
+    "RelativeDurationTimeQuery AFTER accepts the boundary and longer "
+    "durations -- it is a closed (inclusive) bound",
+    "[filter-query][duration]") {
+    const QTime boundary(0, 5, 0);
+    const RelativeDurationTimeQuery query(
+        ReplayStoreModel::Roles::DurationRole, boundary, Comparison::AFTER);
+
+    REQUIRE_FALSE(acceptsDuration(query, boundary.addSecs(-1)));
+    REQUIRE(acceptsDuration(query, boundary));
+    REQUIRE(acceptsDuration(query, boundary.addSecs(1)));
+}
+
+TEST_CASE(
+    "RelativeDurationTimeQuery rejects a row whose role value isn't a "
+    "QTime",
+    "[filter-query][duration]") {
+    const RelativeDurationTimeQuery query(
+        ReplayStoreModel::Roles::DurationRole, QTime(0, 5, 0),
+        Comparison::AFTER);
+
+    SingleRowModel model(
+        static_cast<int>(ReplayStoreModel::Roles::DurationRole), QVariant());
+    REQUIRE_FALSE(query.acceptRow(model, 0, QModelIndex()));
+}
+
+TEST_CASE(
+    "RelativeDurationTimeQuery::repr()'s comparison symbol matches its "
+    "actual comparison direction, and formats the boundary as mm:ss",
+    "[filter-query][duration]") {
+    const QTime boundary(0, 5, 30);
+    const RelativeDurationTimeQuery before(
+        ReplayStoreModel::Roles::DurationRole, boundary, Comparison::BEFORE);
+    const RelativeDurationTimeQuery after(
+        ReplayStoreModel::Roles::DurationRole, boundary, Comparison::AFTER);
+
+    REQUIRE(before.repr().toStdString() == "DurationRole<05:30");
+    REQUIRE(after.repr().toStdString() == "DurationRole>=05:30");
 }
