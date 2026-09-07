@@ -301,11 +301,6 @@ Page {
                 from: 0
                 to: 1
             }
-            ShortAnimation {
-                properties: "scale"
-                from: 0
-                to: 1
-            }
         }
 
         displaced: Transition {
