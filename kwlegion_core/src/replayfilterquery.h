@@ -75,6 +75,24 @@ class RelativeDateTimeQuery : public FilterQuery {
     Comparison m_comparison;
 };
 
+class DurationTimeQuery : public FilterQuery {
+    Q_OBJECT
+   public:
+    DurationTimeQuery(ReplayStoreModel::Roles role, QTime compareTo,
+                      RelativeDateTimeQuery::Comparison comp,
+                      QObject* parent = nullptr);
+
+    [[nodiscard]] bool acceptRow(const QAbstractItemModel& source, int row,
+                                 const QModelIndex& parent) const override;
+
+    [[nodiscard]] QString repr() const override;
+
+   private:
+    ReplayStoreModel::Roles m_role;
+    QTime m_compareTo;
+    RelativeDateTimeQuery::Comparison m_comparison;
+};
+
 // Matches if any of matchTitle/mapName/patch/players contains the needle.
 class AnyTextReplayFilterQuery : public DisjunctionFilterQuery {
     Q_OBJECT

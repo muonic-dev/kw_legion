@@ -28,6 +28,16 @@
 
 namespace KWLegionCore {
 
+namespace {
+
+QTime formatDuration(quint32 engineTicks) {
+    // I think the engine tick rate of 30 was incorrectly and that is UI draw.
+    // I believe its actually 15hz empirically
+    return QTime(0, 0).addSecs(static_cast<qint32>(engineTicks) / 15);
+}
+
+}  // namespace
+
 const QList SELECTED_ROLE{
     static_cast<int>(ReplayStoreModel::Roles::SelectedRole)};
 
@@ -292,12 +302,6 @@ int ReplayStoreModel::rowCount(const QModelIndex& parent) const {
         return 0;
     }
     return static_cast<int>(m_replays.size());
-}
-
-QString formatDuration(quint32 engineTicks) {
-    QLocale locale = QLocale::system();
-    // For now tick rate is 30, but this may become dynamic
-    return QTime(0, 0).addSecs(engineTicks / 30).toString("m:ss");
 }
 
 QVariant ReplayStoreModel::data(const QModelIndex& index, int role) const {

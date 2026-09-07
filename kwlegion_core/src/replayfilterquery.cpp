@@ -129,6 +129,33 @@ QString RelativeDateTimeQuery::repr() const {
         m_compareTo.toString(Qt::ISODate));
 }
 
+bool DurationTimeQuery::acceptRow(const QAbstractItemModel& source, int row,
+                                  const QModelIndex& parent) const {
+    const QVariant value =
+        source.data(source.index(row, 0, parent), static_cast<int>(m_role));
+    const auto time = value.toTime();
+    if (!time.isValid()) {
+        return false;
+    }
+    switch (m_comparison) {
+        case RelativeDateTimeQuery::Comparison::BEFORE:
+            return time < m_compareTo;
+        case RelativeDateTimeQuery::Comparison::AFTER:
+            return m_compareTo < time;
+    }
+    return false;
+}
+
+QString DurationTimeQuery::repr() const {
+    const QMetaEnum roleEnum = QMetaEnum::fromType<ReplayStoreModel::Roles>();
+    return QStringLiteral("%1%2%3").arg(
+        QString::fromUtf8(roleEnum.valueToKey(static_cast<int>(m_role))),
+        m_comparison == RelativeDateTimeQuery::Comparison::BEFORE
+            ? QStringLiteral("<")
+            : QStringLiteral(">"),
+        m_compareTo.toString("mm:ss"));
+}
+
 AnyTextReplayFilterQuery::AnyTextReplayFilterQuery(QString needle,
                                                    QObject* parent)
     : DisjunctionFilterQuery(parent) {

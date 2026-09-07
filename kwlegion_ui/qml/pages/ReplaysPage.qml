@@ -306,7 +306,7 @@ Page {
             required property bool selected
             required property var timestamp
             required property var teams
-            required property string duration
+            required property var duration
 
             // The width of the left zone containing textual data
             readonly property int fieldColumnWidth: 220
@@ -402,7 +402,7 @@ Page {
                             sourceSize: Qt.size(width, height)
                         }
                         Label {
-                            text: delegateRoot.duration
+                            text: delegateRoot.duration.toLocaleString(Qt.locale(), "mm:ss")
                             elide: Text.ElideRight
                             color: Theme.lightMode ? Theme.dark : Theme.light
                         }

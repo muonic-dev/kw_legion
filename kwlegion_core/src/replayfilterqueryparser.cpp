@@ -235,6 +235,30 @@ std::optional<std::tuple<QDate, QStringView>> nextDate(const QLocale& locale,
     return std::make_tuple(date, rest);
 }
 
+std::optional<std::tuple<QTime, QStringView>> nextTime(const QLocale& locale,
+                                                       QStringView current) {
+    current = eatWhitespace(current);
+    if (isNextQuoted(current)) {
+        const auto [word, rest] = requireWord(current);
+        const auto time = locale.toTime(word.toString(), "m:ss");
+        if (time.isValid()) {
+            return std::nullopt;
+        }
+        return std::make_tuple(time, rest);
+    }
+
+    std::optional next = nextLongWord(current);
+    if (!next) {
+        return std::nullopt;
+    }
+    const auto [word, rest] = *next;
+    const auto time = locale.toTime(word.toString(), "m:ss");
+    if (!time.isValid()) {
+        return std::nullopt;
+    }
+    return std::make_tuple(time, rest);
+}
+
 class FieldQueryParser {
    public:
     FieldQueryParser(QString fieldLabel)
@@ -247,12 +271,14 @@ class FieldQueryParser {
 
     virtual ~FieldQueryParser() = default;
 
-    bool matches(QStringView fieldLabel) { return m_fieldLabel == fieldLabel; }
+    bool matches(QStringView fieldLabel) const {
+        return m_fieldLabel == fieldLabel;
+    }
 
     // Parse the field's value out of input, returning the constructed query
     // alongside the remaining unconsumed input.
     [[nodiscard]] virtual std::tuple<FilterQuery*, QStringView> parse(
-        QStringView input) = 0;
+        QStringView input) const = 0;
 
    private:
     QString m_fieldLabel;
@@ -264,7 +290,7 @@ class TextQueryParser : public FieldQueryParser {
         : FieldQueryParser(std::move(fieldLabel)), m_role(role) {}
 
     [[nodiscard]] std::tuple<FilterQuery*, QStringView> parse(
-        QStringView input) override {
+        QStringView input) const override {
         const auto [word, rest] = requireWord(input);
         return {new TextFieldReplayFilterQuery(m_role, word.toString()), rest};
     }
@@ -279,7 +305,7 @@ class StringListQueryParser : public FieldQueryParser {
         : FieldQueryParser(std::move(fieldLabel)), m_role(role) {}
 
     [[nodiscard]] std::tuple<FilterQuery*, QStringView> parse(
-        QStringView input) override {
+        QStringView input) const override {
         const auto [word, rest] = requireWord(input);
         return {
             new StringListContainsReplayFilterQuery(m_role, word.toString()),
@@ -295,7 +321,7 @@ class OnDateQueryParser : public FieldQueryParser {
     OnDateQueryParser(QString fieldLabel, ReplayStoreModel::Roles role)
         : FieldQueryParser(std::move(fieldLabel)), m_role(role) {}
     [[nodiscard]] std::tuple<FilterQuery*, QStringView> parse(
-        QStringView input) override {
+        QStringView input) const override {
         const auto parsed = nextDate(QLocale::system(), input);
         if (!parsed) {
             throw ParseError(QStringLiteral("invalid date"));
@@ -336,7 +362,7 @@ class ComparisonDateTimeQueryParser : public FieldQueryParser {
           m_comparison(comparison) {}
 
     [[nodiscard]] std::tuple<FilterQuery*, QStringView> parse(
-        QStringView input) override {
+        QStringView input) const override {
         const auto parsed = nextDate(QLocale::system(), input);
         if (!parsed) {
             throw ParseError(QStringLiteral("unparseable date"));
@@ -345,6 +371,24 @@ class ComparisonDateTimeQueryParser : public FieldQueryParser {
         auto* query = new RelativeDateTimeQuery(
             m_role, date.startOfDay(QTimeZone::LocalTime), m_comparison);
         return {query, rest};
+    }
+
+   private:
+    ReplayStoreModel::Roles m_role;
+    RelativeDateTimeQuery::Comparison m_comparison;
+};
+
+class DurationQueryParser : public FieldQueryParser {
+   public:
+    DurationQueryParser(QString fieldLabel, ReplayStoreModel::Roles role,
+                        RelativeDateTimeQuery::Comparison comparison)
+        : FieldQueryParser(std::move(fieldLabel)),
+          m_role(role),
+          m_comparison(comparison) {}
+
+    [[nodiscard]] std::tuple<FilterQuery*, QStringView> parse(
+        QStringView input) const override {
+        throw ParseError(QStringLiteral("unimplemented"));
     }
 
    private:
@@ -441,8 +485,8 @@ class CompoundQueryParser final {
 
     QStringView m_text;
     // We always need a conjunction, however, on failure we need to free
-    // So, we store and then if m_conj hasn't been taken from us by the time we
-    // are destroyed we free it
+    // So, we store and then if m_conj hasn't been taken from us by the time
+    // we are destroyed we free it
     ConjunctionFilterQuery* m_conj;
 
     const std::vector<std::unique_ptr<FieldQueryParser>>& m_subparsers;
