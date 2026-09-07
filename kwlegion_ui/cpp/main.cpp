@@ -195,6 +195,17 @@ int main(int argc, char* argv[]) {
             rootWindow->requestActivate();
         });
 
+    QObject::connect(&singleInstanceGuard, &SingleInstanceGuard::quitRequested,
+                     &app, [&engine] {
+                         QObject* root = engine.rootObjects().first();
+                         if (root == nullptr) {
+                             return;
+                         }
+                         // The property used to bypass the shutdown in Main.qml
+                         root->setProperty("quitting", true);
+                         QGuiApplication::quit();
+                     });
+
     auto* settings = requireSingleton<Settings>(engine, "Settings");
     settings->setAutostartMechanism(
         KWLegionCore::createPlatformAutostartMechanism());
