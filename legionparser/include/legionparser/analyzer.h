@@ -60,4 +60,6 @@ class ChunkAnalyzer {
 
     // TODO: How do we express a failed decode
 };
+
+class CommandAnalyzer {};
 }  // namespace LegionParser

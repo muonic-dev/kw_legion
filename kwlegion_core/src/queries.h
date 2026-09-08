@@ -40,8 +40,12 @@ class Queries final {
 
     bool isReplayKnown(const QByteArray& checksum);
 
+    // Determine if a replay needs its body reanalyzed (for things like offset
+    // and engine ticks)
     bool doesReplayNeedAnalysis(const QByteArray& checksum);
 
+    // Select the checksum of all replays that need to be re-analyzed on a body
+    // pass
     QList<QByteArray> selectReplaysNeedingAnalysis();
 
     void insertReplay(const LegionParser::ReplaySynopsis& metadata);
@@ -52,6 +56,8 @@ class Queries final {
     void updateOverrideTitle(const QByteArray& checksum,
                              const QString& overrideTitle);
 
+    // Insert the players of a replay
+    // The order received will be tracked so that analysis can use it
     void insertReplayPlayers(const QByteArray& checksum,
                              const QList<LegionParser::Player>& players);
 
@@ -80,6 +86,9 @@ class Queries final {
 
     std::optional<Replay> selectReplay(const QByteArray& checksum);
 
+    // Select the players in a replay
+    // This is guaranteed to maintain the same order as the player insert does
+    // so that player ordering is stable for doing replay analysis
     QList<Player> selectReplayPlayers(const QByteArray& checksum);
 
     QList<QString> selectExternalPaths(const QByteArray& checksum);

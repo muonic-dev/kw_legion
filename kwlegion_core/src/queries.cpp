@@ -22,6 +22,8 @@ namespace KWLegionCore {
 
 Q_LOGGING_CATEGORY(logQueries, "kwlegion.queries");
 
+// NOTE: It is a pattern that we handle forcing re-analysis of a replay by
+// deleting the relevant information
 constexpr std::array MIGRATIONS{
     // Store the replay here
     // Note: we use the checksum to compute a stored local state path
@@ -128,9 +130,33 @@ constexpr std::array MIGRATIONS{
     "CREATE INDEX idx_replay_external_paths_checksum"
     "    ON replay_external_paths(replay_checksum);",
 
+    // Trigger re-analysis for engine_ticks
     "DELETE FROM replay_analysis",
 
+    // Add the number of engine simulation ticks to the replay_analysis
     "ALTER TABLE replay_analysis ADD COLUMN engine_ticks INT NOT NULL",
+
+    // Trigger player re-analysis by dropping the entire replay_players
+    // We are going to recreate it from scratch without rowid since we have a
+    // new primary key
+    "DROP INDEX idx_replay_players_checksum",
+
+    "DROP TABLE replay_players",
+
+    // Recreate the replay_players with player_index as a field
+    // This is an implicit index of the player that command structures link
+    // to. It is also unique per table so we have the primar key
+    "CREATE TABLE replay_players"
+    "    ( replay_checksum BLOB NOT NULL"
+    "    , player_index INT NOT NULL"
+    "    , player_id INT NOT NULL"
+    "    , player_name TEXT NOT NULL"
+    "    , team_number INT"
+    "    , faction INT NOT NULL"
+    "    , is_computer INT NOT NULL"
+    "    , is_replay_saver INT NOT NULL"
+    "    , PRIMARY KEY (replay_checksum, player_index)"
+    "    ) STRICT, WITHOUT ROWID;",
 };
 
 void Queries::migrate() {
@@ -172,20 +198,37 @@ bool Queries::isReplayKnown(const QByteArray& checksum) {
 
 bool Queries::doesReplayNeedAnalysis(const QByteArray& checksum) {
     prepare(
-        "SELECT count(*) FROM replay_analysis "
-        "WHERE replay_checksum = :checksum");
+        " SELECT "
+        " EXISTS ("
+        "   SELECT 1"
+        "   FROM replay_analysis "
+        "   WHERE replay_checksum = :checksum"
+        " ) as has_analysis"
+        " , EXISTS ( "
+        "   SELECT 1"
+        "   FROM replay_players "
+        "   WHERE replay_checksum = :checksum"
+        " ) as has_players");
     m_query.bindValue(":checksum", checksum);
     exec();
     m_query.next();  // it's a count, there must be 1 row
-    return m_query.value(0).toInt() == 0;
+    return !m_query.value(0).toBool() || !m_query.value(1).toBool();
 }
 
 QList<QByteArray> Queries::selectReplaysNeedingAnalysis() {
     prepare(
-        "SELECT r.checksum "
-        "FROM replays r LEFT OUTER JOIN replay_analysis ra "
-        "   ON r.checksum = ra.replay_checksum "
-        "WHERE ra.body_offset IS NULL");
+        " SELECT checksum"
+        " FROM replays r"
+        " WHERE NOT EXISTS ( "
+        "   SELECT replay_checksum"
+        "   FROM replay_analysis "
+        "   WHERE replay_checksum = r.checksum"
+        " ) "
+        " OR NOT EXISTS ( "
+        "   SELECT 1"
+        "   FROM replay_players "
+        "   WHERE replay_checksum = r.checksum"
+        ")");
     exec();
     QList<QByteArray> result;
     while (m_query.next()) {
@@ -288,6 +331,7 @@ void Queries::insertReplayPlayers(const QByteArray& checksum,
     prepare(
         "INSERT INTO replay_players"
         "    ( replay_checksum"
+        "    , player_index"
         "    , player_id"
         "    , player_name"
         "    , team_number"
@@ -296,20 +340,24 @@ void Queries::insertReplayPlayers(const QByteArray& checksum,
         "    , is_replay_saver )"
         " VALUES"
         "    ( :replay_checksum"
+        "    , :player_index"
         "    , :player_id"
         "    , :player_name"
         "    , :team_number"
         "    , :faction"
         "    , :is_computer"
-        "    , :is_replay_saver);");
-    for (const auto& player : players) {
+        "    , :is_replay_saver)"
+        " ON CONFLICT DO NOTHING;");
+    // We explicitly insert the player index here
+    for (auto it = players.cbegin(); it != players.cend(); ++it) {
         m_query.bindValue(":replay_checksum", checksum);
-        m_query.bindValue(":player_id", player.id);
-        m_query.bindValue(":player_name", player.name);
-        m_query.bindValue(":team_number", player.teamNumber);
-        m_query.bindValue(":faction", LegionParser::toUInt8(player.faction));
-        m_query.bindValue(":is_computer", player.isComputer ? 1 : 0);
-        m_query.bindValue(":is_replay_saver", player.isReplaySaver ? 1 : 0);
+        m_query.bindValue(":player_index", it - players.cbegin());
+        m_query.bindValue(":player_id", it->id);
+        m_query.bindValue(":player_name", it->name);
+        m_query.bindValue(":team_number", it->teamNumber);
+        m_query.bindValue(":faction", LegionParser::toUInt8(it->faction));
+        m_query.bindValue(":is_computer", it->isComputer ? 1 : 0);
+        m_query.bindValue(":is_replay_saver", it->isReplaySaver ? 1 : 0);
         exec();
     }
 }
@@ -445,7 +493,8 @@ QList<Player> Queries::selectReplayPlayers(const QByteArray& checksum) {
         "    , is_computer"
         "    , is_replay_saver"
         " FROM replay_players"
-        " WHERE replay_checksum = :checksum");
+        " WHERE replay_checksum = :checksum"
+        " ORDER BY player_index ASC");  // explicitly order by
     m_query.bindValue(":checksum", checksum);
 
     exec();
