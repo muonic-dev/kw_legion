@@ -511,6 +511,17 @@ Page {
                         implicitWidth: 16 + leftPadding + rightPadding
                         implicitHeight: 16 + topPadding + bottomPadding
                     }
+
+                    Button {
+                        contentItem: TintedIcon {
+                            source: "qrc:/qt/qml/KWLegionUI/ico/chart-line-svgrepo-com.svg"
+                            sourceSize: Qt.size(16, 16)
+                        }
+
+                        padding: 10
+                        implicitWidth: 16 + leftPadding + rightPadding
+                        implicitHeight: 16 + topPadding + bottomPadding
+                    }
                 }
             }
 
