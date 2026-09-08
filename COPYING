@@ -1,0 +1,5 @@
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation version 3 of the License.
+
+This application is built with Qt 6, © The Qt Company Ltd. and other contributors, used here under the GNU Lesser General Public License version 3 (LGPLv3)
+
+Additionally, the Qt Graphs module is used here under the GNU Public License version 3 (GPLv3)
