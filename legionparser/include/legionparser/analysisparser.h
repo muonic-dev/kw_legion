@@ -7,42 +7,36 @@
 
 #include <QList>
 #include <QtTypes>
-#include <memory>
 
 class QIODevice;
 
 namespace LegionParser {
 
-class Reader;
 class ChunkAnalyzer;
 
 /**
- * An AnalysisParser drives an Analyzer of the chunk/framing
- * structure of a replay
+ * Analyze the replay stored in replayFile using the given chunk analyzer
+ *
+ * This wil repeatedly read chunks from the replayFile and feed them to the
+ * analyzer. Assumes that replayFile is positioned before the start of the first
+ * body chunk
+ *
+ * Will throw any additional exceptions that analyzer does, however, well
+ * formed analyzers won't throw exceptions given the command framing is in flux.
+ *
+ * @param replayFile the replay file
+ * @param bodyOffset the position of the first body chunk after the replay
+ * header
+ * @param analyzer the chunk analyzer passed in
+ *
+ * @throws ReplayParseException if there is a parsing failure of the body
+ * framing
+ *
+ *
  */
-class AnalysisParser {
-   public:
-    AnalysisParser(const AnalysisParser&) = delete;
-    AnalysisParser& operator=(const AnalysisParser&) = delete;
-    AnalysisParser(AnalysisParser&&) = delete;
-    AnalysisParser& operator=(AnalysisParser&&) = delete;
-
-    virtual ~AnalysisParser();
-
-    /**
-     * @brief Perform an analysis of the replayFile by passing to the given
-     * listener
-     */
-    static void parse(QIODevice& replayFile, qsizetype offset,
-                      ChunkAnalyzer& analyzer);
-
-   private:
-    AnalysisParser(QIODevice& replayFile, qsizetype offset,
-                   ChunkAnalyzer& analyzer);
-
-    std::unique_ptr<Reader> m_reader;
-    qsizetype m_offset;
-    AnalysisParser& m_analyzer;
-};
+void analyzeReplay(QIODevice& replayFile,
+                   // We need to manually pass offset to align the internal
+                   // offset in the Reader object
+                   qsizetype bodyOffset, ChunkAnalyzer& analyzer);
 
 }  // namespace LegionParser

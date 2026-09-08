@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <legionparser/analyzer.h>
+#include <legionparser/chunkanalyzer.h>
 #include <legionparser/exception.h>
 
 #include <QByteArray>
@@ -39,6 +39,9 @@ struct BodyChunk {
 class Reader {
    public:
     Reader(QIODevice& replayFile);
+    // Allows manually passing a start offset for cases where the body has
+    // already been read
+    Reader(QIODevice& replayFile, qsizetype offset);
 
     Reader(const Reader&) = delete;
     Reader(Reader&&) = delete;

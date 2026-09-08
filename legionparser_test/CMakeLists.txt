@@ -2,6 +2,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core)
 
 add_executable(legionparser_tests
     legionparser_tests.cpp
+    analysisparser_test.cpp
 )
 
 target_link_libraries(legionparser_tests

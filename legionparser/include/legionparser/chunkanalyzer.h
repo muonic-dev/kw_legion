@@ -5,7 +5,9 @@
 
 #pragma once
 
+#include <QByteArray>
 #include <QByteArrayView>
+#include <QList>
 #include <QtTypes>
 #include <cstdint>
 
@@ -28,6 +30,7 @@ enum class ChunkType : std::uint8_t { Command = 1, Camera, Type3, Type4 };
  */
 class ChunkAnalyzer {
    public:
+    ChunkAnalyzer() = default;
     // Pure interface, no move/copy
     ChunkAnalyzer(const ChunkAnalyzer&) = delete;
     ChunkAnalyzer(ChunkAnalyzer&&) = delete;
@@ -49,8 +52,12 @@ class ChunkAnalyzer {
      * @brief Analyze a single chunk
      *
      * @return false when the analyzer is uninterested in more data
+     * @param chunkStart the starting offset of the chunk within the file
+     * @param timecode the chunk timecode
+     * @param type the chunk type
+     * @param QByteArrayView the body bytes of the chunk
      */
-    virtual bool chunk(qint32 timecode, ChunkType type,
+    virtual bool chunk(qsizetype chunkStart, qint32 timecode, ChunkType type,
                        QByteArrayView payload) = 0;
 
     /**
@@ -61,5 +68,30 @@ class ChunkAnalyzer {
     // TODO: How do we express a failed decode
 };
 
-class CommandAnalyzer {};
+struct RawCommand {};
+
+// Once we have more ability to decode commands this will be a variant
+using Command = RawCommand;
+
+// A chunk of commands (type 1 chunk)
+struct CommandChunk {
+    // The timecode
+    qint32 timecode;
+    // The raw payload
+    QByteArray payload;
+    // The decoded commands in the chunk
+    // All framed commands will have have their
+    // views reference payload
+    QList<Command> commands;
+};
+
+class CommandChunkParser : public ChunkAnalyzer {
+   public:
+    bool chunk(qsizetype chunkOffset, qint32 timecode, ChunkType type,
+               QByteArrayView payload) override;
+
+    void finalize() override;
+
+    void commandChunk(qint32 timecode, QByteArrayView payload);
+};
 }  // namespace LegionParser

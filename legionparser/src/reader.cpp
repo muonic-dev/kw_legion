@@ -3,7 +3,6 @@
 
 #include "reader.h"
 
-#include <legionparser/analyzer.h>
 #include <legionparser/exception.h>
 
 #include <QLatin1StringView>
@@ -15,6 +14,11 @@
 namespace LegionParser {
 
 Reader::Reader(QIODevice& replayFile) : m_replayFile(replayFile) {}
+
+Reader::Reader(QIODevice& replayFile, qsizetype offset)
+    : m_replayFile(replayFile) {
+    m_offsetMgr.increment(offset);
+}
 
 QString Reader::readUtf16String() {
     // Match metadata strings are null-terminated sequences of 2-byte

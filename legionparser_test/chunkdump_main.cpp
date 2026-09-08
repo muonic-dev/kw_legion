@@ -263,6 +263,15 @@ int main(int argc, char** argv) {
                    static_cast<long long>(c.length));
     }
 
+    std::map<ChunkType, int> typeCounts;
+    for (const auto& [tc, type, len] : chunkLog) {
+        typeCounts[type]++;
+    }
+    std::printf("  -- chunk type counts --\n");
+    for (const auto& [type, count] : typeCounts) {
+        std::printf("    type=%d count=%d\n", static_cast<int>(type), count);
+    }
+
     std::printf("  -- tail chunks (any type) --\n");
     const size_t cstart = chunkLog.size() > 20 ? chunkLog.size() - 20 : 0;
     for (size_t i = cstart; i < chunkLog.size(); ++i) {
