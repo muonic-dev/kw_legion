@@ -17,7 +17,6 @@
 
 namespace KWLegionCore {
 // Memory management is by qobject hierarchy
-// NOLINTBEGIN(cppcoreguidelines-owning-memory)
 
 TextFieldReplayFilterQuery::TextFieldReplayFilterQuery(
     ReplayStoreModel::Roles role, QString needle, QObject* parent)
@@ -171,6 +170,5 @@ AnyTextReplayFilterQuery::AnyTextReplayFilterQuery(QString needle,
     addQuery(TextFieldReplayFilterQuery::patch(needle));
     addQuery(StringListContainsReplayFilterQuery::player(std::move(needle)));
 }
-// NOLINTEND(cppcoreguidelines-owning-memory)
 
 }  // namespace KWLegionCore

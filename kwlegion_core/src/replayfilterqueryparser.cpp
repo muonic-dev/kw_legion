@@ -37,7 +37,6 @@ void ReplayFilterQueryParser::setQueryText(const QString& value) {
         m_current->setParent(this);
         emit queryTextChanged();
         emit queryChanged();
-        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
         delete previous;
     }
 }
@@ -45,8 +44,6 @@ void ReplayFilterQueryParser::setQueryText(const QString& value) {
 QObject* ReplayFilterQueryParser::query() const { return m_current; }
 
 namespace {
-// Memory is handled by QObject ownership
-// NOLINTBEGIN(cppcoreguidelines-owning-memory)
 // QStringView iterator are pointers so iterator math becomes pointer math
 // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
@@ -503,11 +500,9 @@ class CompoundQueryParser final {
 };
 
 // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-// NOLINTEND(cppcoreguidelines-owning-memory)
 }  // namespace
 
 // Memory management by QObject semantics
-// NOLINTBEGIN(cppcoreguidelines-owning-memory)
 FilterQuery* ReplayFilterQueryParser::parse(QStringView text) {
     if (text.isEmpty()) {
         return new TautologyFilterQuery(this);
@@ -515,6 +510,5 @@ FilterQuery* ReplayFilterQueryParser::parse(QStringView text) {
     CompoundQueryParser parser{text};
     return parser.parse();
 }
-// NOLINTEND(cppcoreguidelines-owning-memory)
 
 }  // namespace KWLegionCore

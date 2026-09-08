@@ -72,7 +72,7 @@ ReplayStoreModel* ReplayStoreModel::create(QQmlEngine* /*qmlEngine*/,
                                            QJSEngine* /*jsEngine*/) {
     // Signature is Qt's QML_SINGLETON factory contract - must return T*, not
     // gsl::owner<T*>. Ownership transfers to the QML engine at the call site.
-    return new ReplayStoreModel();  // NOLINT(cppcoreguidelines-owning-memory)
+    return new ReplayStoreModel();
 }
 
 void ReplayStoreModel::setStore(ReplayStore* store) {
@@ -103,7 +103,6 @@ void ReplayStoreModel::replaysLoaded(const QList<Replay>& replays) {
     qDeleteAll(m_replays);
     m_replays.clear();
     for (const auto& replay : replays) {
-        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
         m_replays.append(new ReplayModel(replay, this));
     }
     endResetModel();
@@ -123,7 +122,6 @@ void ReplayStoreModel::replaysChanged(const QList<Replay>& replays) {
         } else {
             const int row = static_cast<int>(m_replays.size());
             beginInsertRows(QModelIndex(), row, row);
-            // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
             m_replays.append(new ReplayModel(replay, this));
             endInsertRows();
         }

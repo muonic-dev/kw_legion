@@ -197,39 +197,32 @@ bool Queries::isReplayKnown(const QByteArray& checksum) {
     return m_query.value(0).toInt() != 0;
 }
 
+constexpr const char* BASE_REPLAY_NEEDING_ANALYSIS =
+    " SELECT checksum"
+    " FROM replays r"
+    " WHERE NOT EXISTS ( "
+    "   SELECT replay_checksum"
+    "   FROM replay_analysis "
+    "   WHERE replay_checksum = r.checksum"
+    " ) "
+    " OR NOT EXISTS ( "
+    "   SELECT 1"
+    "   FROM replay_players "
+    "   WHERE replay_checksum = r.checksum"
+    ")";
+
 bool Queries::doesReplayNeedAnalysis(const QByteArray& checksum) {
-    prepare(
-        " SELECT "
-        " EXISTS ("
-        "   SELECT 1"
-        "   FROM replay_analysis "
-        "   WHERE replay_checksum = :checksum"
-        " ) as has_analysis"
-        " , EXISTS ( "
-        "   SELECT 1"
-        "   FROM replay_players "
-        "   WHERE replay_checksum = :checksum"
-        " ) as has_players");
+    prepare(QString(BASE_REPLAY_NEEDING_ANALYSIS) +
+            " AND r.checksum = :checksum"
+            " LIMIT 1");
     m_query.bindValue(":checksum", checksum);
     exec();
-    m_query.next();  // it's a count, there must be 1 row
-    return !m_query.value(0).toBool() || !m_query.value(1).toBool();
+    // If there is a row, then re-analysis needed
+    return m_query.next();
 }
 
 QList<QByteArray> Queries::selectReplaysNeedingAnalysis() {
-    prepare(
-        " SELECT checksum"
-        " FROM replays r"
-        " WHERE NOT EXISTS ( "
-        "   SELECT replay_checksum"
-        "   FROM replay_analysis "
-        "   WHERE replay_checksum = r.checksum"
-        " ) "
-        " OR NOT EXISTS ( "
-        "   SELECT 1"
-        "   FROM replay_players "
-        "   WHERE replay_checksum = r.checksum"
-        ")");
+    prepare(BASE_REPLAY_NEEDING_ANALYSIS);
     exec();
     QList<QByteArray> result;
     while (m_query.next()) {

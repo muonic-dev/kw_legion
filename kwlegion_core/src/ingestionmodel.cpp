@@ -22,7 +22,6 @@ IngestionModel* IngestionModel::create(QQmlEngine* /*qmlEngine*/,
                                        QJSEngine* /*jsEngine*/) {
     // Signature is Qt's QML_SINGLETON factory contract - must return T*, not
     // gsl::owner<T*>. Ownership transfers to the QML engine at the call site.
-    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     return new IngestionModel();
 }
 

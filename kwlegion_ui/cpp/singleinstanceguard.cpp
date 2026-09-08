@@ -5,6 +5,7 @@
 
 #include <QLocalSocket>
 #include <QObject>
+#include <QTimer>
 
 namespace {
 // No response is expected on the connection - its existence alone is the
@@ -31,6 +32,8 @@ SingleInstanceGuard::SingleInstanceGuard(const QString& key, QObject* parent)
     if (probe.waitForConnected(PROBE_TIMEOUT_MS)) {
         // Another instance is listening so request that it activate
         probe.write(ACTIVATE_MESSAGE, 1);
+        // Guarantee that we wrote successfully
+        probe.waitForBytesWritten(PROBE_TIMEOUT_MS);
         probe.close();
         return;
     }
@@ -46,14 +49,33 @@ SingleInstanceGuard::SingleInstanceGuard(const QString& key, QObject* parent)
         // activation
         connect(&m_server, &QLocalServer::newConnection, this, [this] {
             QLocalSocket* socket = m_server.nextPendingConnection();
-            if (socket->waitForReadyRead(PROBE_TIMEOUT_MS) &&
-                socket->read(1) ==
-                    QByteArray(1, static_cast<char>(Request::Quit))) {
-                emit quitRequested();
-            } else {
-                emit activationRequested();
-            }
-            delete socket;  // NOLINT(cppcoreguidelines-owning-memory)
+            auto* timer = new QTimer(socket);  // delete on teardown
+            timer->setSingleShot(PROBE_TIMEOUT_MS);
+
+            // Safe for concurrent modification; single thread event loop
+            auto settled = std::make_shared<bool>(false);
+            auto finished = [this, socket, timer, settled](bool haveData) {
+                if (*settled) {
+                    return;
+                }
+                *settled = true;
+                timer->stop();
+
+                if (haveData &&
+                    socket->read(1) ==
+                        QByteArray(1, static_cast<char>(Request::Quit))) {
+                    emit quitRequested();
+                } else {
+                    emit activationRequested();
+                }
+                socket->deleteLater();
+            };
+
+            QObject::connect(socket, &QLocalSocket::readyRead, socket,
+                             [finished] { finished(true); });
+            QObject::connect(timer, &QTimer::timeout, socket,
+                             [finished] { finished(false); });
+            timer->start(PROBE_TIMEOUT_MS);
         });
     }
 }

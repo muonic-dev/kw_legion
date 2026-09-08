@@ -525,6 +525,7 @@ QList<QByteArray> ReplayStore::ingestKnownReplay(
 
     if (queries.doesReplayNeedAnalysis(metadata.checksum)) {
         queries.insertReplayAnalysis(metadata);
+        queries.insertReplayPlayers(metadata.checksum, metadata.players);
     }
     // If the replay has been seen before then we need to add a path to it
     qDebug(logStore) << "Existing replay being ingested: " << file.fileName();

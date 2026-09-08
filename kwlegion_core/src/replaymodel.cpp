@@ -44,7 +44,6 @@ ReplayModel::ReplayModel(const Replay& replay, QObject* parent)
         if (it == teams.end()) {
             // Cleaned up via QObject parent/child deletion and implemented this
             // way for simplicity of integrating with QML
-            // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
             teams.append(new TeamModel(player.teamNumber, this));
             it = teams.end() - 1;
         }

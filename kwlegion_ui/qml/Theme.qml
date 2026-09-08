@@ -19,4 +19,5 @@ QtObject {
     readonly property url appIcon: AppInfo.debugBuild ? "qrc:/qt/qml/KWLegionUI/ico/CNCKW_Black_Hand_Logo.png" : "qrc:/qt/qml/KWLegionUI/ico/CNCKW_Marked_of_Kane_Logo.png"
 
     readonly property int shortAnimationDuration: 120
+    readonly property int mediumAnimationDuration: 360
 }

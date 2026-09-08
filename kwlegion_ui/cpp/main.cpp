@@ -185,6 +185,9 @@ int main(int argc, char* argv[]) {
     QObject::connect(
         &singleInstanceGuard, &SingleInstanceGuard::activationRequested, &app,
         [&engine] {
+            if (engine.rootObjects().isEmpty()) {
+                return;
+            }
             auto* rootWindow =
                 qobject_cast<QWindow*>(engine.rootObjects().constFirst());
             if (rootWindow == nullptr) {

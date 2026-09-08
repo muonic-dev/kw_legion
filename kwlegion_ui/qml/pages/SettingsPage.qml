@@ -19,7 +19,7 @@ Page {
 
         SettingsSwitchRow {
             name: qsTr("Start automatically")
-            description: qsTr("Start automatically when you sign in.")
+            description: qsTr("Start at login. LEGION needs to be running in order to track your replays.")
             checked: Settings.shouldAutostart
             onCheckedChanged: Settings.shouldAutostart = checked
         }

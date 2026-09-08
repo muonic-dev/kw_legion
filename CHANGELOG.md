@@ -7,6 +7,8 @@
 - Replay time is now visible and can be filtered on using `longer:` and `shorter:` with the `m:ss` format.
 - The installer will try and close the application, if this is not possible a dialog box will pop up.
 - The installer will offer to launch the application now.
+- The autostart function (which is important for proper functioning) will be offered to be setup until the user makes a decision
+
 
 ## 0.2.0
 

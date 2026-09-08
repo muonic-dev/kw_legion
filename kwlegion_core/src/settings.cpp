@@ -13,6 +13,12 @@
 namespace KWLegionCore {
 Settings::Settings(QObject* parent) : QObject(parent) {}
 
+Settings* Settings::create(QQmlEngine* /*qmlEngine*/, QJSEngine* /*jsEngine*/) {
+    // Signature is Qt's QML_SINGLETON factory contract - must return T*, not
+    // gsl::owner<T*>. Ownership transfers to the QML engine at the call site.
+    return new Settings();
+}
+
 bool Settings::shouldAutostart() const {
     if (!m_autostarter) {
         return false;
@@ -20,15 +26,24 @@ bool Settings::shouldAutostart() const {
     return m_autostarter->shouldAutostart();
 }
 
-Settings* Settings::create(QQmlEngine* /*qmlEngine*/, QJSEngine* /*jsEngine*/) {
-    // Signature is Qt's QML_SINGLETON factory contract - must return T*, not
-    // gsl::owner<T*>. Ownership transfers to the QML engine at the call site.
-    return new Settings();  // NOLINT(cppcoreguidelines-owning-memory)
-}
-
 void Settings::setAutostart(bool v) {
     m_autostarter->setAutostart(v);
     emit autostartChanged();
+    setHasDismissedAutostart(true);
+}
+
+constexpr const char* START_OFFER_DISMISSED = "start/autostartDismissed";
+
+bool Settings::hasDismissedAutostart() const {
+    return m_settings.value(START_OFFER_DISMISSED, false).toBool() ||
+           // If the user has already set autostart then don't nag
+           shouldAutostart();
+}
+
+void Settings::setHasDismissedAutostart(bool flag) {
+    m_settings.setValue(START_OFFER_DISMISSED, flag);
+    m_settings.sync();
+    emit hasDismissedAutostartChanged();
 }
 
 constexpr const char* START_MINIMIZED = "start/minimized";
