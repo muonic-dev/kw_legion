@@ -59,6 +59,7 @@ constexpr std::array MIGRATIONS{
     // player_id isn't reliably unique per replay - e.g. the trailing
     // commentator player's id is consistently 0, and skirmish replays leave
     // every player's id at 0 - so rows are identified by rowid instead.
+    // NOT AUTHORITATIVE, recreated
     "CREATE TABLE replay_players"
     "    ( replay_checksum BLOB NOT NULL"
     "    , player_id INT NOT NULL"
@@ -290,9 +291,12 @@ void Queries::insertReplay(const LegionParser::ReplaySynopsis& synopsis) {
 void Queries::insertReplayAnalysis(
     const LegionParser::ReplaySynopsis& synopsis) {
     prepare(
-        "INSERT INTO replay_analysis (replay_checksum, body_offset, "
-        "engine_ticks) "
-        "VALUES (:checksum, :offset, :ticks)");
+        "INSERT INTO replay_analysis"
+        " (replay_checksum, body_offset, engine_ticks)"
+        " VALUES (:checksum, :offset, :ticks)"
+        " ON CONFLICT (replay_checksum) "
+        " DO UPDATE SET body_offset = excluded.body_offset"
+        "   , engine_ticks = excluded.engine_ticks");
     m_query.bindValue(":checksum", synopsis.checksum);
     m_query.bindValue(":offset", synopsis.bodyOffset);
     m_query.bindValue(":ticks", synopsis.engineTicks);
@@ -347,7 +351,7 @@ void Queries::insertReplayPlayers(const QByteArray& checksum,
         "    , :faction"
         "    , :is_computer"
         "    , :is_replay_saver)"
-        " ON CONFLICT DO NOTHING;");
+        " ON CONFLICT(replay_checksum, player_index) DO NOTHING;");
     // We explicitly insert the player index here
     for (auto it = players.cbegin(); it != players.cend(); ++it) {
         m_query.bindValue(":replay_checksum", checksum);

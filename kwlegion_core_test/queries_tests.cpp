@@ -191,12 +191,13 @@ TEST_CASE("Queries doesReplayNeedAnalysis reflects insertReplayAnalysis",
     const QByteArray checksum = "checksum-needs-analysis";
     LegionParser::ReplaySynopsis metadata = makeMetadata(checksum);
     metadata.bodyOffset = 512;
-    metadata.players = {LegionParser::Player{.id = 1,
-                                             .name = "Alice",
-                                             .teamNumber = 0,
-                                             .faction = LegionParser::Faction::GDI,
-                                             .isComputer = false,
-                                             .isReplaySaver = true}};
+    metadata.players = {
+        LegionParser::Player{.id = 1,
+                             .name = "Alice",
+                             .teamNumber = 0,
+                             .faction = LegionParser::Faction::GDI,
+                             .isComputer = false,
+                             .isReplaySaver = true}};
     queries.insertReplay(metadata);
 
     // insertReplay alone no longer writes replay_analysis - that's now a
@@ -280,22 +281,6 @@ TEST_CASE("Queries insertReplayAnalysis stores the engine ticks",
 
     db = QSqlDatabase();
     QSqlDatabase::removeDatabase("queries_insert_analysis_ticks");
-}
-
-TEST_CASE("Queries insertReplayAnalysis throws on a duplicate checksum",
-          "[queries][sql][analysis]") {
-    QSqlDatabase db = openMigratedDb("queries_insert_analysis_dup");
-    Queries queries{QSqlQuery(db)};
-
-    const QByteArray checksum = "checksum-analysis-dup";
-    LegionParser::ReplaySynopsis metadata = makeMetadata(checksum);
-    queries.insertReplay(metadata);
-    queries.insertReplayAnalysis(metadata);
-
-    CHECK_THROWS_AS(queries.insertReplayAnalysis(metadata), StorageException);
-
-    db = QSqlDatabase();
-    QSqlDatabase::removeDatabase("queries_insert_analysis_dup");
 }
 
 TEST_CASE(

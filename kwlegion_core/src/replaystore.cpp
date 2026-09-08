@@ -170,6 +170,13 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     ensureDirectories();
     ensureDb();
 
+    // We did some kind of migration that needs additional bookkeeping
+    try {
+        performReplayReanalysis();
+    } catch (StorageException& ex) {
+        qCritical(logStore) << "Failed to re-analyze replays " << ex.what();
+    }
+
     // Inbox contents are derived from what is on disk rather than persisted,
     // so clear whatever the UI is holding before the sweep below repopulates
     // it from the paths we actually find.
@@ -205,14 +212,6 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     } catch (StorageException& ex) {
         qCritical(logStore) << "Unable to access the replays " << ex.what();
     }
-
-    // And finally, analyze any replays that need analysis, avoid blocking
-    // startup on full reanalysis
-    try {
-        performReplayReanalysis();
-    } catch (StorageException& ex) {
-        qCritical(logStore) << "Failed to re-analyze replays " << ex.what();
-    }
 }
 
 void ReplayStore::performReplayReanalysis() {
@@ -235,6 +234,7 @@ void ReplayStore::performReplayReanalysis() {
         try {
             const auto synopsis =
                 LegionParser::SynopsisParser::parse(replayFile);
+            queries.insertReplayPlayers(synopsis.checksum, synopsis.players);
             queries.insertReplayAnalysis(synopsis);
             guard.commit();
         } catch (LegionParser::ReplayParseException& ex) {
