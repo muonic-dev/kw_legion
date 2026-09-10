@@ -23,9 +23,9 @@ namespace LegionParser {
  */
 class TeeDevice : public QIODevice {
    public:
-    template <std::invocable<QByteArrayView> Fn>
-    TeeDevice(QIODevice& wrapped, Fn&& sink)
-        : m_sink{std::forward<Fn>(sink)}, m_wrapped{wrapped} {
+    template <std::invocable<QByteArrayView> ErrorFn>
+    TeeDevice(QIODevice& wrapped, ErrorFn&& sink)
+        : m_sink{std::forward<ErrorFn>(sink)}, m_wrapped{wrapped} {
         setOpenMode(QIODevice::ReadOnly | QIODevice::Unbuffered);
     }
 
@@ -42,9 +42,9 @@ class TeeDevice : public QIODevice {
 
     [[nodiscard]] bool isSequential() const override;
 
-    template <std::invocable<QByteArrayView> Fn>
-    void setSink(Fn&& sink) {
-        m_sink = std::forward<Fn>(sink);
+    template <std::invocable<QByteArrayView> ErrorFn>
+    void setSink(ErrorFn&& sink) {
+        m_sink = std::forward<ErrorFn>(sink);
     }
 
     void clearSink() { m_sink = std::nullopt; }

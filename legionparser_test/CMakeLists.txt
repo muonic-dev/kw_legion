@@ -33,10 +33,6 @@ target_link_libraries(legionparser_chunkdump
     PRIVATE
         legionparser::legionparser
 )
-target_include_directories(legionparser_chunkdump
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../legionparser/src
-)
 add_custom_command(TARGET legionparser_chunkdump POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_RUNTIME_DLLS:legionparser_chunkdump>

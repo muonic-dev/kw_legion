@@ -4,6 +4,8 @@ add_library(legionparser STATIC
     src/synopsisparser.cpp
     src/analysisparser.cpp
     src/chunkanalyzer.cpp
+    src/broadcastchunkanalyzer.cpp
+    src/bookkeepingchunkanalyzer.cpp
     src/reader.cpp
     src/exception.cpp
     src/teedevice.cpp

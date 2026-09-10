@@ -9,6 +9,7 @@
 #include <QFile>
 #include <catch2/catch_test_macros.hpp>
 #include <map>
+#include <span>
 
 using namespace LegionParser;
 
@@ -23,8 +24,8 @@ QString replayPath(const QString& filename) {
 // (analyzeReplay + Reader), not command-level decoding.
 class CountingAnalyzer : public ChunkAnalyzer {
    public:
-    bool chunk(qsizetype /*chunkStart*/, qint32 /*timecode*/, ChunkType type,
-               QByteArrayView /*payload*/) override {
+    bool chunk(qsizetype /*chunkStart*/, quint32 /*timecode*/, ChunkType type,
+               std::span<const std::byte> /*buf*/) override {
         ++m_counts[type];
         return true;
     }
@@ -60,8 +61,9 @@ class StoppingAnalyzer : public ChunkAnalyzer {
    public:
     explicit StoppingAnalyzer(int stopAfter) : m_stopAfter(stopAfter) {}
 
-    bool chunk(qsizetype /*chunkStart*/, qint32 /*timecode*/,
-               ChunkType /*type*/, QByteArrayView /*payload*/) override {
+    bool chunk(qsizetype /*chunkStart*/, quint32 /*timecode*/,
+               ChunkType /*type*/,
+               std::span<const std::byte> /*payload*/) override {
         ++m_seen;
         return m_seen < m_stopAfter;
     }
