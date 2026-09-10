@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 #include <variant>
 
 namespace LegionParser {
@@ -334,6 +335,27 @@ struct Match : Ts... {
 };
 
 }  // namespace
+
+CommandFrameAnalyzer::CommandFrameAnalyzer(const CommandFrameAnalyzer& other)
+    : m_chunk(other.m_chunk), m_error(other.m_error) {}
+
+CommandFrameAnalyzer::CommandFrameAnalyzer(
+    CommandFrameAnalyzer&& other) noexcept
+    : m_chunk(std::move(other.m_chunk)), m_error(std::move(other.m_error)) {}
+
+CommandFrameAnalyzer& CommandFrameAnalyzer::operator=(
+    const CommandFrameAnalyzer& other) {
+    m_chunk = other.m_chunk;
+    m_error = other.m_error;
+    return *this;
+}
+
+CommandFrameAnalyzer& CommandFrameAnalyzer::operator=(
+    CommandFrameAnalyzer&& other) noexcept {
+    m_chunk = std::move(other.m_chunk);
+    m_error = std::move(other.m_error);
+    return *this;
+}
 
 bool CommandFrameAnalyzer::chunk(qsizetype chunkOffset, quint32 timecode,
                                  ChunkType type,

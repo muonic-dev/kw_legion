@@ -126,6 +126,12 @@ class CommandFrameAnalyzer : public ChunkAnalyzer {
         : m_chunk{std::forward<ChunkFn>(chunkCallback)},
           m_error{[](DesyncDetails /* offset */) {}} {}
 
+    CommandFrameAnalyzer(const CommandFrameAnalyzer& other);
+    CommandFrameAnalyzer(CommandFrameAnalyzer&& other) noexcept;
+
+    CommandFrameAnalyzer& operator=(const CommandFrameAnalyzer& other);
+    CommandFrameAnalyzer& operator=(CommandFrameAnalyzer&& other) noexcept;
+
     bool chunk(qsizetype chunkOffset, quint32 timecode, ChunkType type,
                std::span<const std::byte> buf) override;
 

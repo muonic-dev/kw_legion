@@ -25,6 +25,7 @@ add_library(kwlegion_core STATIC
     include/kwlegion_core/ingestionmodel.h
     include/kwlegion_core/inboxitem.h
     # Main src
+    src/apmanalyzer.cpp
     src/appinfo.cpp
     src/metatypes.cpp
     src/prospector.cpp
