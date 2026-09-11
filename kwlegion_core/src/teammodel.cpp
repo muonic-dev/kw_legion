@@ -22,6 +22,7 @@ TeamModel::TeamModel(std::uint32_t number, QObject* parent)
       m_roleNames{
           {static_cast<int>(Roles::NameRole), "name"},
           {static_cast<int>(Roles::FactionRole), "faction"},
+          {static_cast<int>(Roles::SeriesIndexRole), "seriesIndex"},
       } {}
 
 QHash<int, QByteArray> TeamModel::roleNames() const { return m_roleNames; }
@@ -44,12 +45,17 @@ QVariant TeamModel::data(const QModelIndex& index, int role) const {
             return player.name;
         case Roles::FactionRole:
             return QVariant::fromValue(player.faction);
+        case Roles::SeriesIndexRole:
+            return m_seriesIndices.at(index.row());
         default:
             return {};
     }
 }
 
-void TeamModel::addPlayer(const Player& player) { m_players.append(player); }
+void TeamModel::addPlayer(const Player& player, int seriesIndex) {
+    m_players.append(player);
+    m_seriesIndices.append(seriesIndex);
+}
 
 QStringList TeamModel::playerNames() const {
     QStringList names;

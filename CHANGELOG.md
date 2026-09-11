@@ -8,6 +8,10 @@
 - The installer will try and close the application, if this is not possible a dialog box will pop up.
 - The installer will offer to launch the application now.
 - The autostart function (which is important for proper functioning) will be offered to be setup until the user makes a decision
+- Initial replay analysis view with an APM graph average of 5 second windows.
+
+### Changed
+- Linking a replay into the Replays folder now uses the matchtitle and part of the hash instead of the full hash for legibility
 
 
 ## 0.2.0

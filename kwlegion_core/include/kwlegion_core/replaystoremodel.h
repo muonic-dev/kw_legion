@@ -47,7 +47,6 @@ class ReplayStoreModel : public QAbstractListModel {
         ExpandedRole,
         AnalysisStateRole,
         AnalysisAPMRole,
-        AnalysisPlayerNames,
     };
 
     Q_ENUM(Roles);

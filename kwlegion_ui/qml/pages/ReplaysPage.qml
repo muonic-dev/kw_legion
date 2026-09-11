@@ -358,7 +358,6 @@ Page {
             required property bool expanded
             required property int analysisState
             required property var analysisApm
-            required property var analysisPlayerNames
 
             // Monotonic - only ever grows, never shrinks back to 0 when a
             // panel is dismissed. Qt Graphs' PointRenderer caches its own
@@ -642,10 +641,12 @@ Page {
                                     id: playerDelegate
                                     required property string name
                                     required property int faction
+                                    required property int seriesIndex
 
                                     spacing: 6
 
                                     Image {
+                                        anchors.verticalCenter: parent.verticalCenter
                                         source: page.factionIcon(playerDelegate.faction)
                                         sourceSize: Qt.size(32, 32)
                                         width: 24
@@ -653,7 +654,22 @@ Page {
                                         fillMode: Image.PreserveAspectFit
                                     }
 
+                                    // Matches this player's line color in the
+                                    // analysis chart (Theme.categoricalSeries
+                                    // is keyed by the same seriesIndex the
+                                    // chart's LineSeries use) - a colored mark
+                                    // beside the name carries that identity,
+                                    // the text itself stays plain ink.
+                                    Rectangle {
+                                        width: 10
+                                        height: 10
+                                        radius: 2
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        color: Theme.categoricalSeries[playerDelegate.seriesIndex % Theme.categoricalSeries.length]
+                                    }
+
                                     Label {
+                                        anchors.verticalCenter: parent.verticalCenter
                                         width: 94
                                         text: playerDelegate.name
                                         verticalAlignment: Text.AlignVCenter
@@ -767,51 +783,6 @@ Page {
                             }
                         }
                         onObjectAdded: (index, object) => apmChart.addSeries(object)
-                    }
-                }
-
-                // Legend text stays in plain ink - the dataviz skill's rule
-                // is that a colored mark carries identity, never the text
-                // itself, so player names stay readable regardless of which
-                // categorical slot they land on.
-                Rectangle {
-                    id: legendBacking
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.margins: 4
-                    width: playerLegend.width + 8
-                    height: playerLegend.height + 8
-                    radius: 4
-                    color: Theme.lightMode ? Qt.rgba(1, 1, 1, 0.6) : Qt.rgba(0, 0, 0, 0.4)
-                    visible: delegateRoot.analysisState === AsyncState.Complete
-                    z: 1
-
-                    Column {
-                        id: playerLegend
-                        anchors.centerIn: parent
-                        spacing: 2
-
-                        Repeater {
-                            model: delegateRoot.analysisPlayerNames ? delegateRoot.analysisPlayerNames.length : 0
-                            delegate: Row {
-                                required property int index
-                                spacing: 4
-
-                                Rectangle {
-                                    width: 10
-                                    height: 10
-                                    radius: 2
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    color: Theme.categoricalSeries[index % Theme.categoricalSeries.length]
-                                }
-
-                                Label {
-                                    text: delegateRoot.analysisPlayerNames[index]
-                                    color: Theme.lightMode ? Theme.dark : Theme.light
-                                    elide: Text.ElideRight
-                                }
-                            }
-                        }
                     }
                 }
             }

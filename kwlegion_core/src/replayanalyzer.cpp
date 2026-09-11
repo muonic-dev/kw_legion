@@ -63,14 +63,7 @@ AnalysisResult ReplayAnalyzer::analyze(const QByteArray& checksum) {
         LegionParser::analyzeReplay(replayFile, target->replay.bodyOffset,
                                     commandFramer);
 
-        QStringList playerNames;
-        playerNames.reserve(target->replay.players.size());
-        for (const auto& player : target->replay.players) {
-            playerNames.append(player.name);
-        }
-
-        return ReplayAnalysis{.playerNames = std::move(playerNames),
-                              .apmPlot = apmAnalyzer.plot()};
+        return ReplayAnalysis{.apmPlot = apmAnalyzer.plot()};
     } catch (LegionParser::ReplayParseException& ex) {
         qCWarning(logAnalyzer)
             << "Replay parsing failure: " << target->path << " " << ex.what();

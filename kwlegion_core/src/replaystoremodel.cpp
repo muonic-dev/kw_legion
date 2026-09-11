@@ -77,8 +77,7 @@ ReplayStoreModel::ReplayStoreModel(QObject* parent)
            QByteArrayLiteral("analysisState")},
           {static_cast<int>(Roles::AnalysisAPMRole),
            QByteArrayLiteral("analysisApm")},
-          {static_cast<int>(Roles::AnalysisPlayerNames),
-           QByteArrayLiteral("analysisPlayerNames")}} {}
+      } {}
 
 ReplayStoreModel::~ReplayStoreModel() = default;
 
@@ -337,8 +336,7 @@ void ReplayStoreModel::requestAnalysis(const QByteArray& checksum) {
             });
         dataChangedByIter(rowIt,
                           QList{static_cast<int>(Roles::AnalysisStateRole),
-                                static_cast<int>(Roles::AnalysisAPMRole),
-                                static_cast<int>(Roles::AnalysisPlayerNames)});
+                                static_cast<int>(Roles::AnalysisAPMRole)});
     });
 }
 
@@ -425,14 +423,6 @@ QVariant ReplayStoreModel::data(const QModelIndex& index, int role) const {
                 return {};
             }
             return QVariant::fromValue(it->value().apmPlot);
-        }
-        case Roles::AnalysisPlayerNames: {
-            const auto it = m_analysisEntries.constFind(replay->checksum());
-            if (it == m_analysisEntries.cend() ||
-                it->state() != AsyncState::Complete) {
-                return {};
-            }
-            return it->value().playerNames;
         }
         case Roles::PatchRole:
             return replay->inferPatch();

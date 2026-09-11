@@ -441,9 +441,25 @@ void ReplayStore::exposeReplay(const QByteArray& checksum) {
     if (!QDir(m_replayDir).mkpath("managed")) {
         throw StorageException("failed to create managed/ replay folder");
     }
+    Queries queries{QSqlQuery(m_db)};
+    const auto replay = queries.selectReplay(checksum);
+    if (!replay) {
+        qWarning(logStore) << "Replay " << QLatin1String(checksum.toHex())
+                           << " doesn't exist";
+        return;
+    }
+
     const QString ingestedPath = computeIngestionPath(checksum);
-    const QString targetPath = QString("%1/managed/%2.KWReplay")
-                                   .arg(m_replayDir, QString(checksum.toHex()));
+
+    const QString matchTitle = replay->overrideMatchTitle.isEmpty()
+                                   ? replay->matchTitle
+                                   : replay->overrideMatchTitle;
+    const QString fileName =
+        QString("%1 - %2.KWReplay")
+            .arg(matchTitle, QString(checksum.toHex()).slice(0, 8));
+
+    const QString targetPath =
+        QString("%1/managed/%2.KWReplay").arg(m_replayDir, fileName);
     // Assume this exists
     if (!QFile::copy(ingestedPath, targetPath)) {
         throw StorageException("failed to copy into managed/ folder");
