@@ -4,9 +4,11 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQml
 import QtQuick.Controls.Basic
 import QtQuick.Dialogs
 import QtQuick.Layouts
+import QtGraphs
 import KWLegionUI
 import KWLegionCore
 
@@ -62,6 +64,35 @@ Page {
             checksums.push(sortedReplayStoreModel.data(sortedReplayStoreModel.index(row, 0), ReplayStoreModel.ChecksumRole));
         }
         return checksums;
+    }
+
+    // apmPlot is one QList<QPointF> per player - x is the window's time
+    // offset (seconds), y is that window's APM. Used to size the analysis
+    // chart's axes to whatever the current row's data actually spans.
+    function maxSeriesX(plot) {
+        let m = 0;
+        if (!plot) {
+            return m;
+        }
+        for (const series of plot) {
+            for (const point of series) {
+                m = Math.max(m, point.x);
+            }
+        }
+        return m;
+    }
+
+    function maxSeriesY(plot) {
+        let m = 0;
+        if (!plot) {
+            return m;
+        }
+        for (const series of plot) {
+            for (const point of series) {
+                m = Math.max(m, point.y);
+            }
+        }
+        return m;
     }
 
     FileDialog {
@@ -326,7 +357,25 @@ Page {
             required property var duration
             required property bool expanded
             required property int analysisState
-            required property var analysisResult
+            required property var analysisApm
+            required property var analysisPlayerNames
+
+            // Monotonic - only ever grows, never shrinks back to 0 when a
+            // panel is dismissed. Qt Graphs' PointRenderer caches its own
+            // series list across scenegraph polish passes and doesn't purge
+            // it synchronously when a series is removed/destroyed, so
+            // tearing LineSeries objects down on every dismiss raced that
+            // cache and produced a use-after-free the next time the chart
+            // needed to repaint (confirmed via crash dump: PointRenderer::
+            // afterPolish jumping through a freed QAbstractSeries vtable).
+            // Keeping series alive for the row's lifetime and only ever
+            // re-populating their points sidesteps that entirely.
+            property int maxAnalysisPlayers: 0
+            onAnalysisApmChanged: {
+                if (analysisApm && analysisApm.length > maxAnalysisPlayers) {
+                    maxAnalysisPlayers = analysisApm.length;
+                }
+            }
 
             // The width of the left zone containing textual data
             readonly property int fieldColumnWidth: 220
@@ -657,13 +706,113 @@ Page {
                     color: Theme.lightMode ? Theme.dark : Theme.light
                 }
 
-                // Placeholder until the real chart lands - just proves the
-                // result actually made it back through to the view.
-                Label {
-                    anchors.centerIn: parent
+                GraphsView {
+                    id: apmChart
+                    anchors.fill: parent
+                    anchors.margins: 8
                     visible: delegateRoot.analysisState === AsyncState.Complete
-                    text: qsTr("Got %1 plot(s)").arg(delegateRoot.analysisResult ? delegateRoot.analysisResult.length : 0)
-                    color: Theme.lightMode ? Theme.dark : Theme.light
+
+                    axisX: ValueAxis {
+                        min: 0
+                        // apmPlot's x is seconds - converted to minutes at
+                        // this presentation layer only, same as
+                        // formatDuration() does for DurationRole, rather
+                        // than changing the unit the analysis actually
+                        // stores.
+                        max: Math.max(1, page.maxSeriesX(delegateRoot.analysisApm) / 60)
+                        titleText: qsTr("Time (min)")
+                    }
+                    axisY: ValueAxis {
+                        min: 0
+                        max: Math.max(1, page.maxSeriesY(delegateRoot.analysisApm))
+                        titleText: qsTr("APM")
+                    }
+
+                    // LineSeries is a plain QObject, not an Item, so a
+                    // Repeater won't parent its delegates into seriesList
+                    // (that only happens for statically-declared QML
+                    // children) - Instantiator plus the explicit addSeries
+                    // call is the pattern that actually works. The model is
+                    // delegateRoot.maxAnalysisPlayers (monotonic, see there
+                    // for why) rather than the live analysisApm length,
+                    // so these LineSeries are created once and never torn
+                    // down by a dismiss/re-request cycle - onObjectRemoved
+                    // is intentionally not wired to removeSeries here.
+                    Instantiator {
+                        model: delegateRoot.maxAnalysisPlayers
+                        delegate: LineSeries {
+                            id: playerSeries
+                            required property int index
+                            width: 2
+                            // Fixed by player index, never by draw order/rank
+                            // - see Theme.categoricalSeries.
+                            color: Theme.categoricalSeries[index % Theme.categoricalSeries.length]
+
+                            function reloadPoints() {
+                                clear();
+                                if (delegateRoot.analysisApm && index < delegateRoot.analysisApm.length) {
+                                    append(delegateRoot.analysisApm[index].map(point => ({
+                                                x: point.x / 60,
+                                                y: point.y
+                                            })));
+                                }
+                            }
+
+                            Component.onCompleted: reloadPoints()
+                            Connections {
+                                target: delegateRoot
+                                function onAnalysisApmChanged() {
+                                    playerSeries.reloadPoints();
+                                }
+                            }
+                        }
+                        onObjectAdded: (index, object) => apmChart.addSeries(object)
+                    }
+                }
+
+                // Legend text stays in plain ink - the dataviz skill's rule
+                // is that a colored mark carries identity, never the text
+                // itself, so player names stay readable regardless of which
+                // categorical slot they land on.
+                Rectangle {
+                    id: legendBacking
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.margins: 4
+                    width: playerLegend.width + 8
+                    height: playerLegend.height + 8
+                    radius: 4
+                    color: Theme.lightMode ? Qt.rgba(1, 1, 1, 0.6) : Qt.rgba(0, 0, 0, 0.4)
+                    visible: delegateRoot.analysisState === AsyncState.Complete
+                    z: 1
+
+                    Column {
+                        id: playerLegend
+                        anchors.centerIn: parent
+                        spacing: 2
+
+                        Repeater {
+                            model: delegateRoot.analysisPlayerNames ? delegateRoot.analysisPlayerNames.length : 0
+                            delegate: Row {
+                                required property int index
+                                spacing: 4
+
+                                Rectangle {
+                                    width: 10
+                                    height: 10
+                                    radius: 2
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    color: Theme.categoricalSeries[index % Theme.categoricalSeries.length]
+                                }
+
+                                Label {
+                                    text: delegateRoot.analysisPlayerNames[index]
+                                    color: Theme.lightMode ? Theme.dark : Theme.light
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

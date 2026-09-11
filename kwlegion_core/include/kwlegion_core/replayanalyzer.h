@@ -14,6 +14,7 @@ namespace KWLegionCore {
 class ReplayAnalysisTargetProvider;
 
 struct ReplayAnalysis {
+    QStringList playerNames;
     QList<QList<QPointF>> apmPlot;
 };
 

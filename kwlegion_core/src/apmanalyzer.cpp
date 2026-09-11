@@ -63,6 +63,9 @@ void ApmAnalyzer::ingest(quint32 timecode,
         if (!playerIdx.has_value()) {
             continue;
         }
+        // This is generally unexpected but not impossible
+        // We strip the fnial commentary player but if the player ever manages
+        // to fire an action we need to avoid out-of-bounds access
         if (*playerIdx >= m_leadingActionCounts.size()) {
             continue;
         }

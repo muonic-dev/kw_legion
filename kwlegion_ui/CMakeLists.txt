@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform Network Sql Svg)
+find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform Network Sql Svg Graphs)
 
 # Bakes the friendly name/version resource into kw_legion.exe (see
 # cpp/kw_legion.rc.in for why FILEVERSION can't carry the full SemVer).
@@ -95,6 +95,7 @@ target_link_libraries(kw_legion
     Qt6::Network
     Qt6::Sql
     Qt6::Svg
+    Qt6::Graphs
     legionparser::legionparser
     kwlegion::core
     kwlegion::coreplugin

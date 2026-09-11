@@ -11,6 +11,7 @@
 
 #include <QDebug>
 #include <QLoggingCategory>
+#include <ranges>
 
 #include "apmanalyzer.h"
 
@@ -26,6 +27,12 @@ AnalysisResult ReplayAnalyzer::analyze(const QByteArray& checksum) {
         m_targetProvider.lookupReplay(checksum);
     if (!target) {
         return AnalysisFailure::MissingReplay;
+    }
+
+    // Same logic here that we have in the ReplayModel population
+    // The commentator player gets a slot at the end but has no
+    if (target->replay.players.back().name.isEmpty()) {
+        target->replay.players.pop_back();
     }
 
     ApmAnalyzer apmAnalyzer{
@@ -56,7 +63,14 @@ AnalysisResult ReplayAnalyzer::analyze(const QByteArray& checksum) {
         LegionParser::analyzeReplay(replayFile, target->replay.bodyOffset,
                                     commandFramer);
 
-        return ReplayAnalysis{.apmPlot = apmAnalyzer.plot()};
+        QStringList playerNames;
+        playerNames.reserve(target->replay.players.size());
+        for (const auto& player : target->replay.players) {
+            playerNames.append(player.name);
+        }
+
+        return ReplayAnalysis{.playerNames = std::move(playerNames),
+                              .apmPlot = apmAnalyzer.plot()};
     } catch (LegionParser::ReplayParseException& ex) {
         qCWarning(logAnalyzer)
             << "Replay parsing failure: " << target->path << " " << ex.what();

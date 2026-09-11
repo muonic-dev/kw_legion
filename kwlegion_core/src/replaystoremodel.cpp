@@ -75,9 +75,10 @@ ReplayStoreModel::ReplayStoreModel(QObject* parent)
            QByteArrayLiteral("expanded")},
           {static_cast<int>(Roles::AnalysisStateRole),
            QByteArrayLiteral("analysisState")},
-          {static_cast<int>(Roles::AnalysisResultRole),
-           QByteArrayLiteral("analysisResult")},
-      } {}
+          {static_cast<int>(Roles::AnalysisAPMRole),
+           QByteArrayLiteral("analysisApm")},
+          {static_cast<int>(Roles::AnalysisPlayerNames),
+           QByteArrayLiteral("analysisPlayerNames")}} {}
 
 ReplayStoreModel::~ReplayStoreModel() = default;
 
@@ -121,6 +122,8 @@ void ReplayStoreModel::replaysLoaded(const QList<Replay>& replays) {
     for (const auto& replay : replays) {
         m_replays.append(new ReplayModel(replay, this));
     }
+    m_selections.clear();
+    m_analysisEntries.clear();
     endResetModel();
 }
 
@@ -301,11 +304,15 @@ void ReplayStoreModel::requestAnalysis(const QByteArray& checksum) {
     if (m_analysisEntries.contains(checksum)) {
         return;
     }
-    m_analysisEntries.insert(checksum, AsyncValue<ReplayAnalysis>{});
     const auto it =
         std::ranges::find_if(m_replays, [&checksum](const ReplayModel* replay) {
             return replay->checksum() == checksum;
         });
+
+    if (it == std::end(m_replays)) {
+        return;
+    }
+    m_analysisEntries.insert(checksum, AsyncValue<ReplayAnalysis>{});
 
     dataChangedByIter(it, QList{static_cast<int>(Roles::ExpandedRole),
                                 static_cast<int>(Roles::AnalysisStateRole)});
@@ -318,29 +325,32 @@ void ReplayStoreModel::requestAnalysis(const QByteArray& checksum) {
             // update.
             return;
         }
-        std::visit(
-            Match{[&entryIt](AnalysisFailure) { entryIt->error(); },
-                  [&entryIt](ReplayAnalysis& analysis) {
-                      entryIt->finish(std::move(analysis));
-                  }},
-            result);
+        std::visit(Match{[&entryIt](AnalysisFailure) { entryIt->error(); },
+                         [&entryIt](ReplayAnalysis& analysis) {
+                             entryIt->finish(std::move(analysis));
+                         }},
+                   result);
 
         const auto rowIt = std::ranges::find_if(
             m_replays, [&checksum](const ReplayModel* replay) {
                 return replay->checksum() == checksum;
             });
-        dataChangedByIter(
-            rowIt, QList{static_cast<int>(Roles::AnalysisStateRole),
-                        static_cast<int>(Roles::AnalysisResultRole)});
+        dataChangedByIter(rowIt,
+                          QList{static_cast<int>(Roles::AnalysisStateRole),
+                                static_cast<int>(Roles::AnalysisAPMRole),
+                                static_cast<int>(Roles::AnalysisPlayerNames)});
     });
 }
 
 void ReplayStoreModel::dismissAnalysis(const QByteArray& checksum) {
-    m_analysisEntries.remove(checksum);
     const auto it =
         std::ranges::find_if(m_replays, [&checksum](const ReplayModel* replay) {
             return replay->checksum() == checksum;
         });
+    if (it == std::ranges::end(m_replays)) {
+        return;
+    }
+    m_analysisEntries.remove(checksum);
     dataChangedByIter(it, QList{static_cast<int>(Roles::ExpandedRole)});
 }
 
@@ -408,13 +418,21 @@ QVariant ReplayStoreModel::data(const QModelIndex& index, int role) const {
             }
             return QVariant::fromValue(it->state());
         }
-        case Roles::AnalysisResultRole: {
+        case Roles::AnalysisAPMRole: {
             const auto it = m_analysisEntries.constFind(replay->checksum());
             if (it == m_analysisEntries.cend() ||
                 it->state() != AsyncState::Complete) {
                 return {};
             }
             return QVariant::fromValue(it->value().apmPlot);
+        }
+        case Roles::AnalysisPlayerNames: {
+            const auto it = m_analysisEntries.constFind(replay->checksum());
+            if (it == m_analysisEntries.cend() ||
+                it->state() != AsyncState::Complete) {
+                return {};
+            }
+            return it->value().playerNames;
         }
         case Roles::PatchRole:
             return replay->inferPatch();
