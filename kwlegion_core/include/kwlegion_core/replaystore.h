@@ -36,7 +36,35 @@ struct Watermark;
 class InboxItem;
 class StorageException;
 
-class ReplayStore : public QObject {
+/**
+ * Identify where a replay is located for analysis
+ */
+struct ReplayAnalysisTarget {
+    QString path;
+    Replay replay;
+};
+
+/**
+ * An interface that describes how to lookup where a replay is located on disk
+ * for analysis
+ */
+class ReplayAnalysisTargetProvider {
+   public:
+    ReplayAnalysisTargetProvider() = default;
+    ReplayAnalysisTargetProvider(const ReplayAnalysisTargetProvider&) = delete;
+    ReplayAnalysisTargetProvider& operator=(
+        const ReplayAnalysisTargetProvider&) = delete;
+    ReplayAnalysisTargetProvider(ReplayAnalysisTargetProvider&&) = delete;
+    ReplayAnalysisTargetProvider& operator=(ReplayAnalysisTargetProvider&&) =
+        delete;
+
+    virtual ~ReplayAnalysisTargetProvider() = default;
+
+    [[nodiscard]] virtual std::optional<ReplayAnalysisTarget> lookupReplay(
+        const QByteArray& checksum) const = 0;
+};
+
+class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
     Q_OBJECT
 
     /* Replay store operation is as follows
@@ -209,6 +237,10 @@ class ReplayStore : public QObject {
     void exposeReplay(const QByteArray& checksum);
 
     static void hideReplay(Queries& queries, const QByteArray& checksum);
+
+    // Implement helper for the analysis provider
+    [[nodiscard]] std::optional<ReplayAnalysisTarget> lookupReplay(
+        const QByteArray& checksum) const override;
 
     // We want to wait until the full synopsis pass is done on all replays
     // before we emit the first event instead of trickling them in

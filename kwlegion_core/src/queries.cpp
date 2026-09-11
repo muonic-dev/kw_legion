@@ -442,6 +442,7 @@ constexpr const char* const BASE_SELECT_QUERY =
     "      ) AS has_external_path"
     "    , COALESCE(o.override_match_title, '') AS override_match_title"
     "    , COALESCE(a.engine_ticks, 0) as engine_ticks"
+    "    , COALESCE(a.body_offset, 0) as body_offset"
     " FROM replays r"
     " LEFT JOIN replay_overrides o ON o.replay_checksum = r.checksum"
     " LEFT JOIN replay_analysis a ON a.replay_checksum = r.checksum";
@@ -542,6 +543,7 @@ Replay Queries::readReplay() const {
         .hasExternalPath = m_query.value(6).toBool(),
         .overrideMatchTitle = m_query.value(7).toString(),
         .engineTicks = m_query.value(8).toUInt(),
+        .bodyOffset = m_query.value(9).toUInt(),
     };
 }
 

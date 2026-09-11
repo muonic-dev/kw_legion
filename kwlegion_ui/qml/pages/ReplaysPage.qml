@@ -324,13 +324,21 @@ Page {
             required property var timestamp
             required property var teams
             required property var duration
+            required property bool expanded
+            required property int analysisState
+            required property var analysisResult
 
             // The width of the left zone containing textual data
             readonly property int fieldColumnWidth: 220
+            readonly property int analysisPanelHeight: 300
 
             width: ListView.view.width - 6 // some slight padding for the scrollbar
-            height: Math.max(fieldColumn.height, teamsFlow.height) + 16
+            height: expanded ? Math.max(fieldColumn.height, teamsFlow.height) + analysisPanelHeight + 16 : Math.max(fieldColumn.height, teamsFlow.height) + 16
             color: "transparent"
+
+            Behavior on height {
+                ShortAnimation {}
+            }
 
             Rectangle {
                 anchors.fill: parent
@@ -518,6 +526,21 @@ Page {
                             sourceSize: Qt.size(16, 16)
                         }
 
+                        background: Rectangle {
+                            radius: 4
+                            bottomLeftRadius: 0
+                            bottomRightRadius: 0
+                            color: delegateRoot.expanded ? Theme.analysisShade : "transparent"
+                        }
+
+                        onClicked: {
+                            if (delegateRoot.expanded) {
+                                ReplayStoreModel.dismissAnalysis(delegateRoot.checksum);
+                            } else {
+                                ReplayStoreModel.requestAnalysis(delegateRoot.checksum);
+                            }
+                        }
+
                         padding: 10
                         implicitWidth: 16 + leftPadding + rightPadding
                         implicitHeight: 16 + topPadding + bottomPadding
@@ -592,6 +615,55 @@ Page {
                             }
                         }
                     }
+                }
+            }
+
+            Rectangle {
+                id: analysisPanel
+                x: 8
+                // Below the teams or the fields
+                y: Math.max(fieldColumn.height, teamsFlow.height) + 8
+                width: delegateRoot.width - 16
+                height: delegateRoot.expanded ? delegateRoot.analysisPanelHeight : 0
+                radius: 4
+                color: Theme.analysisShade
+                clip: true
+
+                Behavior on height {
+                    ShortAnimation {}
+                }
+
+                TintedIcon {
+                    id: spinnerIcon
+                    anchors.centerIn: parent
+                    width: 24
+                    height: 24
+                    visible: delegateRoot.analysisState === AsyncState.Pending
+                    source: "qrc:/qt/qml/KWLegionUI/ico/arrow-reload-02-svgrepo-com.svg"
+                    sourceSize: Qt.size(width, height)
+                    RotationAnimation on rotation {
+                        running: spinnerIcon.visible
+                        loops: Animation.Infinite
+                        from: 0
+                        to: 360
+                        duration: 1200
+                    }
+                }
+
+                Label {
+                    anchors.centerIn: parent
+                    visible: delegateRoot.analysisState === AsyncState.Failed
+                    text: qsTr("Analysis failed")
+                    color: Theme.lightMode ? Theme.dark : Theme.light
+                }
+
+                // Placeholder until the real chart lands - just proves the
+                // result actually made it back through to the view.
+                Label {
+                    anchors.centerIn: parent
+                    visible: delegateRoot.analysisState === AsyncState.Complete
+                    text: qsTr("Got %1 plot(s)").arg(delegateRoot.analysisResult ? delegateRoot.analysisResult.length : 0)
+                    color: Theme.lightMode ? Theme.dark : Theme.light
                 }
             }
         }

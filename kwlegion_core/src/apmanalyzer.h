@@ -16,7 +16,9 @@ class ApmAnalyzer {
    public:
     ApmAnalyzer(quint32 engineTicksPerSec, quint32 secWindow, quint32 players);
 
-    void ingest(quint32 timecode, const QList<LegionParser::Command>& commands);
+    void ingest(quint32 timecode, QSpan<LegionParser::Command> commands);
+
+    [[nodiscard]] QList<QList<QPointF>> plot() const;
 
    private:
     quint32 m_ticksPerSec;

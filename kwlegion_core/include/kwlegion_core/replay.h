@@ -42,6 +42,7 @@ struct Replay {
 
     QString overrideMatchTitle;
     quint32 engineTicks;
+    quint32 bodyOffset;
 
     QList<Player> players;
 

@@ -15,7 +15,7 @@ ApmAnalyzer::ApmAnalyzer(quint32 engineTicksPerSec, quint32 secWindow,
 }
 
 void ApmAnalyzer::ingest(quint32 timecode,
-                         const QList<LegionParser::Command>& commands) {
+                         const QSpan<LegionParser::Command> commands) {
     /* Recieve a chunk of commands, here's how we process
      * We have a ticks/s and a window duration in seconds
      * We take the current timecode and determine it is in the current window.
@@ -69,4 +69,6 @@ void ApmAnalyzer::ingest(quint32 timecode,
         m_leadingActionCounts[*playerIdx]++;
     }
 }
+
+QList<QList<QPointF>> ApmAnalyzer::plot() const { return m_commited; }
 }  // namespace KWLegionCore

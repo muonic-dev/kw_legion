@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <kwlegion_core/asyncvalue.h>
+#include <kwlegion_core/replayanalyzer.h>
 #include <qqmlintegration.h>
 
 #include <QAbstractListModel>
@@ -18,6 +20,7 @@ namespace KWLegionCore {
 
 class ReplayModel;
 class ReplayStore;
+class ReplayAnalyzerBridge;
 
 class ReplayStoreModel : public QAbstractListModel {
     Q_OBJECT
@@ -40,7 +43,10 @@ class ReplayStoreModel : public QAbstractListModel {
                       // map_reference
         PlayersRole,  // All players from all teams, utility for search
         DurationRole,
-        SelectedRole
+        SelectedRole,
+        ExpandedRole,
+        AnalysisStateRole,
+        AnalysisResultRole,
     };
 
     Q_ENUM(Roles);
@@ -64,7 +70,7 @@ class ReplayStoreModel : public QAbstractListModel {
     // replaysChanged, and connects the shouldX request signals back to the
     // store's corresponding slots. Keeps the pairing self-contained rather
     // than requiring external code to know every signal on both sides.
-    void setStore(ReplayStore* store);
+    void finishInit(ReplayStore* store, ReplayAnalyzer* replayAnalyzer);
 
     void replaysLoaded(const QList<Replay>&);
     void replaysChanged(const QList<Replay>&);
@@ -99,6 +105,9 @@ class ReplayStoreModel : public QAbstractListModel {
     Q_INVOKABLE void setOverrideTitle(const QByteArray& checksum,
                                       const QString& title);
 
+    Q_INVOKABLE void requestAnalysis(const QByteArray& checksum);
+    Q_INVOKABLE void dismissAnalysis(const QByteArray& checksum);
+
     [[nodiscard]] int selectionCount() const {
         return static_cast<int>(m_selections.size());
     }
@@ -131,6 +140,9 @@ class ReplayStoreModel : public QAbstractListModel {
             return;
         }
         const QList<ReplayModel*>::const_iterator cit(it);
+        if (cit == m_replays.cend()) {
+            return;
+        }
         const int row = static_cast<int>(cit - m_replays.cbegin());
         const QModelIndex idx = index(row);
         emit dataChanged(idx, idx, roles);
@@ -140,5 +152,8 @@ class ReplayStoreModel : public QAbstractListModel {
 
     QList<ReplayModel*> m_replays;
     QSet<QByteArray> m_selections;
+    QHash<QByteArray, AsyncValue<ReplayAnalysis>> m_analysisEntries;
+
+    ReplayAnalyzerBridge* m_replayAnalyzerBridge;
 };
 }  // namespace KWLegionCore

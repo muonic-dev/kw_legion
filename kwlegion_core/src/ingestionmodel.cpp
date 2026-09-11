@@ -67,7 +67,7 @@ QVariant IngestionModel::data(const QModelIndex& index, int role) const {
     return {};
 }
 
-void IngestionModel::setStore(ReplayStore* store) const {
+void IngestionModel::finishInit(ReplayStore* store) const {
     QObject::connect(store, &ReplayStore::inboxReset, this,
                      &IngestionModel::inboxReset);
     QObject::connect(store, &ReplayStore::inboxItemObserved, this,

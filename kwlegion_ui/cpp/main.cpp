@@ -166,6 +166,8 @@ int main(int argc, char* argv[]) {
     replayProspector.moveToThread(&ioThread);
     ReplayStore replayStore(ReplayProspector::defaultReplayDirectory());
     replayStore.moveToThread(&ioThread);
+    ReplayAnalyzer replayAnalyzer(replayStore);
+    replayAnalyzer.moveToThread(&ioThread);
 
     QObject::connect(&ioThread, &QThread::finished, &replayStore,
                      &ReplayStore::stop);
@@ -215,11 +217,11 @@ int main(int argc, char* argv[]) {
 
     auto* replayStoreModel =
         requireSingleton<ReplayStoreModel>(engine, "ReplayStoreModel");
-    replayStoreModel->setStore(&replayStore);
+    replayStoreModel->finishInit(&replayStore, &replayAnalyzer);
 
     auto* ingestionModel =
         requireSingleton<IngestionModel>(engine, "IngestionModel");
-    ingestionModel->setStore(&replayStore);
+    ingestionModel->finishInit(&replayStore);
 
     ioThread.start();
 

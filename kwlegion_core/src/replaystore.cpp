@@ -462,6 +462,23 @@ void ReplayStore::hideReplay(Queries& queries, const QByteArray& checksum) {
     }
 }
 
+std::optional<ReplayAnalysisTarget> ReplayStore::lookupReplay(
+    const QByteArray& checksum) const {
+    Queries queries{QSqlQuery{m_db}};
+    try {
+        std::optional<Replay> replay = queries.selectReplay(checksum);
+        if (replay) {
+            replay->players = queries.selectReplayPlayers(checksum);
+            QString path = computeIngestionPath(checksum);
+            return ReplayAnalysisTarget{.path = std::move(path),
+                                        .replay = std::move(*replay)};
+        }
+    } catch (StorageException& ex) {
+        qCritical(logStore) << "Failed to query the database: " << ex.what();
+    }
+    return std::nullopt;
+}
+
 void ReplayStore::acknowledgeItem(const QString& path) {
     // Dismissal is scoped to this session. Inbox state is derived from what
     // is on disk, and the paths that reach the inbox include the game's

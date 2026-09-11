@@ -46,7 +46,7 @@ class IngestionModel : public QAbstractListModel {
     [[nodiscard]] int rowCount(
         const QModelIndex& parent = QModelIndex()) const override;
 
-    void setStore(ReplayStore* store) const;
+    void finishInit(ReplayStore* store) const;
 
     Q_INVOKABLE void acknowledgeItem(const QString& path);
 
