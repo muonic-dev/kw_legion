@@ -236,10 +236,16 @@ void ReplayStore::performReplayReanalysis() {
                 LegionParser::SynopsisParser::parse(replayFile);
             queries.insertReplayPlayers(synopsis.checksum, synopsis.players);
             queries.insertReplayAnalysis(synopsis);
+            qDebug(logStore)
+                << "Completed re-analysis of: " << synopsis.checksum.toHex();
             guard.commit();
         } catch (LegionParser::ReplayParseException& ex) {
             qCritical(logStore)
                 << "Failed to parse previously ingested replay: "
+                << internalPath;
+        } catch (StorageException& ex) {
+            qCritical(logStore)
+                << "Failed to commit renalysis of ingested replay: "
                 << internalPath;
         }
 
