@@ -29,6 +29,11 @@ AnalysisResult ReplayAnalyzer::analyze(const QByteArray& checksum) {
         return AnalysisFailure::MissingReplay;
     }
 
+    // No players: maybe happens when the game crashes during startup
+    if (target->replay.players.isEmpty()) {
+        return ReplayAnalysis{.apmPlot = QList<QList<QPointF>>()};
+    }
+
     // Same logic here that we have in the ReplayModel population
     // The commentator player gets a slot at the end but has no
     if (target->replay.players.back().name.isEmpty()) {
