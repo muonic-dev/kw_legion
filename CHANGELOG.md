@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 0.3.1
+
+### Changed
+
+- If replays need to be re-analyzed avoid scrolling to a random place in the view
+
+### Fixed
+
+- A crash that can happen due to invalid data from pre-0.2.0
+
 ## 0.3.0
 
 ### Added

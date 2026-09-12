@@ -249,14 +249,12 @@ void ReplayStore::performReplayReanalysis() {
                 << internalPath;
         }
 
-        // Now we should re-emit
         const std::optional<Replay> replay = queries.selectReplay(checksum);
         if (!replay.has_value()) {
             qWarning(logStore) << "Replay disappeared during reanalysis path: "
                                << QString(checksum.toHex());
             continue;
         }
-        emit replaysChanged(QList{*replay});
     }
 }
 
