@@ -128,44 +128,28 @@ if(WIN32)
     # The app defaults to minimizing to tray on close, so window state can't
     # tell us it actually exited - instead poll whether its exe file is
     # still locked, which is what actually blocks the install.
-    set(CPACK_NSIS_EXTRA_PREINSTALL_COMMANDS [[
-      ; Send Request::Quit (value 1) to the app's local-socket pipe. If
-      ; nothing is listening, CreateFileW just fails and we fall through -
-      ; the poll below will find the exe already unlocked.
-      System::Call 'kernel32::CreateFileW(w "\\.\pipe\kw_legion", i 0x40000000, i 0, i 0, i 3, i 0, i 0) i .r0'
-      IntCmp $0 -1 legion_pipe_absent legion_pipe_connected legion_pipe_connected
-      legion_pipe_connected:
-        System::Call '*(&i1 1) i .r1'
-        System::Call 'kernel32::WriteFile(i r0, i r1, i 1, *i .r2, i 0) i .r3'
-        System::Free $1
-        System::Call 'kernel32::CloseHandle(i r0)'
-      legion_pipe_absent:
-
-      StrCpy $2 0
-      legion_wait_loop:
-        ClearErrors
-        Rename "$INSTDIR\kw_legion.exe" "$INSTDIR\kw_legion.exe"
-        IfErrors legion_wait_retry legion_wait_done
-      legion_wait_retry:
-        IntOp $2 $2 + 1
-        IntCmp $2 10 legion_wait_prompt legion_wait_sleep legion_wait_prompt
-      legion_wait_sleep:
-        Sleep 500
-        Goto legion_wait_loop
-
-      legion_wait_prompt:
-        ClearErrors
-        Rename "$INSTDIR\kw_legion.exe" "$INSTDIR\kw_legion.exe"
-        IfErrors legion_wait_ask legion_wait_done
-      legion_wait_ask:
-        MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION \
-          "KW Legion is still running and needs to close before installing.$\r$\n\
-          Please close it manually, then click Retry." \
-          IDRETRY legion_wait_prompt
-        Quit
-
-      legion_wait_done:
-    ]])
+    # The actual script lives in packaging/nsis/ rather than being embedded
+    # directly as this variable's value: CPack's own CPackConfig.cmake
+    # generator copies CPACK_* string values verbatim into a new
+    # set(VAR "value") with no re-escaping at all, so anything embedded here
+    # has to already be safe for that one-way trip:
+    #  - No literal double quotes at all - confirmed they corrupt regardless
+    #    of source (a two-argument NSIS command needing quotes, and even a
+    #    single quoted !include path, both got mangled). NSIS's !include
+    #    doesn't require quotes for a path with no spaces, so this is a
+    #    quote-free bare path rather than a quoted one.
+    #  - Backslashes doubled, not left single: !include didn't resolve the
+    #    forward-slash form of this path, so it's a native backslash path -
+    #    but a single backslash here would let a segment like "\nsis" get
+    #    silently misread as CMake's own \n (newline) escape when cpack
+    #    re-parses the generated file. Doubling collapses back to single
+    #    backslashes on that re-parse instead.
+    set(_kw_legion_preinstall_path
+        "${CMAKE_SOURCE_DIR}/packaging/nsis/quit_and_wait_preinstall.nsh")
+    string(REPLACE "/" "\\\\" _kw_legion_preinstall_path
+                   "${_kw_legion_preinstall_path}")
+    set(CPACK_NSIS_EXTRA_PREINSTALL_COMMANDS
+        "!include ${_kw_legion_preinstall_path}")
 else()
     set(CPACK_GENERATOR "TGZ")
 endif()
