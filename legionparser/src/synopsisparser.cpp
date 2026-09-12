@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Muonic
 
 #include <legionparser/exception.h>
-#include <legionparser/parser.h>
+#include <legionparser/synopsisparser.h>
 
 #include <QByteArrayView>
 #include <QCryptographicHash>
@@ -15,7 +15,6 @@
 #include <QtEndian>
 #include <QtMinMax>
 #include <QtTypes>
-#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -23,17 +22,18 @@
 
 #include "legionparser/replay.h"
 #include "reader.h"
+#include "teedevice.h"
 
 namespace LegionParser {
 
 constinit const char* const CNC_MAGIC = "C&C3 REPLAY HEADER";
-constexpr std::size_t MAGIC_SIZE = 18;
-constexpr std::size_t U1_SIZE = 33;
-constexpr std::size_t U2_SIZE = 19;
-constexpr std::size_t DATETIME_STRING_LENGTH = 8;
+constexpr qsizetype MAGIC_SIZE = 18;
+constexpr qsizetype U1_SIZE = 33;
+constexpr qsizetype U2_SIZE = 19;
+constexpr qsizetype DATETIME_STRING_LENGTH = 8;
 constexpr char MAX_PLAYERS = 8;
 constexpr const char* const REPL_MAGIC = "CNC3RPL";
-constexpr std::size_t REPL_MAGIC_SIZE = 8;
+constexpr qsizetype REPL_MAGIC_SIZE = 8;
 
 //  The S= string has the faction field at 6 and the computer has it at 3
 constexpr qsizetype HUMAN_FACTION_SLOT_FIELD = 5;
@@ -63,8 +63,8 @@ constexpr std::uint32_t UNALLIED_TEAM_BASE = 100;
 // The largest valid replay is a few MB at most; this bounds how much of a
 // corrupt/malicious file we'll read while fingerprinting the payload,
 // rather than trusting the device to eventually hit a real EOF.
-constexpr qint64 BODY_READ_CHUNK_SIZE = static_cast<qint64>(16 * 1024);
-constexpr size_t MAX_BODY_SIZE = static_cast<size_t>(32 * 1024 * 1024);
+constexpr qsizetype BODY_READ_CHUNK_SIZE = static_cast<qsizetype>(16 * 1024);
+constexpr qsizetype MAX_BODY_SIZE = static_cast<qsizetype>(32 * 1024 * 1024);
 
 // Footer format, per
 // https://github.com/louisdx/cnc-replayreaders/blob/master/eareplay.html :
@@ -129,20 +129,21 @@ std::optional<QByteArrayView> footerFromTail(QByteArrayView tail) {
 }
 }  // namespace
 
-Parser::Parser(QIODevice& replayFile)
-    : m_reader(std::make_unique<Reader>(replayFile)),
-      m_metadata{},
+SynopsisParser::SynopsisParser(QIODevice& replayFile)
+    : m_tee{std::make_unique<TeeDevice>(replayFile)},
+      m_reader(std::make_unique<Reader>(*m_tee)),
+      m_synopsis{},
       m_offset{0} {}
 
-Parser::~Parser() = default;
+SynopsisParser::~SynopsisParser() = default;
 
-void Parser::parse() {
+void SynopsisParser::parse() {
     checkMagic();
     parseHeader();
     parseBody();
 }
 
-void Parser::checkMagic() {
+void SynopsisParser::checkMagic() {
     const QByteArray magic = m_reader->readBlock(MAGIC_SIZE);
     if (magic != QByteArray(CNC_MAGIC, MAGIC_SIZE)) {
         throw CorruptDataException(QLatin1String("replay magic"),
@@ -150,7 +151,7 @@ void Parser::checkMagic() {
     }
 }
 
-void Parser::parseHeader() {
+void SynopsisParser::parseHeader() {
     parseGameType();
     parseVersions();
     parseCommentaryFlag();
@@ -159,9 +160,9 @@ void Parser::parseHeader() {
     parseOffsetAndMagic();
     parseHeaderTail();
 
-    const size_t actualOffset = m_reader->offset() - m_reader->mark();
+    const qsizetype actualOffset = m_reader->offset() - m_reader->mark();
     // Validate that we read the correct length
-    if (m_offset != actualOffset) {
+    if (std::cmp_not_equal(m_offset, actualOffset)) {
         throw CorruptDataException(
             QString("header length did not match recorded offset: was %1 "
                     "expected %2")
@@ -169,42 +170,45 @@ void Parser::parseHeader() {
                 .arg(m_offset),
             m_reader->offset());
     }
+    // The current reader position is now the location that the body begins
+    // Record is for use elsewhere
+    m_synopsis.bodyOffset = m_reader->offset();
 }
 
-void Parser::parseGameType() {
+void SynopsisParser::parseGameType() {
     // Immediately following the magic is a header that appears to signify
     // skirmish (0x04) or multiplayer (0x05)
-    m_metadata.gameType = gameTypeFromUInt8(m_reader->readByte<std::uint8_t>());
+    m_synopsis.gameType = gameTypeFromUInt8(m_reader->readByte<std::uint8_t>());
 }
 
-void Parser::parseVersions() {
+void SynopsisParser::parseVersions() {
     // Following the match type there are a series of build sequences
     // These are all basically the same always, but worth tracking
     m_reader->withDataStream([this](QDataStream& stream) {
-        m_metadata.versionMajor = m_reader->readIntegral<std::uint32_t>(stream);
-        m_metadata.versionMinor = m_reader->readIntegral<std::uint32_t>(stream);
-        m_metadata.buildMajor = m_reader->readIntegral<std::uint32_t>(stream);
-        m_metadata.buildMinor = m_reader->readIntegral<std::uint32_t>(stream);
+        m_synopsis.versionMajor = m_reader->readIntegral<std::uint32_t>(stream);
+        m_synopsis.versionMinor = m_reader->readIntegral<std::uint32_t>(stream);
+        m_synopsis.buildMajor = m_reader->readIntegral<std::uint32_t>(stream);
+        m_synopsis.buildMinor = m_reader->readIntegral<std::uint32_t>(stream);
     });
 }
 
-void Parser::parseCommentaryFlag() {
+void SynopsisParser::parseCommentaryFlag() {
     // Following the build numbers is a byte indicating whether the replay
     // includes commentary (0x06 no commentary, 0x1E with commentary),
     // followed by a reserved byte that is always 0x00
     const auto hnum2 = m_reader->readByte<uint8_t>();
     switch (hnum2) {
         case 0x06:
-            m_metadata.hasCommentary = false;
+            m_synopsis.hasCommentary = false;
             break;
         case 0x1E:
-            m_metadata.hasCommentary = true;
+            m_synopsis.hasCommentary = true;
             break;
         default:
             // TODO: signal this as a warning once ParserEventListener grows
             // a warning-level callback; an unrecognized value here isn't
             // fatal enough to treat as an error via onError.
-            m_metadata.hasCommentary = false;
+            m_synopsis.hasCommentary = false;
     }
 
     const auto zero1 = m_reader->readByte<uint8_t>();
@@ -214,14 +218,14 @@ void Parser::parseCommentaryFlag() {
     }
 }
 
-void Parser::parseMatchStrings() {
-    m_metadata.matchTitle = m_reader->readUtf16String();
-    m_metadata.matchDescription = m_reader->readUtf16String();
-    m_metadata.mapName = m_reader->readUtf16String();
-    m_metadata.mapId = m_reader->readUtf16String();
+void SynopsisParser::parseMatchStrings() {
+    m_synopsis.matchTitle = m_reader->readUtf16String();
+    m_synopsis.matchDescription = m_reader->readUtf16String();
+    m_synopsis.mapName = m_reader->readUtf16String();
+    m_synopsis.mapId = m_reader->readUtf16String();
 }
 
-void Parser::parsePlayers() {
+void SynopsisParser::parsePlayers() {
     const auto playerCount = m_reader->readByte<uint8_t>();
     if (playerCount == 0) {
         throw CorruptDataException(QLatin1String("Player count is 0"),
@@ -233,16 +237,16 @@ void Parser::parsePlayers() {
             m_reader->lastOffset());
     }
     for (uint8_t i = 0; i < playerCount; i++) {
-        m_metadata.players.append(parseOnePlayer());
+        m_synopsis.players.append(parseOnePlayer());
     }
     // Parse the final commentator player that always appears to exist
-    m_metadata.players.append(parseOnePlayer());
+    m_synopsis.players.append(parseOnePlayer());
 }
 
-Player Parser::parseOnePlayer() {
+Player SynopsisParser::parseOnePlayer() {
     const auto id = m_reader->readIntegral<std::uint32_t>();
     const QString name = m_reader->readUtf16String();
-    if (m_metadata.gameType == GameType::Multiplayer) {
+    if (m_synopsis.gameType == GameType::Multiplayer) {
         // This byte exists here in multiplayer replays, but team is sourced
         // entirely from the S= slot text instead (see parsePlayerSlots): the
         // only replays that let us confirm real team semantics are 1v1
@@ -257,7 +261,7 @@ Player Parser::parseOnePlayer() {
     return Player{.id = id, .name = name};
 }
 
-void Parser::parseMapReference(const QStringView header) {
+void SynopsisParser::parseMapReference(const QStringView header) {
     // The header's GameInfo text begins with "M=" followed by a numeric
     // (short-range, hex-encoded per the format doc) unknown value of
     // variable width - it can contain hex letters (e.g. a trailing 'b'),
@@ -288,11 +292,11 @@ void Parser::parseMapReference(const QStringView header) {
             m_reader->lastOffset());
     }
 
-    m_metadata.mapReference =
+    m_synopsis.mapReference =
         header.sliced(mapStart, mapEnd - mapStart).toString();
 }
 
-void Parser::parsePlayerSlots(const QStringView header) {
+void SynopsisParser::parsePlayerSlots(const QStringView header) {
     // The header's ";S=" key holds a colon-separated list of player slots,
     // e.g. "S=HMuonic,0,0,TT,4,10,-1,-1,0,1,-1,:CB,-1,11,-1,-1,0,4:X:X:...;"
     // Each slot starts with a type letter: H (human), C (computer), or X
@@ -310,12 +314,12 @@ void Parser::parsePlayerSlots(const QStringView header) {
     // Move past the starting token
     slotStart += slotMarker.size();
 
-    for (auto player = m_metadata.players.begin();
+    for (auto player = m_synopsis.players.begin();
          // TODO: breaking due to slotStart running off the end before we've
          // marked all the players should be tracked/warned
-         slotStart < header.size() && player < m_metadata.players.end();
+         slotStart < header.size() && player < m_synopsis.players.end();
          player++) {
-        const qsizetype playerIdx{player - m_metadata.players.begin()};
+        const qsizetype playerIdx{player - m_synopsis.players.begin()};
 
         // find the end of the current slot. This is either the following ':',
         // the next ';', or the end of the header.
@@ -332,7 +336,7 @@ void Parser::parsePlayerSlots(const QStringView header) {
         // We only ever get 8 players, the synthetic +1 player
         // just doesn't get parsed in this case
         if (slotView.isEmpty()) {
-            if (playerIdx == m_metadata.players.size() - 1) {
+            if (playerIdx == m_synopsis.players.size() - 1) {
                 // The synthetic commentator has no slot entry when the lobby is
                 // full
                 break;
@@ -407,7 +411,7 @@ void Parser::parsePlayerSlots(const QStringView header) {
     }
 }
 
-void Parser::parseOffsetAndMagic() {
+void SynopsisParser::parseOffsetAndMagic() {
     m_offset = m_reader->readIntegral<uint32_t>();
     // Read this manually since we want to mark mid-read so we track it
     const auto strReplLength = m_reader->readIntegral<uint32_t>();
@@ -430,10 +434,10 @@ void Parser::parseOffsetAndMagic() {
     }
 }
 
-void Parser::parseHeaderTail() {
+void SynopsisParser::parseHeaderTail() {
     // no mod_info in kw
     const auto ts = m_reader->readIntegral<uint32_t>();
-    m_metadata.timestamp = QDateTime::fromSecsSinceEpoch(
+    m_synopsis.timestamp = QDateTime::fromSecsSinceEpoch(
         static_cast<qint64>(ts), QTimeZone(QTimeZone::UTC));
 
     // read and discard the unknown1 block
@@ -445,8 +449,8 @@ void Parser::parseHeaderTail() {
     parsePlayerSlots(header);
 
     const auto replaySaver = m_reader->readByte<uint8_t>();
-    if (replaySaver < m_metadata.players.size()) {
-        (m_metadata.players.begin() + replaySaver)->isReplaySaver = true;
+    if (replaySaver < m_synopsis.players.size()) {
+        (m_synopsis.players.begin() + replaySaver)->isReplaySaver = true;
     }
     // TODO: else warn here, not worth throwing on corruption
 
@@ -454,7 +458,7 @@ void Parser::parseHeaderTail() {
     m_reader->discardZero<uint32_t>();
     m_reader->discardZero<uint32_t>();
 
-    m_metadata.filename = m_reader->readFixedUtf16String<uint32_t>();
+    m_synopsis.filename = m_reader->readFixedUtf16String<uint32_t>();
 
     // Read and discard the datetime field
     // The replay timestamp has what we want and this one doesn't make sense
@@ -473,37 +477,44 @@ void Parser::parseHeaderTail() {
     m_reader->readBlock(U2_SIZE * sizeof(std::uint32_t));
 }
 
-void Parser::parseBody() {
-    // The payload isn't parsed at this time; just fingerprint it so callers
-    // can cheaply compare/identify replay content. Read in bounded chunks
-    // rather than the whole remaining file at once, so a corrupt or
-    // maliciously oversized file can't force unbounded memory use.
+void SynopsisParser::parseBody() {
+    // At this point, we want to turn on hashing so that we can capture the
+    // checksum
     QCryptographicHash hash(QCryptographicHash::Sha256);
-    size_t totalSize = 0;
-    // The footer lives in the last handful of bytes of the file, but isn't
-    // guaranteed to fall entirely within the very last chunk read - e.g. if
-    // the file size puts the footer's start right at a chunk boundary.
-    // readRemainingChunked hands back the last two chunks concatenated so
-    // the footer's bytes are guaranteed complete somewhere within it.
-    const QByteArray tail = m_reader->readRemainingChunked(
-        [&](QByteArrayView chunk) {
-            totalSize += static_cast<size_t>(chunk.size());
-            if (totalSize > MAX_BODY_SIZE) {
-                throw LimitExceededException(QLatin1String("replay payload"),
-                                             m_reader->offset(), MAX_BODY_SIZE,
-                                             totalSize);
-            }
-            hash.addData(chunk);
-        },
-        BODY_READ_CHUNK_SIZE);
+    m_tee->setSink([&hash](QByteArrayView bs) { hash.addData(bs); });
+    // These are seperate so we can skip the end marker timecode
 
-    verifyFooter(tail);
+    qint32 maxTimeCode = 0;
+    std::optional<BodyChunk> chunk = m_reader->readBodyChunk();
+    while (chunk.has_value()) {
+        if (m_reader->offset() > MAX_BODY_SIZE) {
+            throw LimitExceededException(QLatin1String("replay payload"),
+                                         m_reader->offset(), MAX_BODY_SIZE,
+                                         m_reader->offset());
+        }
+        // Assumes for sanity sake that the replay timecodes are monotonically
+        // increasing
+        maxTimeCode = chunk->timeCode;
+        chunk = m_reader->readBodyChunk();
+    }
 
-    m_metadata.checksum = hash.result();
+    // The chunk stream has been walked precisely, so whatever the device has
+    // left to give us should be exactly the footer - one bounded read gets
+    // it in full without paging through it a chunk at a time like the body
+    // itself.
+    const QByteArray footerPayload = m_reader->readRemaining(MAX_BODY_SIZE);
+    verifyFooter(footerPayload, maxTimeCode);
+    // We shouldn't ever read any more after this point, but since hash is going
+    // out of scope do it for safety
+    m_tee->clearSink();
+
+    m_synopsis.checksum = hash.result();
+    m_synopsis.engineTicks = maxTimeCode;
 }
 
-void Parser::verifyFooter(QByteArrayView lastChunk) const {
-    const std::optional<QByteArrayView> maybeFooter = footerFromTail(lastChunk);
+void SynopsisParser::verifyFooter(QByteArrayView payload,
+                                  qint32 maxTimeCode) const {
+    const std::optional<QByteArrayView> maybeFooter = footerFromTail(payload);
     if (!maybeFooter) {
         throw TornDataException(m_reader->offset());
     }
@@ -512,6 +523,27 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
     // Once we have read the FOOTER_MAGIC the likelihood that further validation
     // errors are the result of a torn read are vanishingly unlikely so we
     // switch back to throwing CorruptDataException from here on
+
+    // The chunk stream was walked precisely via readBodyChunk, so payload
+    // should be nothing but the footer - any leftover bytes before or after
+    // it mean the walk didn't actually land where the footer starts.
+    if (footer.size() != payload.size()) {
+        throw CorruptDataException(
+            QLatin1String("replay footer does not fill the remaining payload"),
+            m_reader->offset());
+    }
+
+    // final_time_code immediately follows the magic string, and should agree
+    // with the highest time code seen while walking the body - if it
+    // doesn't, the chunk walk and the footer disagree about where the
+    // replay actually ended.
+    const quint32 finalTimeCode = readLE32(footer.sliced(FOOTER_MAGIC_SIZE));
+    if (std::cmp_not_equal(finalTimeCode, maxTimeCode)) {
+        throw CorruptDataException(
+            QLatin1String("replay footer final time code does not match the "
+                          "last observed chunk"),
+            m_reader->offset());
+    }
 
     // data sits between final_time_code and footer_length (the trailing 4
     // bytes, whose value is footer.size() itself); it's either {0x02}, or
@@ -556,7 +588,7 @@ void Parser::verifyFooter(QByteArrayView lastChunk) const {
     }
 }
 
-bool Parser::looksComplete(QIODevice& replayFile) {
+bool SynopsisParser::looksComplete(QIODevice& replayFile) {
     // Every "can't tell" path here answers true. This check exists only to
     // rule a file out cheaply - anything it can't inspect falls through to a
     // full parse, which is the authority on the result either way.
@@ -590,8 +622,8 @@ bool Parser::looksComplete(QIODevice& replayFile) {
     return footerFromTail(tail).has_value();
 }
 
-ReplayMetadata Parser::parse(QIODevice& replayFile) {
-    Parser parser{replayFile};
+ReplaySynopsis SynopsisParser::parse(QIODevice& replayFile) {
+    SynopsisParser parser{replayFile};
     parser.parse();
     return parser.metadata();
 }

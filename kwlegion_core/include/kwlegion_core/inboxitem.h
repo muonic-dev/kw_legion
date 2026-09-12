@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <QtQml/qqmlregistration.h>
+#include <qqmlintegration.h>
 
 #include <QDateTime>
 #include <QString>

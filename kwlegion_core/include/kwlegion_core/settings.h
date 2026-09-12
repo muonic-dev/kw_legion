@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <QtQml/qqmlregistration.h>
+#include <qqmlintegration.h>
 
 #include <QObject>
 #include <QSettings>
@@ -23,6 +23,12 @@ class Settings : public QObject {
 
     Q_PROPERTY(bool shouldAutostart READ shouldAutostart WRITE setAutostart
                    NOTIFY autostartChanged)
+    // Has the user dismissed the autostart setting
+    // This is implicitly true if shouldAutostart is already true
+    // Additionally, this is implicitly set to true if the shouldAutostart value
+    // is ever written to.
+    Q_PROPERTY(bool hasDismissedAutostart READ hasDismissedAutostart WRITE
+                   setHasDismissedAutostart NOTIFY hasDismissedAutostartChanged)
     Q_PROPERTY(bool startMinimized READ startMinimized WRITE setStartMinimized
                    NOTIFY startMinimizedChanged)
     Q_PROPERTY(bool closeToTray READ closeToTray WRITE setCloseToTray NOTIFY
@@ -33,6 +39,9 @@ class Settings : public QObject {
 
     [[nodiscard]] bool shouldAutostart() const;
     void setAutostart(bool);
+
+    [[nodiscard]] bool hasDismissedAutostart() const;
+    void setHasDismissedAutostart(bool dismissed);
 
     [[nodiscard]] bool startMinimized() const;
     void setStartMinimized(bool startMinimized);
@@ -48,6 +57,7 @@ class Settings : public QObject {
     void autostartChanged();
     void startMinimizedChanged();
     void closeToTrayChanged();
+    void hasDismissedAutostartChanged();
 
    private:
     QSettings m_settings;

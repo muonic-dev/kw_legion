@@ -9,8 +9,8 @@
 #include <QList>
 
 namespace KWLegionCore {
-Replay Replay::fromReplay(const LegionParser::ReplayMetadata& replay,
-                          bool hasExternalPath) {
+Replay Replay::fromSynopsis(const LegionParser::ReplaySynopsis& replay,
+                            bool hasExternalPath) {
     QList<Player> players;
     players.reserve(replay.players.size());
     for (const auto& player : replay.players) {
@@ -26,6 +26,7 @@ Replay Replay::fromReplay(const LegionParser::ReplayMetadata& replay,
                   .matchDescription = replay.matchDescription,
                   .mapName = replay.mapName,
                   .mapReference = replay.mapReference,
-                  .hasExternalPath = hasExternalPath};
+                  .hasExternalPath = hasExternalPath,
+                  .engineTicks = replay.engineTicks};
 }
 }  // namespace KWLegionCore

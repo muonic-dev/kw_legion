@@ -3,7 +3,6 @@
 
 #include <legionparser/exception.h>
 
-#include <cstddef>
 #include <stdexcept>
 
 namespace LegionParser {
@@ -12,8 +11,9 @@ ReplayParseException::ReplayParseException(const QString& msg)
     : std::runtime_error(msg.toStdString()) {}
 
 LimitExceededException::LimitExceededException(const QString& what,
-                                               size_t offset, size_t limit,
-                                               size_t allowed)
+                                               qsizetype offset,
+                                               qsizetype limit,
+                                               qsizetype allowed)
     : ReplayParseException(QString("%1 exceeded limit of %2 (was %3) at %4")
                                .arg(what)
                                .arg(limit)
@@ -24,9 +24,10 @@ LimitExceededException::LimitExceededException(const QString& what,
       m_limit(limit),
       m_actual(allowed) {}
 
-CorruptDataException::CorruptDataException(const QString& what, size_t offset)
+CorruptDataException::CorruptDataException(const QString& what,
+                                           qsizetype offset)
     : ReplayParseException(QString("%1 at %2").arg(what).arg(offset)) {}
 
-TornDataException::TornDataException(size_t offset)
+TornDataException::TornDataException(qsizetype offset)
     : ReplayParseException(QString("Torn at %1").arg(offset)) {}
 }  // namespace LegionParser

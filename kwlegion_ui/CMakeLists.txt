@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform Network Sql Svg)
+find_package(Qt6 REQUIRED COMPONENTS Quick LabsPlatform Network Sql Svg Graphs)
 
 # Bakes the friendly name/version resource into kw_legion.exe (see
 # cpp/kw_legion.rc.in for why FILEVERSION can't carry the full SemVer).
@@ -32,8 +32,10 @@ qt_add_qml_module(kw_legion
         qml/Main.qml
         qml/Theme.qml
         qml/ShortAnimation.qml
+        qml/MediumAnimation.qml
         qml/NavRail.qml
         qml/SettingsSwitchRow.qml
+        qml/SettingDescription.qml
         qml/PatchPill.qml
         qml/TintedIcon.qml
         qml/TextFieldEdit.qml
@@ -71,6 +73,8 @@ qt_add_qml_module(kw_legion
         ico/close-lg-svgrepo-com.svg
         ico/close-sm-svgrepo-com.svg
         ico/arrow-reload-02-svgrepo-com.svg
+        ico/timer-svgrepo-com.svg
+        ico/check-svgrepo-com.svg
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
@@ -91,6 +95,7 @@ target_link_libraries(kw_legion
     Qt6::Network
     Qt6::Sql
     Qt6::Svg
+    Qt6::Graphs
     legionparser::legionparser
     kwlegion::core
     kwlegion::coreplugin

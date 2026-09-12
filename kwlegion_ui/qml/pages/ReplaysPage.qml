@@ -4,9 +4,11 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQml
 import QtQuick.Controls.Basic
 import QtQuick.Dialogs
 import QtQuick.Layouts
+import QtGraphs
 import KWLegionUI
 import KWLegionCore
 
@@ -62,6 +64,35 @@ Page {
             checksums.push(sortedReplayStoreModel.data(sortedReplayStoreModel.index(row, 0), ReplayStoreModel.ChecksumRole));
         }
         return checksums;
+    }
+
+    // apmPlot is one QList<QPointF> per player - x is the window's time
+    // offset (seconds), y is that window's APM. Used to size the analysis
+    // chart's axes to whatever the current row's data actually spans.
+    function maxSeriesX(plot) {
+        let m = 0;
+        if (!plot) {
+            return m;
+        }
+        for (const series of plot) {
+            for (const point of series) {
+                m = Math.max(m, point.x);
+            }
+        }
+        return m;
+    }
+
+    function maxSeriesY(plot) {
+        let m = 0;
+        if (!plot) {
+            return m;
+        }
+        for (const series of plot) {
+            for (const point of series) {
+                m = Math.max(m, point.y);
+            }
+        }
+        return m;
     }
 
     FileDialog {
@@ -294,8 +325,25 @@ Page {
             }
         }
 
+        // Using scale isntead of height because height is a bound property
+        add: Transition {
+            ShortAnimation {
+                properties: "opacity"
+                from: 0
+                to: 1
+            }
+        }
+
+        displaced: Transition {
+            ShortAnimation {
+                properties: "y"
+                easing.type: Easing.OutQuad
+            }
+        }
+
         delegate: Rectangle {
             id: delegateRoot
+            transformOrigin: Item.Top
 
             required property int index
             required property var checksum
@@ -306,13 +354,39 @@ Page {
             required property bool selected
             required property var timestamp
             required property var teams
+            required property var duration
+            required property bool expanded
+            required property int analysisState
+            required property var analysisApm
+
+            // Monotonic - only ever grows, never shrinks back to 0 when a
+            // panel is dismissed. Qt Graphs' PointRenderer caches its own
+            // series list across scenegraph polish passes and doesn't purge
+            // it synchronously when a series is removed/destroyed, so
+            // tearing LineSeries objects down on every dismiss raced that
+            // cache and produced a use-after-free the next time the chart
+            // needed to repaint (confirmed via crash dump: PointRenderer::
+            // afterPolish jumping through a freed QAbstractSeries vtable).
+            // Keeping series alive for the row's lifetime and only ever
+            // re-populating their points sidesteps that entirely.
+            property int maxAnalysisPlayers: 0
+            onAnalysisApmChanged: {
+                if (analysisApm && analysisApm.length > maxAnalysisPlayers) {
+                    maxAnalysisPlayers = analysisApm.length;
+                }
+            }
 
             // The width of the left zone containing textual data
             readonly property int fieldColumnWidth: 220
+            readonly property int analysisPanelHeight: 300
 
             width: ListView.view.width - 6 // some slight padding for the scrollbar
-            height: Math.max(fieldColumn.height, teamsFlow.height) + 16
+            height: expanded ? Math.max(fieldColumn.height, teamsFlow.height) + analysisPanelHeight + 16 : Math.max(fieldColumn.height, teamsFlow.height) + 16
             color: "transparent"
+
+            Behavior on height {
+                ShortAnimation {}
+            }
 
             Rectangle {
                 anchors.fill: parent
@@ -386,11 +460,25 @@ Page {
                         }
                     }
 
-                    Label {
+                    RowLayout {
                         width: parent.width
-                        text: delegateRoot.timestamp.toLocaleString(Qt.locale(), Locale.ShortFormat)
-                        elide: Text.ElideRight
-                        color: Theme.lightMode ? Theme.dark : Theme.light
+                        Label {
+                            Layout.fillWidth: true
+                            text: delegateRoot.timestamp.toLocaleString(Qt.locale(), Locale.ShortFormat)
+                            elide: Text.ElideRight
+                            color: Theme.lightMode ? Theme.dark : Theme.light
+                        }
+                        TintedIcon {
+                            height: 16
+                            width: 16
+                            source: "qrc:/qt/qml/KWLegionUI/ico/timer-svgrepo-com.svg"
+                            sourceSize: Qt.size(width, height)
+                        }
+                        Label {
+                            text: delegateRoot.duration.toLocaleString(Qt.locale(), "mm:ss")
+                            elide: Text.ElideRight
+                            color: Theme.lightMode ? Theme.dark : Theme.light
+                        }
                     }
 
                     RowLayout {
@@ -479,6 +567,32 @@ Page {
                         implicitWidth: 16 + leftPadding + rightPadding
                         implicitHeight: 16 + topPadding + bottomPadding
                     }
+
+                    Button {
+                        contentItem: TintedIcon {
+                            source: "qrc:/qt/qml/KWLegionUI/ico/chart-line-svgrepo-com.svg"
+                            sourceSize: Qt.size(16, 16)
+                        }
+
+                        background: Rectangle {
+                            radius: 4
+                            bottomLeftRadius: 0
+                            bottomRightRadius: 0
+                            color: delegateRoot.expanded ? Theme.analysisShade : "transparent"
+                        }
+
+                        onClicked: {
+                            if (delegateRoot.expanded) {
+                                ReplayStoreModel.dismissAnalysis(delegateRoot.checksum);
+                            } else {
+                                ReplayStoreModel.requestAnalysis(delegateRoot.checksum);
+                            }
+                        }
+
+                        padding: 10
+                        implicitWidth: 16 + leftPadding + rightPadding
+                        implicitHeight: 16 + topPadding + bottomPadding
+                    }
                 }
             }
 
@@ -527,10 +641,12 @@ Page {
                                     id: playerDelegate
                                     required property string name
                                     required property int faction
+                                    required property int seriesIndex
 
                                     spacing: 6
 
                                     Image {
+                                        anchors.verticalCenter: parent.verticalCenter
                                         source: page.factionIcon(playerDelegate.faction)
                                         sourceSize: Qt.size(32, 32)
                                         width: 24
@@ -538,7 +654,22 @@ Page {
                                         fillMode: Image.PreserveAspectFit
                                     }
 
+                                    // Matches this player's line color in the
+                                    // analysis chart (Theme.categoricalSeries
+                                    // is keyed by the same seriesIndex the
+                                    // chart's LineSeries use) - a colored mark
+                                    // beside the name carries that identity,
+                                    // the text itself stays plain ink.
+                                    Rectangle {
+                                        width: 10
+                                        height: 10
+                                        radius: 2
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        color: Theme.categoricalSeries[playerDelegate.seriesIndex % Theme.categoricalSeries.length]
+                                    }
+
                                     Label {
+                                        anchors.verticalCenter: parent.verticalCenter
                                         width: 94
                                         text: playerDelegate.name
                                         verticalAlignment: Text.AlignVCenter
@@ -548,6 +679,110 @@ Page {
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            Rectangle {
+                id: analysisPanel
+                x: 8
+                // Below the teams or the fields
+                y: Math.max(fieldColumn.height, teamsFlow.height) + 8
+                width: delegateRoot.width - 16
+                height: delegateRoot.expanded ? delegateRoot.analysisPanelHeight : 0
+                radius: 4
+                color: Theme.analysisShade
+                clip: true
+
+                Behavior on height {
+                    ShortAnimation {}
+                }
+
+                TintedIcon {
+                    id: spinnerIcon
+                    anchors.centerIn: parent
+                    width: 24
+                    height: 24
+                    visible: delegateRoot.analysisState === AsyncState.Pending
+                    source: "qrc:/qt/qml/KWLegionUI/ico/arrow-reload-02-svgrepo-com.svg"
+                    sourceSize: Qt.size(width, height)
+                    RotationAnimation on rotation {
+                        running: spinnerIcon.visible
+                        loops: Animation.Infinite
+                        from: 0
+                        to: 360
+                        duration: 1200
+                    }
+                }
+
+                Label {
+                    anchors.centerIn: parent
+                    visible: delegateRoot.analysisState === AsyncState.Failed
+                    text: qsTr("Analysis failed")
+                    color: Theme.lightMode ? Theme.dark : Theme.light
+                }
+
+                GraphsView {
+                    id: apmChart
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    visible: delegateRoot.analysisState === AsyncState.Complete
+
+                    axisX: ValueAxis {
+                        min: 0
+                        // apmPlot's x is seconds - converted to minutes at
+                        // this presentation layer only, same as
+                        // formatDuration() does for DurationRole, rather
+                        // than changing the unit the analysis actually
+                        // stores.
+                        max: Math.max(1, page.maxSeriesX(delegateRoot.analysisApm) / 60)
+                        titleText: qsTr("Time (min)")
+                    }
+                    axisY: ValueAxis {
+                        min: 0
+                        max: Math.max(1, page.maxSeriesY(delegateRoot.analysisApm))
+                        titleText: qsTr("APM")
+                    }
+
+                    // LineSeries is a plain QObject, not an Item, so a
+                    // Repeater won't parent its delegates into seriesList
+                    // (that only happens for statically-declared QML
+                    // children) - Instantiator plus the explicit addSeries
+                    // call is the pattern that actually works. The model is
+                    // delegateRoot.maxAnalysisPlayers (monotonic, see there
+                    // for why) rather than the live analysisApm length,
+                    // so these LineSeries are created once and never torn
+                    // down by a dismiss/re-request cycle - onObjectRemoved
+                    // is intentionally not wired to removeSeries here.
+                    Instantiator {
+                        model: delegateRoot.maxAnalysisPlayers
+                        delegate: LineSeries {
+                            id: playerSeries
+                            required property int index
+                            width: 2
+                            // Fixed by player index, never by draw order/rank
+                            // - see Theme.categoricalSeries.
+                            color: Theme.categoricalSeries[index % Theme.categoricalSeries.length]
+
+                            function reloadPoints() {
+                                clear();
+                                if (delegateRoot.analysisApm && index < delegateRoot.analysisApm.length) {
+                                    append(delegateRoot.analysisApm[index].map(point => ({
+                                                x: point.x / 60,
+                                                y: point.y
+                                            })));
+                                }
+                            }
+
+                            Component.onCompleted: reloadPoints()
+                            Connections {
+                                target: delegateRoot
+                                function onAnalysisApmChanged() {
+                                    playerSeries.reloadPoints();
+                                }
+                            }
+                        }
+                        onObjectAdded: (index, object) => apmChart.addSeries(object)
                     }
                 }
             }

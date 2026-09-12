@@ -37,7 +37,6 @@ void ReplayFilterQueryParser::setQueryText(const QString& value) {
         m_current->setParent(this);
         emit queryTextChanged();
         emit queryChanged();
-        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
         delete previous;
     }
 }
@@ -45,8 +44,6 @@ void ReplayFilterQueryParser::setQueryText(const QString& value) {
 QObject* ReplayFilterQueryParser::query() const { return m_current; }
 
 namespace {
-// Memory is handled by QObject ownership
-// NOLINTBEGIN(cppcoreguidelines-owning-memory)
 // QStringView iterator are pointers so iterator math becomes pointer math
 // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
@@ -235,6 +232,30 @@ std::optional<std::tuple<QDate, QStringView>> nextDate(const QLocale& locale,
     return std::make_tuple(date, rest);
 }
 
+std::optional<std::tuple<QTime, QStringView>> nextTime(const QLocale& locale,
+                                                       QStringView current) {
+    current = eatWhitespace(current);
+    if (isNextQuoted(current)) {
+        const auto [word, rest] = requireWord(current);
+        const auto time = locale.toTime(word.toString(), "m:ss");
+        if (!time.isValid()) {
+            throw ParseError(QStringLiteral("invalid quoted time"));
+        }
+        return std::make_tuple(time, rest);
+    }
+
+    std::optional next = nextLongWord(current);
+    if (!next) {
+        return std::nullopt;
+    }
+    const auto [word, rest] = *next;
+    const auto time = locale.toTime(word.toString(), "m:ss");
+    if (!time.isValid()) {
+        return std::nullopt;
+    }
+    return std::make_tuple(time, rest);
+}
+
 class FieldQueryParser {
    public:
     FieldQueryParser(QString fieldLabel)
@@ -247,12 +268,14 @@ class FieldQueryParser {
 
     virtual ~FieldQueryParser() = default;
 
-    bool matches(QStringView fieldLabel) { return m_fieldLabel == fieldLabel; }
+    bool matches(QStringView fieldLabel) const {
+        return m_fieldLabel == fieldLabel;
+    }
 
     // Parse the field's value out of input, returning the constructed query
     // alongside the remaining unconsumed input.
     [[nodiscard]] virtual std::tuple<FilterQuery*, QStringView> parse(
-        QStringView input) = 0;
+        QStringView input) const = 0;
 
    private:
     QString m_fieldLabel;
@@ -264,7 +287,7 @@ class TextQueryParser : public FieldQueryParser {
         : FieldQueryParser(std::move(fieldLabel)), m_role(role) {}
 
     [[nodiscard]] std::tuple<FilterQuery*, QStringView> parse(
-        QStringView input) override {
+        QStringView input) const override {
         const auto [word, rest] = requireWord(input);
         return {new TextFieldReplayFilterQuery(m_role, word.toString()), rest};
     }
@@ -279,7 +302,7 @@ class StringListQueryParser : public FieldQueryParser {
         : FieldQueryParser(std::move(fieldLabel)), m_role(role) {}
 
     [[nodiscard]] std::tuple<FilterQuery*, QStringView> parse(
-        QStringView input) override {
+        QStringView input) const override {
         const auto [word, rest] = requireWord(input);
         return {
             new StringListContainsReplayFilterQuery(m_role, word.toString()),
@@ -295,7 +318,7 @@ class OnDateQueryParser : public FieldQueryParser {
     OnDateQueryParser(QString fieldLabel, ReplayStoreModel::Roles role)
         : FieldQueryParser(std::move(fieldLabel)), m_role(role) {}
     [[nodiscard]] std::tuple<FilterQuery*, QStringView> parse(
-        QStringView input) override {
+        QStringView input) const override {
         const auto parsed = nextDate(QLocale::system(), input);
         if (!parsed) {
             throw ParseError(QStringLiteral("invalid date"));
@@ -313,12 +336,9 @@ class OnDateQueryParser : public FieldQueryParser {
         }
 
         auto* conj = new ConjunctionFilterQuery();
-        conj->addQuery(new RelativeDateTimeQuery(
-            m_role,
-            // Sub 1 for poor mans >=
-            start.addMSecs(-1), RelativeDateTimeQuery::Comparison::AFTER));
-        conj->addQuery(new RelativeDateTimeQuery(
-            m_role, end, RelativeDateTimeQuery::Comparison::BEFORE));
+        conj->addQuery(
+            new RelativeDateTimeQuery(m_role, start, Comparison::AFTER));
+        conj->addQuery(new RelativeDateTimeQuery(m_role, end, Comparison::BEFORE));
         return {conj, rest};
     }
 
@@ -330,13 +350,13 @@ class ComparisonDateTimeQueryParser : public FieldQueryParser {
    public:
     ComparisonDateTimeQueryParser(QString fieldLabel,
                                   ReplayStoreModel::Roles role,
-                                  RelativeDateTimeQuery::Comparison comparison)
+                                  Comparison comparison)
         : FieldQueryParser(std::move(fieldLabel)),
           m_role(role),
           m_comparison(comparison) {}
 
     [[nodiscard]] std::tuple<FilterQuery*, QStringView> parse(
-        QStringView input) override {
+        QStringView input) const override {
         const auto parsed = nextDate(QLocale::system(), input);
         if (!parsed) {
             throw ParseError(QStringLiteral("unparseable date"));
@@ -349,7 +369,32 @@ class ComparisonDateTimeQueryParser : public FieldQueryParser {
 
    private:
     ReplayStoreModel::Roles m_role;
-    RelativeDateTimeQuery::Comparison m_comparison;
+    Comparison m_comparison;
+};
+
+class ComparisonDurationQueryParser : public FieldQueryParser {
+   public:
+    ComparisonDurationQueryParser(QString fieldLabel,
+                                  ReplayStoreModel::Roles role,
+                                  Comparison comparison)
+        : FieldQueryParser(std::move(fieldLabel)),
+          m_role(role),
+          m_comparison(comparison) {}
+
+    [[nodiscard]] std::tuple<FilterQuery*, QStringView> parse(
+        QStringView input) const override {
+        std::optional next = nextTime(QLocale::system(), input);
+        if (!next) {
+            throw ParseError("expected time");
+        }
+        auto [time, rest] = next.value();
+        return {new RelativeDurationTimeQuery(m_role, time, m_comparison),
+                rest};
+    }
+
+   private:
+    ReplayStoreModel::Roles m_role;
+    Comparison m_comparison;
 };
 
 // The field dispatch table, shared by every CompoundQueryParser instead of
@@ -374,10 +419,16 @@ const std::vector<std::unique_ptr<FieldQueryParser>>& fieldParsers() {
             "on", ReplayStoreModel::Roles::TimestampRole));
         v.emplace_back(std::make_unique<ComparisonDateTimeQueryParser>(
             "before", ReplayStoreModel::Roles::TimestampRole,
-            RelativeDateTimeQuery::Comparison::BEFORE));
+            Comparison::BEFORE));
         v.emplace_back(std::make_unique<ComparisonDateTimeQueryParser>(
             "after", ReplayStoreModel::Roles::TimestampRole,
-            RelativeDateTimeQuery::Comparison::AFTER));
+            Comparison::AFTER));
+        v.emplace_back(std::make_unique<ComparisonDurationQueryParser>(
+            "longer", ReplayStoreModel::Roles::DurationRole,
+            Comparison::AFTER));
+        v.emplace_back(std::make_unique<ComparisonDurationQueryParser>(
+            "shorter", ReplayStoreModel::Roles::DurationRole,
+            Comparison::BEFORE));
         return v;
     }();
     return PARSERS;
@@ -441,19 +492,17 @@ class CompoundQueryParser final {
 
     QStringView m_text;
     // We always need a conjunction, however, on failure we need to free
-    // So, we store and then if m_conj hasn't been taken from us by the time we
-    // are destroyed we free it
+    // So, we store and then if m_conj hasn't been taken from us by the time
+    // we are destroyed we free it
     ConjunctionFilterQuery* m_conj;
 
     const std::vector<std::unique_ptr<FieldQueryParser>>& m_subparsers;
 };
 
 // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-// NOLINTEND(cppcoreguidelines-owning-memory)
 }  // namespace
 
 // Memory management by QObject semantics
-// NOLINTBEGIN(cppcoreguidelines-owning-memory)
 FilterQuery* ReplayFilterQueryParser::parse(QStringView text) {
     if (text.isEmpty()) {
         return new TautologyFilterQuery(this);
@@ -461,6 +510,5 @@ FilterQuery* ReplayFilterQueryParser::parse(QStringView text) {
     CompoundQueryParser parser{text};
     return parser.parse();
 }
-// NOLINTEND(cppcoreguidelines-owning-memory)
 
 }  // namespace KWLegionCore

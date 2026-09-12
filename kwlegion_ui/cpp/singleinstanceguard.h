@@ -25,6 +25,7 @@ class SingleInstanceGuard : public QObject {
     // Emitted (primary instance only) whenever another launch of the app
     // connects to check for a running instance.
     void activationRequested();
+    void quitRequested();
 
    private:
     QLocalServer m_server;

@@ -5,9 +5,12 @@
 
 #include <QByteArray>
 #include <QDateTime>
+#include <QLatin1String>
 #include <QList>
 #include <QString>
+#include <QtTypes>
 #include <cstdint>
+#include <limits>
 
 namespace LegionParser {
 
@@ -67,7 +70,7 @@ struct Player {
     std::uint32_t id = std::numeric_limits<std::uint32_t>::max();
     QString name = QLatin1String("");
     // Sourced entirely from the S= slot text (see
-    // Parser::parsePlayerSlots), for both skirmish and multiplayer
+    // SynopsisParser::parsePlayerSlots), for both skirmish and multiplayer
     // replays, using 1-based numbering matching the lobby UI. Multiplayer
     // replays also carry a binary team_number byte, but real network
     // matches confirmed so far are all 1v1, where that byte's behavior
@@ -84,7 +87,7 @@ struct Player {
     bool isReplaySaver = false;
 };
 
-struct ReplayMetadata {
+struct ReplaySynopsis {
     std::uint32_t versionMajor;
     std::uint32_t versionMinor;
     std::uint32_t buildMajor;
@@ -131,5 +134,18 @@ struct ReplayMetadata {
      * fingerprint/compare replay content.
      */
     QByteArray checksum;
+
+    /**
+     * The offset in the replay file where the body begins.
+     *
+     * Detected by scanning the header and can be re-used to perform
+     * on demand analysis without walking the entire replay.
+     */
+    qsizetype bodyOffset;
+
+    /**
+     * The number of ticks in the replay
+     */
+    quint32 engineTicks;
 };
 }  // namespace LegionParser

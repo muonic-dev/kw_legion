@@ -127,4 +127,63 @@ ApplicationWindow {
             AboutPage {}
         }
     }
+
+    // Snackbar hint: reminds the user that autostart-on-login is available.
+    // Declared after the RowLayout above so it paints on top of the page content.
+    Rectangle {
+        id: autostartSnackbar
+        color: Theme.lightMode ? Theme.light : Theme.dark
+        border.width: 1
+        border.color: Theme.lightMode ? Theme.dark : Theme.light
+        width: content.implicitWidth + 32
+        height: content.implicitHeight + 12
+        x: (parent.width - width) / 2
+        y: Settings.hasDismissedAutostart ? parent.height : parent.height - (height + 16)
+        Behavior on y {
+            MediumAnimation {
+                id: slideAnimation
+            }
+        }
+
+        RowLayout {
+            id: content
+            anchors.centerIn: parent
+            SettingDescription {
+                name: qsTr("Start automatically")
+                description: qsTr("Start at login. LEGION needs to be running in order to track your replays.")
+                Layout.fillWidth: true
+                rightPadding: 24
+            }
+
+            Button {
+                contentItem: TintedIcon {
+                    source: "qrc:/qt/qml/KWLegionUI/ico/check-svgrepo-com.svg"
+                    sourceSize: Qt.size(16, 16)
+                }
+                onClicked: {
+                    Settings.shouldAutostart = true;
+                }
+                Layout.fillHeight: false
+                Layout.alignment: Qt.AlignVCenter
+                padding: 10
+                implicitWidth: 16 + leftPadding + rightPadding
+                implicitHeight: 16 + topPadding + bottomPadding
+            }
+            Button {
+                contentItem: TintedIcon {
+                    source: "qrc:/qt/qml/KWLegionUI/ico/close-md-svgrepo-com.svg"
+                    sourceSize: Qt.size(16, 16)
+                }
+                onClicked: {
+                    Settings.shouldAutostart = false;
+                }
+                Layout.fillHeight: false
+                Layout.alignment: Qt.AlignVCenter
+
+                padding: 10
+                implicitWidth: 16 + leftPadding + rightPadding
+                implicitHeight: 16 + topPadding + bottomPadding
+            }
+        }
+    }
 }

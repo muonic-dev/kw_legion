@@ -70,14 +70,16 @@ void configure(Deferred& deferred) {
 
 }  // namespace
 
-TEST_CASE("Deferred::sample reports zero size for a nonexistent path") {
+TEST_CASE("Deferred::sample reports zero size for a nonexistent path",
+         "[deferred][filesystem][watermark]") {
     const Watermark sample =
         Deferred::sample("Z:/definitely/not/a/real/path.KWReplay");
     CHECK(sample.size == 0);
     CHECK_FALSE(sample.modifiedAt.isValid());
 }
 
-TEST_CASE("Deferred::sample reports the size of an existing file") {
+TEST_CASE("Deferred::sample reports the size of an existing file",
+         "[deferred][filesystem][watermark]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -89,7 +91,8 @@ TEST_CASE("Deferred::sample reports the size of an existing file") {
     CHECK(sample.modifiedAt.isValid());
 }
 
-TEST_CASE("Watermark::differsFrom is false for an unchanged file") {
+TEST_CASE("Watermark::differsFrom is false for an unchanged file",
+         "[deferred][filesystem][watermark]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -102,7 +105,8 @@ TEST_CASE("Watermark::differsFrom is false for an unchanged file") {
     CHECK_FALSE(second.differsFrom(first));
 }
 
-TEST_CASE("Watermark::differsFrom is true once a file grows") {
+TEST_CASE("Watermark::differsFrom is true once a file grows",
+         "[deferred][filesystem][watermark]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -116,7 +120,8 @@ TEST_CASE("Watermark::differsFrom is true once a file grows") {
 }
 
 TEST_CASE(
-    "Watermark::differsFrom is true when only the modification time moves") {
+    "Watermark::differsFrom is true when only the modification time moves",
+    "[deferred][filesystem][watermark]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -133,7 +138,8 @@ TEST_CASE(
     CHECK(after.differsFrom(before));
 }
 
-TEST_CASE("Deferred does not emit pathChanged while a file is unchanged") {
+TEST_CASE("Deferred does not emit pathChanged while a file is unchanged",
+         "[deferred][filesystem][watch]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -149,7 +155,8 @@ TEST_CASE("Deferred does not emit pathChanged while a file is unchanged") {
     CHECK(spy.isEmpty());
 }
 
-TEST_CASE("Deferred emits pathChanged once a file grows") {
+TEST_CASE("Deferred emits pathChanged once a file grows",
+         "[deferred][filesystem][watch]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -170,7 +177,8 @@ TEST_CASE("Deferred emits pathChanged once a file grows") {
     CHECK(spy.at(0).at(0).toString() == path);
 }
 
-TEST_CASE("Deferred emits pathChanged for a file that appears later") {
+TEST_CASE("Deferred emits pathChanged for a file that appears later",
+         "[deferred][filesystem][watch]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -192,7 +200,8 @@ TEST_CASE("Deferred emits pathChanged for a file that appears later") {
     CHECK(spy.at(0).at(0).toString() == path);
 }
 
-TEST_CASE("Deferred emits pathChanged on the long stop with no file change") {
+TEST_CASE("Deferred emits pathChanged on the long stop with no file change",
+         "[deferred][filesystem][watch]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -212,7 +221,8 @@ TEST_CASE("Deferred emits pathChanged on the long stop with no file change") {
     CHECK(spy.at(0).at(0).toString() == path);
 }
 
-TEST_CASE("Deferred tracks multiple paths and only emits the changed one") {
+TEST_CASE("Deferred tracks multiple paths and only emits the changed one",
+         "[deferred][filesystem][watch]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -237,7 +247,8 @@ TEST_CASE("Deferred tracks multiple paths and only emits the changed one") {
     CHECK(spy.at(0).at(0).toString() == changedPath);
 }
 
-TEST_CASE("Deferred stops watching a removed path") {
+TEST_CASE("Deferred stops watching a removed path",
+         "[deferred][filesystem][watch]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
@@ -256,7 +267,8 @@ TEST_CASE("Deferred stops watching a removed path") {
     CHECK(spy.isEmpty());
 }
 
-TEST_CASE("Deferred::stop halts pending rechecks") {
+TEST_CASE("Deferred::stop halts pending rechecks",
+         "[deferred][filesystem][watch]") {
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());

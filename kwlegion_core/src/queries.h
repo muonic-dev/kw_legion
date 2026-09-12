@@ -11,12 +11,15 @@
 #include <QByteArray>
 #include <QDateTime>
 #include <QList>
+#include <QLoggingCategory>
 #include <QSqlQuery>
 #include <QString>
-#include <array>
 #include <optional>
+#include <utility>
 
 namespace KWLegionCore {
+
+Q_DECLARE_LOGGING_CATEGORY(logQueries);
 
 // Helper utility class for dispatching queries. Kept alongside MIGRATIONS so
 // the DDL and the statements that reference it stay adjacent.
@@ -32,17 +35,29 @@ class Queries final {
     Queries& operator=(const Queries&) = delete;
     Queries& operator=(Queries&&) = delete;
 
-    // Returns false on failure. Caller should inspect the db for whatever the
-    // error was
-    bool migrate();
+    // Runs any pending migrations. Throws StorageException on failure.
+    void migrate();
 
     bool isReplayKnown(const QByteArray& checksum);
 
-    void insertReplay(const LegionParser::ReplayMetadata& metadata);
+    // Determine if a replay needs its body reanalyzed (for things like offset
+    // and engine ticks)
+    bool doesReplayNeedAnalysis(const QByteArray& checksum);
+
+    // Select the checksum of all replays that need to be re-analyzed on a body
+    // pass
+    QList<QByteArray> selectReplaysNeedingAnalysis();
+
+    void insertReplay(const LegionParser::ReplaySynopsis& metadata);
+
+    // Handle when the replay is already known
+    void insertReplayAnalysis(const LegionParser::ReplaySynopsis& metadata);
 
     void updateOverrideTitle(const QByteArray& checksum,
                              const QString& overrideTitle);
 
+    // Insert the players of a replay
+    // The order received will be tracked so that analysis can use it
     void insertReplayPlayers(const QByteArray& checksum,
                              const QList<LegionParser::Player>& players);
 
@@ -71,6 +86,9 @@ class Queries final {
 
     std::optional<Replay> selectReplay(const QByteArray& checksum);
 
+    // Select the players in a replay
+    // This is guaranteed to maintain the same order as the player insert does
+    // so that player ordering is stable for doing replay analysis
     QList<Player> selectReplayPlayers(const QByteArray& checksum);
 
     QList<QString> selectExternalPaths(const QByteArray& checksum);

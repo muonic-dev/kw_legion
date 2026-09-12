@@ -10,9 +10,9 @@ them.
 
 | Component | Location | Responsibility |
 |---|---|---|
-| `LegionParser::Parser` | `legionparser/` | Parses the `.KWReplay` binary format from a `QIODevice` into `ReplayMetadata` (players, factions, map, timestamp, checksum). This is only a format parser. There is no knowledge of persistence of the filesystem beyond whatever QIODevice is handed in. |
+| `LegionParser::SynopsisParser` | `legionparser/` | Parses the `.KWReplay` binary format from a `QIODevice` into `ReplaySynopsis` (players, factions, map, timestamp, checksum). This is only a format parser. There is no knowledge of persistence of the filesystem beyond whatever QIODevice is handed in. |
 | `KWLegionCore::ReplayProspector` | `kwlegion_core/` | Watches the configured replay directory (`QFileSystemWatcher`), performs an initial sweep, and emits paths as replays are discovered or removed. |
-| `KWLegionCore::ReplayStore` | `kwlegion_core/` | Owns the SQLite-backed catalog. Parses paths it's handed via `LegionParser::Parser`, ingests new/changed replays, and emits domain events. |
+| `KWLegionCore::ReplayStore` | `kwlegion_core/` | Owns the SQLite-backed catalog. Parses paths it's handed via `LegionParser::SynopsisParser`, ingests new/changed replays, and emits domain events. |
 | `KWLegionCore::ReplayStoreModel` | `kwlegion_core/` | `QAbstractListModel` adapter exposing the store's replay list to QML. |
 | App shell | `kwlegion_ui/` | Wires the components together, owns the background I/O thread, registers the QML singleton, boots the engine. |
 | UI | `kwlegion_ui/qml/` | `Main.qml` / `NavRail.qml` shell plus pages (`ReplaysPage`, `StatisticsPage`, `SettingsPage`, `AboutPage`) that bind to the `ReplayStoreModel` singleton. |
@@ -42,18 +42,18 @@ data model to populate the view.
 ### Runtime
 
 As the `ReplayProspector` receives directory changed events it determines which files were added or removed
-based on its own cached filesystem state. It emits the events `replayFileChanged` and `replayFileRemoved` for this update. The `ReplayStore` listens for these with `analyzeReplayFile` and `removeReplayFileLink` to synchronize
+based on its own cached filesystem state. It emits the events `replayFileChanged` and `replayFileRemoved` for this update. The `ReplayStore` listens for these with `synopsizeReplayFile` and `removeReplayFileLink` to synchronize
 the database state. It subsequently emits events to keep the `ReplayStoreModel` in sync. There is now a 
 `replayDiscovered`, `replayChanged`, and `replayRemoved`. These are keyed on a `Replay` type that bears a checksum. Functionally, the `ReplayStore` sits betwen the `Prospector` and the `Model` and converts between paths and checksums. Logically, a replay is not a file so the changed event can bear information like the replay is now present in the Documents folder or it was removed.
 
 
-### Replay Analysis
+### Replay Synopsis
 
 The core must cope with replays that are not fully written. In general, the flow proceeds as
 
 - prospector discovers a change
-- store attempts analysis
-- on success the analysis is stored
+- store attempts to build a synopsis
+- on success the synopsis is stored
 - on failure the replay may retry depending whether the replay is torn (partially written) or corrupt by resignalling itself through the Deferred mechanism
 
 Eventually, the application will give up and wait for an additional file event

@@ -3,7 +3,7 @@
 
 #include <kwlegion_core/inboxitem.h>
 #include <kwlegion_core/replaystore.h>
-#include <legionparser/parser.h>
+#include <legionparser/synopsisparser.h>
 
 #include <QDateTime>
 #include <QDebug>
@@ -19,13 +19,13 @@
 #include <QUrl>
 #include <QVariant>
 #include <QtLogging>
-#include <cstddef>
 #include <optional>
 #include <stdexcept>
 #include <utility>
 
 #include "deferred.h"
 #include "exception.h"
+#include "legionparser/exception.h"
 #include "legionparser/replay.h"
 #include "queries.h"
 #include "transaction.h"
@@ -35,8 +35,8 @@ Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
 namespace KWLegionCore {
 
 // The poll itself is only a stat per deferred path, and since
-// Parser::looksComplete rejects an unfinished file from its tail, a poll that
-// sees a change no longer costs a whole-payload hash either.
+// SynopsisParser::looksComplete rejects an unfinished file from its tail, a
+// poll that sees a change no longer costs a whole-payload hash either.
 constexpr int RECHECK_INTERVAL_MS = 5000;
 
 // How many times in a row a path may fail to open before it stops being
@@ -83,9 +83,9 @@ ReplayStore::ReplayStore(QString replayDir, const QString& statePath,
       m_replayDir(std::move(replayDir)),
       m_deferred(new Deferred(this)) {
     m_deferred->setRecheckIntervalMs(RECHECK_INTERVAL_MS);
-    // Send it back throught the analyze replay file
+    // Send it back through the synopsize replay file slot
     QObject::connect(m_deferred, &Deferred::pathChanged, this,
-                     &ReplayStore::analyzeReplayFile);
+                     &ReplayStore::synopsizeReplayFile);
 }
 
 void ReplayStore::stop() {
@@ -170,20 +170,27 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     ensureDirectories();
     ensureDb();
 
+    // We did some kind of migration that needs additional bookkeeping
+    try {
+        performReplayReanalysis();
+    } catch (StorageException& ex) {
+        qCritical(logStore) << "Failed to re-analyze replays " << ex.what();
+    }
+
     // Inbox contents are derived from what is on disk rather than persisted,
     // so clear whatever the UI is holding before the sweep below repopulates
     // it from the paths we actually find.
     emit inboxReset();
 
-    // Bracket analyzeReplayFile so that we don't constantly emit the individual
-    // load action
+    // Bracket synopsizeReplayFile so that we don't constantly emit the
+    // individual load action
     const auto guard = m_initialSweep.enter();
     // Ingest every path that we have
     for (const auto& path : paths) {
         // TODO: Maybe we can avoid making this a ton of transactions
         // We ignore the return value here because its the initial startup.
         // We're emitting everythign at the end
-        analyzeReplayFile(path);
+        synopsizeReplayFile(path);
     }
 
     // Now that we've done all the initial processing we will emit the query
@@ -198,8 +205,52 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
         }
 
         emit replaysLoaded(replays);
+
+        // We've done startup, so lets do any pending analysis that we need.
+        // In the future we may need to do re-emission of individual replays
+        // but this is fine
     } catch (StorageException& ex) {
         qCritical(logStore) << "Unable to access the replays " << ex.what();
+    }
+}
+
+void ReplayStore::performReplayReanalysis() {
+    Queries queries{QSqlQuery(m_db)};
+    const auto needsAnalysis = queries.selectReplaysNeedingAnalysis();
+
+    for (const auto& checksum : needsAnalysis) {
+        const QString internalPath = computeIngestionPath(checksum);
+        qDebug(logStore) << "Reanalyzing replay at: " << internalPath;
+        SqlTransactionGuard guard(m_db);
+
+        QFile replayFile(internalPath);
+        if (!replayFile.open(QIODevice::ReadOnly)) {
+            qCritical(logStore) << "Failed to open " << internalPath << " "
+                                << replayFile.errorString();
+            continue;
+        }
+
+        // It should be complete if its internally parsed
+        try {
+            const auto synopsis =
+                LegionParser::SynopsisParser::parse(replayFile);
+            queries.insertReplayPlayers(synopsis.checksum, synopsis.players);
+            queries.insertReplayAnalysis(synopsis);
+            guard.commit();
+        } catch (LegionParser::ReplayParseException& ex) {
+            qCritical(logStore)
+                << "Failed to parse previously ingested replay: "
+                << internalPath;
+        }
+
+        // Now we should re-emit
+        const std::optional<Replay> replay = queries.selectReplay(checksum);
+        if (!replay.has_value()) {
+            qWarning(logStore) << "Replay disappeared during reanalysis path: "
+                               << QString(checksum.toHex());
+            continue;
+        }
+        emit replaysChanged(QList{*replay});
     }
 }
 
@@ -212,7 +263,7 @@ void ReplayStore::removeReplayFile(const QString& path) {
     emit inboxItemRemoved(path);
 }
 
-void ReplayStore::analyzeReplayFile(const QString& path) {
+void ReplayStore::synopsizeReplayFile(const QString& path) {
     // We were waiting but also a file notification happened
     m_deferred->removeWaitForChange(path);
 
@@ -232,7 +283,7 @@ void ReplayStore::analyzeReplayFile(const QString& path) {
     }
 
     try {
-        performReplayAnalysis(path);
+        performReplaySynopsis(path);
         // Success = not pending
         m_storageRetries.remove(path);
         emit inboxItemRemoved(path);
@@ -251,30 +302,27 @@ void ReplayStore::analyzeReplayFile(const QString& path) {
 }
 
 void ReplayStore::handleTornFailure(const QString& path,
-                                    const Watermark& observed) noexcept {
+                                    const Watermark& observed) {
     // If the replay cannot be parsed then whatever then
     // the link to an existing replay needs to be broken
     qDebug(logStore) << "path " << path << " is incomplete";
     // No throw since we get external calls
     removeReplayFileLink(path);
-
     // The parser is the authority on whether the file is complete, and it
-    // just said no - so there is nothing to learn until the bytes on disk
+    // just said no. So there is nothing to learn until the bytes on disk
     // actually move.
     m_deferred->waitForChange(path, observed);
     emit inboxItemObserved(makeInboxItem(path, InboxType::TORN));
 }
 
 void ReplayStore::handleParseFailure(
-    const LegionParser::ReplayParseException& ex,
-    const QString& path) noexcept {
+    const LegionParser::ReplayParseException& ex, const QString& path) {
     // The replay is terminally invalid, so just remove it. Unlike a torn
     // replay this doesn't go back into the deferred set - nothing is going
     // to un-corrupt the file, so retrying only burns reads.
     // TODO: ReplayParseException includes potential IO failures which may
     // be transient in addition to CorruptDataException
     qInfo(logStore) << "unable to parse " << ex.what();
-    // No throw since we get external calls
     removeReplayFileLink(path);
     emit inboxItemObserved(makeInboxItem(path, InboxType::CORRUPT));
 }
@@ -311,6 +359,10 @@ void ReplayStore::handleStorageFailure(const QString& path,
     //
     // So retry against something no existing file can match, which asks the
     // only question that matters: can we open it yet.
+    // QHash::operator[] default-constructs (0) a missing key rather than
+    // being UB/throwing like a sequential container's operator[] - the
+    // bounds-safety concern the linter is flagging doesn't apply here.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     const int attempts = ++m_storageRetries[path];
     if (attempts <= MAX_FAST_STORAGE_RETRIES) {
         m_deferred->waitForChange(path, unmatchableWatermark());
@@ -389,9 +441,25 @@ void ReplayStore::exposeReplay(const QByteArray& checksum) {
     if (!QDir(m_replayDir).mkpath("managed")) {
         throw StorageException("failed to create managed/ replay folder");
     }
+    Queries queries{QSqlQuery(m_db)};
+    const auto replay = queries.selectReplay(checksum);
+    if (!replay) {
+        qWarning(logStore) << "Replay " << QLatin1String(checksum.toHex())
+                           << " doesn't exist";
+        return;
+    }
+
     const QString ingestedPath = computeIngestionPath(checksum);
-    const QString targetPath = QString("%1/managed/%2.KWReplay")
-                                   .arg(m_replayDir, QString(checksum.toHex()));
+
+    const QString matchTitle = replay->overrideMatchTitle.isEmpty()
+                                   ? replay->matchTitle
+                                   : replay->overrideMatchTitle;
+    const QString fileName =
+        QString("%1 - %2.KWReplay")
+            .arg(matchTitle, QString(checksum.toHex()).slice(0, 8));
+
+    const QString targetPath =
+        QString("%1/managed/%2.KWReplay").arg(m_replayDir, fileName);
     // Assume this exists
     if (!QFile::copy(ingestedPath, targetPath)) {
         throw StorageException("failed to copy into managed/ folder");
@@ -410,6 +478,23 @@ void ReplayStore::hideReplay(Queries& queries, const QByteArray& checksum) {
     }
 }
 
+std::optional<ReplayAnalysisTarget> ReplayStore::lookupReplay(
+    const QByteArray& checksum) const {
+    Queries queries{QSqlQuery{m_db}};
+    try {
+        std::optional<Replay> replay = queries.selectReplay(checksum);
+        if (replay) {
+            replay->players = queries.selectReplayPlayers(checksum);
+            QString path = computeIngestionPath(checksum);
+            return ReplayAnalysisTarget{.path = std::move(path),
+                                        .replay = std::move(*replay)};
+        }
+    } catch (StorageException& ex) {
+        qCritical(logStore) << "Failed to query the database: " << ex.what();
+    }
+    return std::nullopt;
+}
+
 void ReplayStore::acknowledgeItem(const QString& path) {
     // Dismissal is scoped to this session. Inbox state is derived from what
     // is on disk, and the paths that reach the inbox include the game's
@@ -419,8 +504,8 @@ void ReplayStore::acknowledgeItem(const QString& path) {
     emit inboxItemRemoved(path);
 }
 
-void ReplayStore::performReplayAnalysis(const QString& path) {
-    qDebug(logStore) << "Analyzing replay: " << path;
+void ReplayStore::performReplaySynopsis(const QString& path) {
+    qDebug(logStore) << "Synopsizing replay: " << path;
     QFile replayFile(path);
     if (!replayFile.open(QIODevice::ReadOnly)) {
         // We may need to figure out how to recover from this such as by locked
@@ -433,17 +518,16 @@ void ReplayStore::performReplayAnalysis(const QString& path) {
     // reject it. Checking the tail first turns that into two small reads.
     // Only ever a short-circuit: a file it doesn't rule out still goes
     // through the parser, which stays the authority on torn vs corrupt.
-    if (!LegionParser::Parser::looksComplete(replayFile)) {
+    if (!LegionParser::SynopsisParser::looksComplete(replayFile)) {
         // Reported at the end of the file - that's where the footer we
         // didn't find would have been.
-        throw LegionParser::TornDataException(
-            static_cast<size_t>(replayFile.size()));
+        throw LegionParser::TornDataException(replayFile.size());
     }
 
     // TODO: In theory there is a short race condition here where the file
     // is overwritten before we can analyze and copy it, but meh
-    const LegionParser::ReplayMetadata metadata =
-        LegionParser::Parser::parse(replayFile);
+    const LegionParser::ReplaySynopsis metadata =
+        LegionParser::SynopsisParser::parse(replayFile);
 
     // Ingest the replay and determine all the checksums that changed
     const QList<QByteArray> impacted = ingestReplay(replayFile, metadata);
@@ -451,46 +535,64 @@ void ReplayStore::performReplayAnalysis(const QString& path) {
 }
 
 QList<QByteArray> ReplayStore::ingestReplay(
-    QFile& file, const LegionParser::ReplayMetadata& metadata) {
+    QFile& file, const LegionParser::ReplaySynopsis& metadata) {
     SqlTransactionGuard tx(m_db);
     Queries queries{QSqlQuery(m_db)};
 
-    QList<QByteArray> impactedChecksums{{metadata.checksum}};
-
+    QList<QByteArray> checksums;
     if (queries.isReplayKnown(metadata.checksum)) {
-        // If the replay has been seen before then we need to add a path to it
-        qDebug(logStore) << "Existing replay being ingested: "
-                         << file.fileName();
-
-        handleExistingReplayAtPath(queries, file.fileName(), impactedChecksums);
-
-        if (!queries.insertExternalFilename(metadata.checksum,
-                                            file.fileName())) {
-            qDebug(logStore)
-                << "Existing replay was already tracked" << file.fileName();
-        }
-
+        checksums = ingestKnownReplay(queries, file, metadata);
     } else {
-        qInfo(logStore) << "New replay being ingested: " << file.fileName();
-        // This is the first time the replay has been seen so
-        // we need to perform to insert everything
-        queries.insertReplay(metadata);
-        queries.insertReplayPlayers(metadata.checksum, metadata.players);
-
-        handleExistingReplayAtPath(queries, file.fileName(), impactedChecksums);
-
-        queries.insertExternalFilename(metadata.checksum, file.fileName());
-
-        // Before committing we should copy to the canonical path
-        if (!file.copy(computeIngestionPath(metadata.checksum))) {
-            qCritical(logStore)
-                << "Failed to copy the replay file to the store";
-            throw StorageException("failed to copy");
-        }
+        checksums = ingestUnknownReplay(queries, file, metadata);
     }
 
     tx.commit();
 
+    return checksums;
+}
+
+QList<QByteArray> ReplayStore::ingestKnownReplay(
+    Queries& queries, QFile& file,
+    const LegionParser::ReplaySynopsis& metadata) {
+    QList<QByteArray> impactedChecksums{{metadata.checksum}};
+
+    if (queries.doesReplayNeedAnalysis(metadata.checksum)) {
+        queries.insertReplayAnalysis(metadata);
+        queries.insertReplayPlayers(metadata.checksum, metadata.players);
+    }
+    // If the replay has been seen before then we need to add a path to it
+    qDebug(logStore) << "Existing replay being ingested: " << file.fileName();
+
+    handleExistingReplayAtPath(queries, file.fileName(), impactedChecksums);
+
+    if (!queries.insertExternalFilename(metadata.checksum, file.fileName())) {
+        qDebug(logStore) << "Existing replay was already tracked"
+                         << file.fileName();
+    }
+
+    return impactedChecksums;
+}
+
+QList<QByteArray> ReplayStore::ingestUnknownReplay(
+    Queries& queries, QFile& file,
+    const LegionParser::ReplaySynopsis& metadata) {
+    QList<QByteArray> impactedChecksums{{metadata.checksum}};
+    qInfo(logStore) << "New replay being ingested: " << file.fileName();
+    // This is the first time the replay has been seen so
+    // we need to perform to insert everything
+    queries.insertReplay(metadata);
+    queries.insertReplayAnalysis(metadata);
+    queries.insertReplayPlayers(metadata.checksum, metadata.players);
+
+    handleExistingReplayAtPath(queries, file.fileName(), impactedChecksums);
+
+    queries.insertExternalFilename(metadata.checksum, file.fileName());
+
+    // Before committing we should copy to the canonical path
+    if (!file.copy(computeIngestionPath(metadata.checksum))) {
+        qCritical(logStore) << "Failed to copy the replay file to the store";
+        throw StorageException("failed to copy");
+    }
     return impactedChecksums;
 }
 
@@ -561,6 +663,7 @@ void ReplayStore::ensureDb() {
 
     m_db = QSqlDatabase::addDatabase("QSQLITE", "kwlegion_store");
     m_db.setDatabaseName(m_dbPath);
+    m_db.setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000"));
     if (!m_db.open()) {
         qCCritical(logStore)
             << "Failed to open database: " << m_db.lastError().text();
@@ -572,10 +675,7 @@ void ReplayStore::ensureDb() {
         // Outside a transaction so that we do as much as we can
         // if we ever ship a broken migration this means there is less to do
         Queries queries{QSqlQuery(m_db)};
-        if (!queries.migrate()) {
-            qCritical(logStore)
-                << "Failed to migrate database: " << m_db.lastError().text();
-        }
+        queries.migrate();
     } catch (const StorageException& ex) {
         qCritical(logStore) << "Failed to migrate database: " << ex.what();
     }

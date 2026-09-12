@@ -24,7 +24,11 @@ add_library(kwlegion_core STATIC
     include/kwlegion_core/settings.h
     include/kwlegion_core/ingestionmodel.h
     include/kwlegion_core/inboxitem.h
+    include/kwlegion_core/asyncvalue.h
+    include/kwlegion_core/replayanalyzer.h
     # Main src
+
+    src/apmanalyzer.cpp
     src/appinfo.cpp
     src/metatypes.cpp
     src/prospector.cpp
@@ -40,6 +44,7 @@ add_library(kwlegion_core STATIC
     src/deferred.cpp
     src/deferred.h #MOC
     src/faction_registration.h #MOC
+    src/asyncstate_registration.h #MOC
     src/settings.cpp
     src/ingestionmodel.cpp
     src/replayfilterqueryparser.h #MOC
@@ -48,6 +53,8 @@ add_library(kwlegion_core STATIC
     src/filterquery.cpp
     src/replayfilterquery.h #MOC
     src/replayfilterquery.cpp
+    src/replayanalyzer.cpp
+    src/replayanalyzerbridge.cpp
     src/sortfilterproxymodel.h #MOC
     src/sortfilterproxymodel.cpp
     ${platform_sources}

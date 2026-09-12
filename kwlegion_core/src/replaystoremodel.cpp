@@ -3,10 +3,12 @@
  * Copyright (C) 2026 Muonic
  */
 
+#include <kwlegion_core/replayanalyzer.h>
 #include <kwlegion_core/replaystore.h>
 #include <kwlegion_core/replaystoremodel.h>
 
 #include <QAbstractItemModel>
+#include <QDebug>
 #include <QHash>
 #include <QHashFunctions>
 #include <QJSEngine>
@@ -22,11 +24,26 @@
 #include <ranges>
 #include <utility>
 
-#include "legionparser/replay.h"
+#include "replayanalyzerbridge.h"
 #include "replaymodel.h"
 #include "teammodel.h"
 
 namespace KWLegionCore {
+
+namespace {
+
+template <typename... Ts>
+struct Match : Ts... {
+    using Ts::operator()...;
+};
+
+QTime formatDuration(quint32 engineTicks) {
+    // I think the engine tick rate of 30 was incorrectly and that is UI draw.
+    // I believe its actually 15hz empirically
+    return QTime(0, 0).addSecs(static_cast<qint32>(engineTicks) / 15);
+}
+
+}  // namespace
 
 const QList SELECTED_ROLE{
     static_cast<int>(ReplayStoreModel::Roles::SelectedRole)};
@@ -50,8 +67,16 @@ ReplayStoreModel::ReplayStoreModel(QObject* parent)
           {static_cast<int>(Roles::TeamsRole), QByteArrayLiteral("teams")},
           {static_cast<int>(Roles::PlayersRole), QByteArrayLiteral("players")},
           {static_cast<int>(Roles::PatchRole), QByteArrayLiteral("patch")},
+          {static_cast<int>(Roles::DurationRole),
+           QByteArrayLiteral("duration")},
           {static_cast<int>(Roles::SelectedRole),
            QByteArrayLiteral("selected")},
+          {static_cast<int>(Roles::ExpandedRole),
+           QByteArrayLiteral("expanded")},
+          {static_cast<int>(Roles::AnalysisStateRole),
+           QByteArrayLiteral("analysisState")},
+          {static_cast<int>(Roles::AnalysisAPMRole),
+           QByteArrayLiteral("analysisApm")},
       } {}
 
 ReplayStoreModel::~ReplayStoreModel() = default;
@@ -60,10 +85,11 @@ ReplayStoreModel* ReplayStoreModel::create(QQmlEngine* /*qmlEngine*/,
                                            QJSEngine* /*jsEngine*/) {
     // Signature is Qt's QML_SINGLETON factory contract - must return T*, not
     // gsl::owner<T*>. Ownership transfers to the QML engine at the call site.
-    return new ReplayStoreModel();  // NOLINT(cppcoreguidelines-owning-memory)
+    return new ReplayStoreModel();
 }
 
-void ReplayStoreModel::setStore(ReplayStore* store) {
+void ReplayStoreModel::finishInit(ReplayStore* store,
+                                  ReplayAnalyzer* analyzer) {
     connect(store, &ReplayStore::replaysLoaded, this,
             &ReplayStoreModel::replaysLoaded);
     connect(store, &ReplayStore::replaysChanged, this,
@@ -84,6 +110,8 @@ void ReplayStoreModel::setStore(ReplayStore* store) {
             &ReplayStore::clearOverrideTitle);
     connect(this, &ReplayStoreModel::shouldSetOverrideTitle, store,
             &ReplayStore::setOverrideTitle);
+    // Tie ourselves to the replay analyzer
+    m_replayAnalyzerBridge = new ReplayAnalyzerBridge(analyzer, this);
 }
 
 void ReplayStoreModel::replaysLoaded(const QList<Replay>& replays) {
@@ -91,9 +119,10 @@ void ReplayStoreModel::replaysLoaded(const QList<Replay>& replays) {
     qDeleteAll(m_replays);
     m_replays.clear();
     for (const auto& replay : replays) {
-        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
         m_replays.append(new ReplayModel(replay, this));
     }
+    m_selections.clear();
+    m_analysisEntries.clear();
     endResetModel();
 }
 
@@ -111,7 +140,6 @@ void ReplayStoreModel::replaysChanged(const QList<Replay>& replays) {
         } else {
             const int row = static_cast<int>(m_replays.size());
             beginInsertRows(QModelIndex(), row, row);
-            // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
             m_replays.append(new ReplayModel(replay, this));
             endInsertRows();
         }
@@ -271,6 +299,59 @@ void ReplayStoreModel::invertSelection(const QList<QByteArray>& checksums) {
     }
 }
 
+void ReplayStoreModel::requestAnalysis(const QByteArray& checksum) {
+    if (m_analysisEntries.contains(checksum)) {
+        return;
+    }
+    const auto it =
+        std::ranges::find_if(m_replays, [&checksum](const ReplayModel* replay) {
+            return replay->checksum() == checksum;
+        });
+
+    if (it == std::end(m_replays)) {
+        return;
+    }
+    m_analysisEntries.insert(checksum, AsyncValue<ReplayAnalysis>{});
+
+    dataChangedByIter(it, QList{static_cast<int>(Roles::ExpandedRole),
+                                static_cast<int>(Roles::AnalysisStateRole)});
+
+    QFuture<AnalysisResult> future = m_replayAnalyzerBridge->analyze(checksum);
+    future.then(this, [this, checksum](AnalysisResult result) {
+        auto entryIt = m_analysisEntries.find(checksum);
+        if (entryIt == m_analysisEntries.end()) {
+            // Dismissed before the analysis finished - nothing left to
+            // update.
+            return;
+        }
+        std::visit(Match{[&entryIt](AnalysisFailure) { entryIt->error(); },
+                         [&entryIt](ReplayAnalysis& analysis) {
+                             entryIt->finish(std::move(analysis));
+                         }},
+                   result);
+
+        const auto rowIt = std::ranges::find_if(
+            m_replays, [&checksum](const ReplayModel* replay) {
+                return replay->checksum() == checksum;
+            });
+        dataChangedByIter(rowIt,
+                          QList{static_cast<int>(Roles::AnalysisStateRole),
+                                static_cast<int>(Roles::AnalysisAPMRole)});
+    });
+}
+
+void ReplayStoreModel::dismissAnalysis(const QByteArray& checksum) {
+    const auto it =
+        std::ranges::find_if(m_replays, [&checksum](const ReplayModel* replay) {
+            return replay->checksum() == checksum;
+        });
+    if (it == std::ranges::end(m_replays)) {
+        return;
+    }
+    m_analysisEntries.remove(checksum);
+    dataChangedByIter(it, QList{static_cast<int>(Roles::ExpandedRole)});
+}
+
 void ReplayStoreModel::saveReplayAs(const QByteArray& checksum,
                                     const QUrl& path) {
     emit shouldSaveReplay(checksum, path);
@@ -326,8 +407,27 @@ QVariant ReplayStoreModel::data(const QModelIndex& index, int role) const {
         }
         case Roles::SelectedRole:
             return m_selections.contains(replay->checksum());
+        case Roles::ExpandedRole:
+            return m_analysisEntries.contains(replay->checksum());
+        case Roles::AnalysisStateRole: {
+            const auto it = m_analysisEntries.constFind(replay->checksum());
+            if (it == m_analysisEntries.cend()) {
+                return {};
+            }
+            return QVariant::fromValue(it->state());
+        }
+        case Roles::AnalysisAPMRole: {
+            const auto it = m_analysisEntries.constFind(replay->checksum());
+            if (it == m_analysisEntries.cend() ||
+                it->state() != AsyncState::Complete) {
+                return {};
+            }
+            return QVariant::fromValue(it->value().apmPlot);
+        }
         case Roles::PatchRole:
             return replay->inferPatch();
+        case Roles::DurationRole:
+            return formatDuration(replay->engineTicks());
         default:
             return {};
     }

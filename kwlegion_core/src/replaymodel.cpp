@@ -27,11 +27,14 @@ ReplayModel::ReplayModel(const Replay& replay, QObject* parent)
       m_matchDescription(replay.matchDescription),
       m_mapName(replay.mapName),
       m_mapReference(replay.mapReference),
-      m_hasExternalPath(replay.hasExternalPath) {
+      m_hasExternalPath(replay.hasExternalPath),
+      m_engineTicks(replay.engineTicks) {
     // Build the teams by scanning for players
     QList<TeamModel*> teams;
 
-    for (const auto& player : replay.players) {
+    for (qsizetype seriesIndex = 0; seriesIndex < replay.players.size();
+         ++seriesIndex) {
+        const auto& player = replay.players.at(seriesIndex);
         // We get empty player names for what is described as the commentary
         // player in replay metadata. We don't want to show this in the ui.
         if (player.name.isEmpty()) {
@@ -43,11 +46,14 @@ ReplayModel::ReplayModel(const Replay& replay, QObject* parent)
         if (it == teams.end()) {
             // Cleaned up via QObject parent/child deletion and implemented this
             // way for simplicity of integrating with QML
-            // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
             teams.append(new TeamModel(player.teamNumber, this));
             it = teams.end() - 1;
         }
-        (*it)->addPlayer(player);
+        // seriesIndex is this player's position in replay.players, the same
+        // indexing ReplayAnalyzer/ApmAnalyzer use (via unmanglePlayerIdx) -
+        // not this team's own row index - so a player's chart color and
+        // team-list swatch always agree.
+        (*it)->addPlayer(player, static_cast<int>(seriesIndex));
     }
 
     m_teams.reserve(teams.size());
@@ -68,6 +74,10 @@ QList<int> ReplayModel::updateFromReplay(const Replay& replay) {
     if (m_overrideMatchTitle != replay.overrideMatchTitle) {
         m_overrideMatchTitle = replay.overrideMatchTitle;
         roles.append(static_cast<int>(ReplayStoreModel::Roles::MatchTitleRole));
+    }
+    if (m_engineTicks != replay.engineTicks) {
+        m_engineTicks = replay.engineTicks;
+        roles.append(static_cast<int>(ReplayStoreModel::Roles::DurationRole));
     }
     return roles;
 }

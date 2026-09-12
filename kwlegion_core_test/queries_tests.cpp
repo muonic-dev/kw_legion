@@ -28,16 +28,16 @@ QSqlDatabase openMigratedDb(const QString& connectionName) {
     REQUIRE(db.open());
 
     Queries migrator{QSqlQuery(db)};
-    REQUIRE(migrator.migrate());
+    migrator.migrate();
 
     return db;
 }
 
 // The checksum only needs to be unique per test, not a real SHA-256 - a
 // short literal tag is enough to identify a row.
-LegionParser::ReplayMetadata makeMetadata(const QByteArray& checksum,
+LegionParser::ReplaySynopsis makeMetadata(const QByteArray& checksum,
                                           const QString& mapName = "Test Map") {
-    return LegionParser::ReplayMetadata{
+    return LegionParser::ReplaySynopsis{
         .versionMajor = 1,
         .versionMinor = 0,
         .buildMajor = 1,
@@ -83,13 +83,14 @@ int countExternalPaths(QSqlDatabase& db, const QByteArray& checksum) {
 
 }  // namespace
 
-TEST_CASE("Queries migrate creates the schema and is idempotent") {
+TEST_CASE("Queries migrate creates the schema and is idempotent",
+          "[queries][sql][schema]") {
     QSqlDatabase db = openMigratedDb("queries_migrate_idempotent");
     Queries queries{QSqlQuery(db)};
 
     // Calling migrate() again once the schema is already current should be
     // a harmless no-op rather than trying to re-run already-applied DDL.
-    CHECK(queries.migrate());
+    CHECK_NOTHROW(queries.migrate());
 
     QSqlQuery check(db);
     REQUIRE(check.exec(
@@ -105,7 +106,8 @@ TEST_CASE("Queries migrate creates the schema and is idempotent") {
     QSqlDatabase::removeDatabase("queries_migrate_idempotent");
 }
 
-TEST_CASE("Queries isReplayKnown reflects insertReplay") {
+TEST_CASE("Queries isReplayKnown reflects insertReplay",
+          "[queries][sql][replay-crud]") {
     QSqlDatabase db = openMigratedDb("queries_is_known");
     Queries queries{QSqlQuery(db)};
 
@@ -121,14 +123,15 @@ TEST_CASE("Queries isReplayKnown reflects insertReplay") {
     QSqlDatabase::removeDatabase("queries_is_known");
 }
 
-TEST_CASE("Queries selectReplay returns the stored fields") {
+TEST_CASE("Queries selectReplay returns the stored fields",
+          "[queries][sql][replay-crud]") {
     QSqlDatabase db = openMigratedDb("queries_select_replay");
     Queries queries{QSqlQuery(db)};
 
     const QByteArray checksum = "checksum-select";
     const QDateTime timestamp =
         QDateTime::fromSecsSinceEpoch(1700000000, QTimeZone(QTimeZone::UTC));
-    LegionParser::ReplayMetadata metadata =
+    LegionParser::ReplaySynopsis metadata =
         makeMetadata(checksum, "Sample Map");
     metadata.timestamp = timestamp;
     metadata.matchTitle = "Stored Match Title";
@@ -154,7 +157,8 @@ TEST_CASE("Queries selectReplay returns the stored fields") {
     QSqlDatabase::removeDatabase("queries_select_replay");
 }
 
-TEST_CASE("Queries selectReplay returns nullopt for an unknown checksum") {
+TEST_CASE("Queries selectReplay returns nullopt for an unknown checksum",
+          "[queries][sql][replay-crud]") {
     QSqlDatabase db = openMigratedDb("queries_select_replay_missing");
     Queries queries{QSqlQuery(db)};
 
@@ -164,7 +168,8 @@ TEST_CASE("Queries selectReplay returns nullopt for an unknown checksum") {
     QSqlDatabase::removeDatabase("queries_select_replay_missing");
 }
 
-TEST_CASE("Queries insertReplay throws on a duplicate checksum") {
+TEST_CASE("Queries insertReplay throws on a duplicate checksum",
+          "[queries][sql][replay-crud]") {
     QSqlDatabase db = openMigratedDb("queries_insert_duplicate");
     Queries queries{QSqlQuery(db)};
 
@@ -178,7 +183,163 @@ TEST_CASE("Queries insertReplay throws on a duplicate checksum") {
     QSqlDatabase::removeDatabase("queries_insert_duplicate");
 }
 
-TEST_CASE("Queries insertReplayPlayers stores every player for a replay") {
+TEST_CASE("Queries doesReplayNeedAnalysis reflects insertReplayAnalysis",
+          "[queries][sql][analysis]") {
+    QSqlDatabase db = openMigratedDb("queries_needs_analysis");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-needs-analysis";
+    LegionParser::ReplaySynopsis metadata = makeMetadata(checksum);
+    metadata.bodyOffset = 512;
+    metadata.players = {
+        LegionParser::Player{.id = 1,
+                             .name = "Alice",
+                             .teamNumber = 0,
+                             .faction = LegionParser::Faction::GDI,
+                             .isComputer = false,
+                             .isReplaySaver = true}};
+    queries.insertReplay(metadata);
+
+    // insertReplay alone no longer writes replay_analysis - that's now a
+    // separate step - so a freshly-inserted replay still needs analysis.
+    CHECK(queries.doesReplayNeedAnalysis(checksum));
+
+    // Needing analysis also requires replay_players to be populated -
+    // without this, insertReplayAnalysis alone would still leave the
+    // replay needing (player) analysis, see the dedicated test below.
+    queries.insertReplayPlayers(checksum, metadata.players);
+    queries.insertReplayAnalysis(metadata);
+
+    CHECK_FALSE(queries.doesReplayNeedAnalysis(checksum));
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_needs_analysis");
+}
+
+TEST_CASE(
+    "Queries doesReplayNeedAnalysis is true with a replay_analysis row but "
+    "no replay_players row",
+    "[queries][sql][analysis]") {
+    QSqlDatabase db = openMigratedDb("queries_needs_analysis_no_players");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-analysis-no-players";
+    LegionParser::ReplaySynopsis metadata = makeMetadata(checksum);
+    queries.insertReplay(metadata);
+    queries.insertReplayAnalysis(metadata);
+    // Deliberately never call insertReplayPlayers for this checksum.
+
+    CHECK(queries.doesReplayNeedAnalysis(checksum));
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_needs_analysis_no_players");
+}
+
+TEST_CASE("Queries insertReplayAnalysis stores the body offset",
+          "[queries][sql][analysis]") {
+    QSqlDatabase db = openMigratedDb("queries_insert_analysis");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-insert-analysis";
+    LegionParser::ReplaySynopsis metadata = makeMetadata(checksum);
+    metadata.bodyOffset = 4096;
+    queries.insertReplay(metadata);
+    queries.insertReplayAnalysis(metadata);
+
+    QSqlQuery check(db);
+    REQUIRE(check.prepare(
+        "SELECT body_offset FROM replay_analysis WHERE replay_checksum = "
+        ":checksum"));
+    check.bindValue(":checksum", checksum);
+    REQUIRE(check.exec());
+    REQUIRE(check.next());
+    CHECK(check.value(0).toLongLong() == 4096);
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_insert_analysis");
+}
+
+TEST_CASE("Queries insertReplayAnalysis stores the engine ticks",
+          "[queries][sql][analysis]") {
+    QSqlDatabase db = openMigratedDb("queries_insert_analysis_ticks");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-insert-analysis-ticks";
+    LegionParser::ReplaySynopsis metadata = makeMetadata(checksum);
+    metadata.engineTicks = 12345;
+    queries.insertReplay(metadata);
+    queries.insertReplayAnalysis(metadata);
+
+    QSqlQuery check(db);
+    REQUIRE(check.prepare(
+        "SELECT engine_ticks FROM replay_analysis WHERE replay_checksum = "
+        ":checksum"));
+    check.bindValue(":checksum", checksum);
+    REQUIRE(check.exec());
+    REQUIRE(check.next());
+    CHECK(check.value(0).toLongLong() == 12345);
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_insert_analysis_ticks");
+}
+
+TEST_CASE(
+    "Queries selectReplaysNeedingAnalysis lists replays missing an "
+    "analysis row",
+    "[queries][sql][analysis]") {
+    QSqlDatabase db = openMigratedDb("queries_needs_analysis_list");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray analyzed = "checksum-analyzed";
+    const QByteArray pending = "checksum-pending";
+
+    auto analyzedMeta = makeMetadata(analyzed);
+    analyzedMeta.players = {
+        LegionParser::Player{.id = 1, .name = "P1", .teamNumber = 0}};
+    queries.insertReplay(analyzedMeta);
+    queries.insertReplayPlayers(analyzedMeta.checksum, analyzedMeta.players);
+    queries.insertReplayAnalysis(analyzedMeta);
+
+    auto pendingMeta = makeMetadata(pending);
+    pendingMeta.players = {
+        LegionParser::Player{.id = 1, .name = "P1", .teamNumber = 0}};
+    queries.insertReplay(pendingMeta);
+    queries.insertReplayPlayers(pendingMeta.checksum, pendingMeta.players);
+
+    const QList<QByteArray> needsAnalysis =
+        queries.selectReplaysNeedingAnalysis();
+
+    CHECK(needsAnalysis.size() == 1);
+    CHECK(needsAnalysis.contains(pending));
+    CHECK_FALSE(needsAnalysis.contains(analyzed));
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_needs_analysis_list");
+}
+
+TEST_CASE(
+    "Queries selectReplaysNeedingAnalysis is empty once every replay has "
+    "analysis and players",
+    "[queries][sql][analysis]") {
+    QSqlDatabase db = openMigratedDb("queries_needs_analysis_none");
+    Queries queries{QSqlQuery(db)};
+
+    const QByteArray checksum = "checksum-fully-analyzed";
+    auto metadata = makeMetadata(checksum);
+    metadata.players = {
+        LegionParser::Player{.id = 1, .name = "P1", .teamNumber = 0}};
+    queries.insertReplay(metadata);
+    queries.insertReplayPlayers(checksum, metadata.players);
+    queries.insertReplayAnalysis(metadata);
+
+    CHECK(queries.selectReplaysNeedingAnalysis().isEmpty());
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase("queries_needs_analysis_none");
+}
+
+TEST_CASE("Queries insertReplayPlayers stores every player for a replay",
+          "[queries][sql][players]") {
     QSqlDatabase db = openMigratedDb("queries_insert_players");
     Queries queries{QSqlQuery(db)};
 
@@ -221,7 +382,8 @@ TEST_CASE("Queries insertReplayPlayers stores every player for a replay") {
     QSqlDatabase::removeDatabase("queries_insert_players");
 }
 
-TEST_CASE("Queries insertReplayPlayers with an empty list inserts nothing") {
+TEST_CASE("Queries insertReplayPlayers with an empty list inserts nothing",
+          "[queries][sql][players]") {
     QSqlDatabase db = openMigratedDb("queries_insert_players_empty");
     Queries queries{QSqlQuery(db)};
 
@@ -236,7 +398,8 @@ TEST_CASE("Queries insertReplayPlayers with an empty list inserts nothing") {
     QSqlDatabase::removeDatabase("queries_insert_players_empty");
 }
 
-TEST_CASE("Queries insertExternalFilename reports whether the path is new") {
+TEST_CASE("Queries insertExternalFilename reports whether the path is new",
+          "[queries][sql][external-path]") {
     QSqlDatabase db = openMigratedDb("queries_insert_external");
     Queries queries{QSqlQuery(db)};
 
@@ -256,7 +419,8 @@ TEST_CASE("Queries insertExternalFilename reports whether the path is new") {
 
 TEST_CASE(
     "Queries insertExternalFilename reassigns a path claimed by a "
-    "different checksum") {
+    "different checksum",
+    "[queries][sql][external-path]") {
     QSqlDatabase db = openMigratedDb("queries_insert_external_reassign");
     Queries queries{QSqlQuery(db)};
 
@@ -285,7 +449,8 @@ TEST_CASE(
 }
 
 TEST_CASE(
-    "Queries checksumForExternalPath reflects the current owner of a path") {
+    "Queries checksumForExternalPath reflects the current owner of a path",
+    "[queries][sql][external-path]") {
     QSqlDatabase db = openMigratedDb("queries_checksum_for_path");
     Queries queries{QSqlQuery(db)};
 
@@ -306,7 +471,8 @@ TEST_CASE(
     QSqlDatabase::removeDatabase("queries_checksum_for_path");
 }
 
-TEST_CASE("Queries removeExternalFilename drops only the given path") {
+TEST_CASE("Queries removeExternalFilename drops only the given path",
+          "[queries][sql][external-path]") {
     QSqlDatabase db = openMigratedDb("queries_remove_external");
     Queries queries{QSqlQuery(db)};
 
@@ -337,7 +503,8 @@ TEST_CASE("Queries removeExternalFilename drops only the given path") {
 
 TEST_CASE(
     "Queries removeExternalFilename on an unregistered path is a harmless "
-    "no-op") {
+    "no-op",
+    "[queries][sql][external-path]") {
     QSqlDatabase db = openMigratedDb("queries_remove_external_missing");
     Queries queries{QSqlQuery(db)};
 
@@ -357,7 +524,8 @@ TEST_CASE(
 
 TEST_CASE(
     "Queries forgetMissingReplays drops paths absent from the current "
-    "listing") {
+    "listing",
+    "[queries][sql][external-path]") {
     QSqlDatabase db = openMigratedDb("queries_forget_missing");
     Queries queries{QSqlQuery(db)};
 
@@ -387,7 +555,8 @@ TEST_CASE(
 
 TEST_CASE(
     "Queries forgetMissingReplays handles more paths than SQLite's bound "
-    "parameter limit") {
+    "parameter limit",
+    "[queries][sql][external-path]") {
     QSqlDatabase db = openMigratedDb("queries_forget_missing_many");
     Queries queries{QSqlQuery(db)};
 
@@ -417,20 +586,21 @@ TEST_CASE(
     QSqlDatabase::removeDatabase("queries_forget_missing_many");
 }
 
-TEST_CASE("Queries selectReplays reports hasExternalPath per replay") {
+TEST_CASE("Queries selectReplays reports hasExternalPath per replay",
+          "[queries][sql][replay-crud]") {
     QSqlDatabase db = openMigratedDb("queries_select_replays");
     Queries queries{QSqlQuery(db)};
 
     const QByteArray withPath = "checksum-with-path";
     const QByteArray withoutPath = "checksum-without-path";
-    LegionParser::ReplayMetadata withPathMetadata =
+    LegionParser::ReplaySynopsis withPathMetadata =
         makeMetadata(withPath, "Map A");
     withPathMetadata.matchTitle = "Match A";
     withPathMetadata.matchDescription = "Description A";
     withPathMetadata.mapReference = "Reference A";
     queries.insertReplay(withPathMetadata);
 
-    LegionParser::ReplayMetadata withoutPathMetadata =
+    LegionParser::ReplaySynopsis withoutPathMetadata =
         makeMetadata(withoutPath, "Map B");
     withoutPathMetadata.matchTitle = "Match B";
     withoutPathMetadata.matchDescription = "Description B";
@@ -463,7 +633,8 @@ TEST_CASE("Queries selectReplays reports hasExternalPath per replay") {
     QSqlDatabase::removeDatabase("queries_select_replays");
 }
 
-TEST_CASE("Queries selectReplay defaults overrideMatchTitle to empty") {
+TEST_CASE("Queries selectReplay defaults overrideMatchTitle to empty",
+          "[queries][sql][override-title]") {
     QSqlDatabase db = openMigratedDb("queries_override_title_default");
     Queries queries{QSqlQuery(db)};
 
@@ -480,7 +651,8 @@ TEST_CASE("Queries selectReplay defaults overrideMatchTitle to empty") {
 
 TEST_CASE(
     "Queries updateOverrideTitle is reflected by selectReplay and "
-    "selectReplays") {
+    "selectReplays",
+    "[queries][sql][override-title]") {
     QSqlDatabase db = openMigratedDb("queries_override_title_update");
     Queries queries{QSqlQuery(db)};
 
@@ -501,7 +673,8 @@ TEST_CASE(
     QSqlDatabase::removeDatabase("queries_override_title_update");
 }
 
-TEST_CASE("Queries updateOverrideTitle overwrites a previous override") {
+TEST_CASE("Queries updateOverrideTitle overwrites a previous override",
+          "[queries][sql][override-title]") {
     QSqlDatabase db = openMigratedDb("queries_override_title_overwrite");
     Queries queries{QSqlQuery(db)};
 
@@ -520,7 +693,8 @@ TEST_CASE("Queries updateOverrideTitle overwrites a previous override") {
 }
 
 TEST_CASE(
-    "Queries updateOverrideTitle with an empty string clears the override") {
+    "Queries updateOverrideTitle with an empty string clears the override",
+    "[queries][sql][override-title]") {
     QSqlDatabase db = openMigratedDb("queries_override_title_clear");
     Queries queries{QSqlQuery(db)};
 

@@ -9,6 +9,7 @@
 
 #include <QDir>
 #include <QHash>
+#include <QList>
 #include <QLoggingCategory>
 #include <QObject>
 #include <QSet>
@@ -17,7 +18,7 @@
 #include <QString>
 #include <QTimer>
 #include <QUrl>
-#include <tuple>
+#include <optional>
 
 Q_DECLARE_LOGGING_CATEGORY(logStore);
 
@@ -35,7 +36,35 @@ struct Watermark;
 class InboxItem;
 class StorageException;
 
-class ReplayStore : public QObject {
+/**
+ * Identify where a replay is located for analysis
+ */
+struct ReplayAnalysisTarget {
+    QString path;
+    Replay replay;
+};
+
+/**
+ * An interface that describes how to lookup where a replay is located on disk
+ * for analysis
+ */
+class ReplayAnalysisTargetProvider {
+   public:
+    ReplayAnalysisTargetProvider() = default;
+    ReplayAnalysisTargetProvider(const ReplayAnalysisTargetProvider&) = delete;
+    ReplayAnalysisTargetProvider& operator=(
+        const ReplayAnalysisTargetProvider&) = delete;
+    ReplayAnalysisTargetProvider(ReplayAnalysisTargetProvider&&) = delete;
+    ReplayAnalysisTargetProvider& operator=(ReplayAnalysisTargetProvider&&) =
+        delete;
+
+    virtual ~ReplayAnalysisTargetProvider() = default;
+
+    [[nodiscard]] virtual std::optional<ReplayAnalysisTarget> lookupReplay(
+        const QByteArray& checksum) const = 0;
+};
+
+class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
     Q_OBJECT
 
     /* Replay store operation is as follows
@@ -43,9 +72,9 @@ class ReplayStore : public QObject {
      * directory will be received from the prospector
      *
      * Subsequently, each new file will come in via an
-     * analyzeReplayFile/removeReplayFileLink
+     * synopsizeReplayFile/removeReplayFileLink
      *
-     * Internally, performReplayAnalysis does the parsing
+     * Internally, performReplaySynopsis does the parsing
      * This is used both on initial load and on periodic
      * updates. The m_initialSweep is a gate to control
      * whether periodic emission happens. This prevents
@@ -75,7 +104,7 @@ class ReplayStore : public QObject {
     /**
      * A replay file definitely just appeared
      */
-    void analyzeReplayFile(const QString& path);
+    void synopsizeReplayFile(const QString& path);
     /**
      * A replay file has disappeared
      * This is seperate from removeReplayFileLink so that we can clear any
@@ -138,23 +167,25 @@ class ReplayStore : public QObject {
     void ensureDb();
     void ensureDirectories();
 
-    // Perform the actual replay analysis
+    // Perform the actual replay synopsis
     // This is the happy path for parsing and ingestion
     // It can throw ReplayParseException or StorageException
     // It is provided here because we want a slot entrypoint
-    // from the prospector (analyzeReplayFile)
+    // from the prospector (synopsizeReplayFile)
     // But we also want an entrypoint for the deferred retry logic
     // that will share the logic
-    void performReplayAnalysis(const QString& path);
+    void performReplaySynopsis(const QString& path);
+
+    void performReplayReanalysis();
 
     // observed is the state of the file sampled before the parse attempt
     // that came back torn - the path goes back into the deferred set to be
     // retried once the bytes on disk move past it.
-    void handleTornFailure(const QString& path,
-                           const Watermark& observed) noexcept;
+    // This also
+    void handleTornFailure(const QString& path, const Watermark& observed);
     // Assumes that ReplayParseException is disjoint from TornDataException
     void handleParseFailure(const LegionParser::ReplayParseException& ex,
-                            const QString& path) noexcept;
+                            const QString& path);
 
     // We could not read the file, or could not record what we read. Unlike
     // the two above, this says nothing about the file's contents, so the path
@@ -171,13 +202,27 @@ class ReplayStore : public QObject {
     // Returns the checksums that were impacted by the ingestion
     // This is guaranteed to contain metadata.checksum
     QList<QByteArray> ingestReplay(
-        QFile& file, const LegionParser::ReplayMetadata& metadata);
+        QFile& file, const LegionParser::ReplaySynopsis& synopsis);
+
+    // Ingest a known replay
+    // This may insert aot replay analysis such as the body offset if it hasn't
+    // been done yet
+    QList<QByteArray> ingestKnownReplay(
+        Queries& queries, QFile& file,
+        const LegionParser::ReplaySynopsis& synopsis);
+
+    QList<QByteArray> ingestUnknownReplay(
+        Queries& queries, QFile& file,
+        const LegionParser::ReplaySynopsis& synopsis);
+
     // The replay file at the path is gone or otherwise corrupt so we should
     // remove it
     std::optional<QByteArray> removeReplayAtPath(const QString& path);
 
     // Handles dealing with any existing checksums at a given path (which can
     // occur on multiple branches in ingestReplay)
+    // The replay at path was ingested previously but has been overwritten by
+    // something new
     static void handleExistingReplayAtPath(Queries& queries,
                                            const QString& path,
                                            QList<QByteArray>& checksums);
@@ -193,8 +238,12 @@ class ReplayStore : public QObject {
 
     static void hideReplay(Queries& queries, const QByteArray& checksum);
 
-    // We want to wait until full analysis is done on all replays before we
-    // emit the first event instead of trickling them in with analyze
+    // Implement helper for the analysis provider
+    [[nodiscard]] std::optional<ReplayAnalysisTarget> lookupReplay(
+        const QByteArray& checksum) const override;
+
+    // We want to wait until the full synopsis pass is done on all replays
+    // before we emit the first event instead of trickling them in
     // Allow suppressing the emission on the initial sweeep
     ActionScope m_initialSweep;
 

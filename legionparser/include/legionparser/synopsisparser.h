@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <legionparser/exception.h>
 #include <legionparser/replay.h>
 
 #include <QByteArrayView>
@@ -11,21 +10,22 @@
 #include <QDateTime>
 #include <QIODevice>
 #include <QString>
-#include <concepts>
-#include <type_traits>
+#include <QtTypes>
+#include <memory>
 
 namespace LegionParser {
 
 class Reader;
+class TeeDevice;
 
-class Parser {
+class SynopsisParser {
    public:
-    Parser(const Parser&) = delete;
-    Parser& operator=(const Parser&) = delete;
-    Parser(Parser&&) = delete;
-    Parser& operator=(Parser&&) = delete;
+    SynopsisParser(const SynopsisParser&) = delete;
+    SynopsisParser& operator=(const SynopsisParser&) = delete;
+    SynopsisParser(SynopsisParser&&) = delete;
+    SynopsisParser& operator=(SynopsisParser&&) = delete;
 
-    virtual ~Parser();
+    virtual ~SynopsisParser();
 
     /**
      * @brief Parse a replay file from the given QIODevice and record the
@@ -39,7 +39,7 @@ class Parser {
      * @throws ReplayParseException describing the parsing failure
      *
      */
-    static ReplayMetadata parse(QIODevice& replayFile);
+    static ReplaySynopsis parse(QIODevice& replayFile);
 
     /**
      * @brief Cheaply test whether replayFile ends in a replay footer.
@@ -60,9 +60,9 @@ class Parser {
     static bool looksComplete(QIODevice& replayFile);
 
    private:
-    explicit Parser(QIODevice&);
+    explicit SynopsisParser(QIODevice&);
 
-    [[nodiscard]] const ReplayMetadata& metadata() const { return m_metadata; }
+    [[nodiscard]] const ReplaySynopsis& metadata() const { return m_synopsis; }
 
     void parse();
 
@@ -87,28 +87,36 @@ class Parser {
 
     // Extracts the "M=" map reference from the start of the header's
     // GameInfo text - a path-like reference into the game's .big archives -
-    // and stores it in m_metadata.mapReference.
+    // and stores it in m_synopsis.mapReference.
     void parseMapReference(QStringView header);
 
     // Extracts the ";S=" player-slot list from the header text and assigns
     // each slot's name (where present) and faction onto the corresponding
-    // entry in m_metadata.players, matched positionally in slot order.
+    // entry in m_synopsis.players, matched positionally in slot order.
     void parsePlayerSlots(QStringView header);
 
     void parseBody();
 
-    // Validates that lastChunk - the final chunk read while fingerprinting
-    // the body - ends with a semantically valid "C&C3 REPLAY FOOTER"
-    // structure. This lets us distinguish a torn read (e.g. parsing a
-    // replay the game is still actively writing, which truncates the file
-    // before the footer is appended) from other forms of corruption.
-    void verifyFooter(QByteArrayView lastChunk) const;
+    // Validates that payload - everything left in the file once the body's
+    // chunk stream has been walked to its end marker - is itself a
+    // semantically valid "C&C3 REPLAY FOOTER" structure with nothing extra
+    // before or after it, and that the footer's own final_time_code field
+    // agrees with maxTimeCode, the highest real chunk time code observed
+    // while walking the body. This lets us distinguish a torn read (e.g.
+    // parsing a replay the game is still actively writing, which truncates
+    // the file before the footer is appended) from other forms of
+    // corruption.
+    void verifyFooter(QByteArrayView payload, qint32 maxTimeCode) const;
 
+    // The TeeDevice allows transparently hashing at specific known points
+    // We enable/disable hashing so that a replay's identity is only its body
+    // content. We would like any header rewriting to not change identity
+    std::unique_ptr<TeeDevice> m_tee;
     std::unique_ptr<Reader> m_reader;
-    ReplayMetadata m_metadata;
+    ReplaySynopsis m_synopsis;
 
     // Used during parsing to describe the length of the header starting at the
     // magic string CNC3RPL\0
-    size_t m_offset;
+    qsizetype m_offset;
 };
 }  // namespace LegionParser

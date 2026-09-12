@@ -21,13 +21,19 @@ class TeamModel : public QAbstractListModel {
     enum class Roles : std::uint16_t {
         NameRole = Qt::UserRole + 1,
         FactionRole,
+        SeriesIndexRole,
     };
 
     TeamModel(std::uint32_t number, QObject* parent = nullptr);
 
     [[nodiscard]] std::uint32_t number() const { return m_number; }
 
-    void addPlayer(const Player& player);
+    // seriesIndex is the player's position in Replay::players (not this
+    // team's row index) - the same index ReplayAnalyzer/ApmAnalyzer use, so a
+    // player's chart line and its team-list swatch always agree on color
+    // without needing to thread player names through the analysis pipeline
+    // separately.
+    void addPlayer(const Player& player, int seriesIndex);
 
     // Flat player-name list for JS-side searching (e.g. SortFilterProxyModel's
     // filterPredicate).
@@ -45,5 +51,6 @@ class TeamModel : public QAbstractListModel {
     std::uint32_t m_number;
     QHash<int, QByteArray> m_roleNames;
     QList<Player> m_players;
+    QList<int> m_seriesIndices;
 };
 }  // namespace KWLegionCore

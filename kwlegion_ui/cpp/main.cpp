@@ -166,6 +166,8 @@ int main(int argc, char* argv[]) {
     replayProspector.moveToThread(&ioThread);
     ReplayStore replayStore(ReplayProspector::defaultReplayDirectory());
     replayStore.moveToThread(&ioThread);
+    ReplayAnalyzer replayAnalyzer(replayStore);
+    replayAnalyzer.moveToThread(&ioThread);
 
     QObject::connect(&ioThread, &QThread::finished, &replayStore,
                      &ReplayStore::stop);
@@ -176,7 +178,7 @@ int main(int argc, char* argv[]) {
                      &ReplayProspector::initialSweepCompleted, &replayStore,
                      &ReplayStore::receiveInitialReplayPaths);
     QObject::connect(&replayProspector, &ReplayProspector::replayFileChanged,
-                     &replayStore, &ReplayStore::analyzeReplayFile);
+                     &replayStore, &ReplayStore::synopsizeReplayFile);
     QObject::connect(&replayProspector, &ReplayProspector::replayFileRemoved,
                      &replayStore, &ReplayStore::removeReplayFile);
 
@@ -185,6 +187,9 @@ int main(int argc, char* argv[]) {
     QObject::connect(
         &singleInstanceGuard, &SingleInstanceGuard::activationRequested, &app,
         [&engine] {
+            if (engine.rootObjects().isEmpty()) {
+                return;
+            }
             auto* rootWindow =
                 qobject_cast<QWindow*>(engine.rootObjects().constFirst());
             if (rootWindow == nullptr) {
@@ -195,17 +200,28 @@ int main(int argc, char* argv[]) {
             rootWindow->requestActivate();
         });
 
+    QObject::connect(&singleInstanceGuard, &SingleInstanceGuard::quitRequested,
+                     &app, [&engine] {
+                         QObject* root = engine.rootObjects().first();
+                         if (root == nullptr) {
+                             return;
+                         }
+                         // The property used to bypass the shutdown in Main.qml
+                         root->setProperty("quitting", true);
+                         QGuiApplication::quit();
+                     });
+
     auto* settings = requireSingleton<Settings>(engine, "Settings");
     settings->setAutostartMechanism(
         KWLegionCore::createPlatformAutostartMechanism());
 
     auto* replayStoreModel =
         requireSingleton<ReplayStoreModel>(engine, "ReplayStoreModel");
-    replayStoreModel->setStore(&replayStore);
+    replayStoreModel->finishInit(&replayStore, &replayAnalyzer);
 
     auto* ingestionModel =
         requireSingleton<IngestionModel>(engine, "IngestionModel");
-    ingestionModel->setStore(&replayStore);
+    ingestionModel->finishInit(&replayStore);
 
     ioThread.start();
 
