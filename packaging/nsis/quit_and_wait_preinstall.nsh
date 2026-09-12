@@ -38,6 +38,15 @@ legion_pipe_absent:
 ; itself, which turned out to report success regardless of whether the
 ; process is running at all and so never reflected real lock state).
 legion_wait_check:
+  ; CreateFileW(OPEN_EXISTING) returns INVALID_HANDLE_VALUE (-1) both when
+  ; the file is locked by a running process AND when it simply doesn't
+  ; exist yet (e.g. no prior install at this path, or a fresh install) -
+  ; confirmed the two are indistinguishable from the handle alone. Without
+  ; this existence check first, a fresh/first-time install would always
+  ; get flagged as "still running" even with nothing running at all.
+  IfFileExists "$INSTDIR\kw_legion.exe" legion_check_lock legion_wait_done
+
+legion_check_lock:
   System::Call 'kernel32::CreateFileW(w "$INSTDIR\kw_legion.exe", i 0x40000000, i 0, i 0, i 3, i 0, i 0) i .r3'
   IntCmp $3 -1 legion_still_running
   System::Call 'kernel32::CloseHandle(i r3)'
