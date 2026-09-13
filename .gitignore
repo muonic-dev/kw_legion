@@ -97,4 +97,4 @@ CMakeLists.txt.user*
 /CMakeUserPresets.json
 
 # Debug builds write a log file to cwd
-/*.log
+/*.log*

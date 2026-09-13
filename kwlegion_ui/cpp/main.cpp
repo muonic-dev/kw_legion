@@ -32,65 +32,20 @@
 #include <cstdio>
 
 #include "kwlegion_core/autostart.h"
+#include "logrotator.h"
 #include "singleinstanceguard.h"
 
 namespace {
 
+// Adapt to the Qt log handler
+std::optional<
+    std::function<void(QtMsgType, const QMessageLogContext&, const QString&)>>
+    messageTrampoline;
+
 void logMessageHandler(QtMsgType type, const QMessageLogContext& context,
                        const QString& msg) {
-    static QMutex mutex;
-    static QFile file;
-
-    const QMutexLocker locker(&mutex);
-
-    if (!file.isOpen()) {
-        const QString logPath = KWLegionCore::AppInfo::defaultLogFilePath();
-
-        const QFileInfo logInfo(logPath);
-        QDir().mkpath(logInfo.dir().path());
-
-        file.setFileName(logPath);
-        // Keep trying to open it if this fails
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate |
-                       QIODevice::Text)) {
-            return;
-        }
-    }
-
-    QString level;
-    switch (type) {
-        case QtDebugMsg:
-            level = QLatin1String("Debug");
-            break;
-        case QtInfoMsg:
-            level = QLatin1String("Info");
-            break;
-        case QtWarningMsg:
-            level = QLatin1String("Warning");
-            break;
-        case QtCriticalMsg:
-            level = QLatin1String("Critical");
-            break;
-        case QtFatalMsg:
-            level = QLatin1String("Fatal");
-            break;
-    }
-
-    QTextStream fileStream(&file);
-    QTextStream stderrStream(stderr);
-
-    fileStream << '[' << level << "] " << "<" << context.category << "> " << msg
-               << " <" << context.line << "> " << "\n";
-    stderrStream << '[' << level << "] " << "<" << context.category << "> "
-                 << " <" << context.line << "> " << msg << "\n";
-
-    // Only flush for the important stuff
-    if (QtMsgType::QtWarningMsg <= type && type <= QtMsgType::QtCriticalMsg) {
-        fileStream.flush();
-        file.flush();
-
-        stderrStream.flush();
-        fflush(stderr);
+    if (messageTrampoline.has_value()) {
+        (*messageTrampoline)(type, context, msg);
     }
 }
 
@@ -106,6 +61,7 @@ T* requireSingleton(QQmlApplicationEngine& engine, const char* typeName) {
 }  // namespace
 
 using namespace KWLegionCore;
+using namespace KWLegionUI;
 
 // NOLINTNEXTLINE(modernize-avoid-c-arrays, cppcoreguidelines-avoid-c-arrays)
 int main(int argc, char* argv[]) {
@@ -115,9 +71,17 @@ int main(int argc, char* argv[]) {
     QCoreApplication::setApplicationName(
         KWLegionCore::DEBUG_BUILD ? "kw_legion-debug" : "kw_legion");
 
-    qInstallMessageHandler(logMessageHandler);
-
     QGuiApplication app(argc, argv);
+
+    LogRotator logRotator(KWLegionCore::AppInfo::defaultLogFilePath());
+    logRotator.start();
+
+    messageTrampoline = [&logRotator](QtMsgType type,
+                                      const QMessageLogContext& context,
+                                      const QString& msg) {
+        logRotator.logMessage(type, context, msg);
+    };
+    qInstallMessageHandler(logMessageHandler);
 
     const SingleInstanceGuard singleInstanceGuard(
         QCoreApplication::applicationName());
@@ -229,6 +193,9 @@ int main(int argc, char* argv[]) {
 
     ioThread.quit();
     ioThread.wait();
+
+    logRotator.stop();
+    logRotator.wait();
 
     return result;
 }
