@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- The blank statistics page has been removed until there are meaningful statistics
+
 ### Fixed
 
 - Automatically fix broken data that can occur with replays loaded under the wrong checksum

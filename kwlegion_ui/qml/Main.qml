@@ -100,10 +100,10 @@ ApplicationWindow {
                     readonly property string label: "Inbox"
                     readonly property bool showable: IngestionModel.ingestionCount > 0
                 },
-                QtObject {
-                    readonly property string label: "Statistics"
-                    readonly property bool showable: true
-                },
+                // QtObject {
+                //     readonly property string label: "Statistics"
+                //     readonly property bool showable: true
+                // },
                 QtObject {
                     readonly property string label: "Settings"
                     readonly property bool showable: true
@@ -122,7 +122,7 @@ ApplicationWindow {
 
             ReplaysPage {}
             InboxPage {}
-            StatisticsPage {}
+            // StatisticsPage {}
             SettingsPage {}
             AboutPage {}
         }
