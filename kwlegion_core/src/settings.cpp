@@ -26,24 +26,19 @@ bool Settings::shouldAutostart() const {
     return m_autostarter->shouldAutostart();
 }
 
+constexpr const char* START_OFFER_DISMISSED = "start/autostartDismissed";
+
 void Settings::setAutostart(bool v) {
     m_autostarter->setAutostart(v);
     emit autostartChanged();
-    setHasDismissedAutostart(true);
+    m_settings.setValue(START_OFFER_DISMISSED, true);
+    emit hasDismissedAutostartChanged();
 }
-
-constexpr const char* START_OFFER_DISMISSED = "start/autostartDismissed";
 
 bool Settings::hasDismissedAutostart() const {
     return m_settings.value(START_OFFER_DISMISSED, false).toBool() ||
            // If the user has already set autostart then don't nag
            shouldAutostart();
-}
-
-void Settings::setHasDismissedAutostart(bool flag) {
-    m_settings.setValue(START_OFFER_DISMISSED, flag);
-    m_settings.sync();
-    emit hasDismissedAutostartChanged();
 }
 
 constexpr const char* START_MINIMIZED = "start/minimized";
@@ -54,8 +49,24 @@ bool Settings::startMinimized() const {
 
 void Settings::setStartMinimized(bool minimized) {
     m_settings.setValue(START_MINIMIZED, minimized);
-    m_settings.sync();
     emit startMinimizedChanged();
+}
+
+constexpr const char* CHECK_FOR_UPDATES = "updates/checkForUpdates";
+bool Settings::checkForUpdates() const {
+    return m_settings.value(CHECK_FOR_UPDATES, true).toBool();
+}
+
+void Settings::setCheckForUpdates(bool checkForUpdates) {
+    m_settings.setValue(CHECK_FOR_UPDATES, checkForUpdates);
+    emit checkForUpdatesChanged();
+    emit hasDismissedCheckForUpdatesChanged();
+}
+
+constexpr const char* CHECK_FOR_UPDATES_DISMISSED =
+    "updates/checkForUpdatesDismissed";
+bool Settings::hasDismissedCheckForUpdates() const {
+    return m_settings.contains(CHECK_FOR_UPDATES);
 }
 
 constexpr const char* CLOSE_TO_TRAY = "close/toTray";
@@ -65,7 +76,6 @@ bool Settings::closeToTray() const {
 
 void Settings::setCloseToTray(bool closeToTray) {
     m_settings.setValue(CLOSE_TO_TRAY, closeToTray);
-    m_settings.sync();
     emit closeToTrayChanged();
 }
 

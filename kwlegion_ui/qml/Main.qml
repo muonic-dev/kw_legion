@@ -139,14 +139,14 @@ ApplicationWindow {
                 active: !Settings.hasDismissedAutostart
                 onConfirmed: Settings.shouldAutostart = true
                 onDismissed: Settings.shouldAutostart = false
+            },
+            SnackbarSpec {
+                title: qsTr("Automatically check for updates")
+                description: qsTr("LEGION will check for updates periodically about once per day.")
+                active: !Settings.hasDismissedCheckForUpdates
+                onConfirmed: Settings.checkForUpdates = true
+                onDismissed: Settings.checkForUpdates = false
             }
-            // SnackbarSpec {
-            //     title: qsTr("Automatically check for updates")
-            //     description: qsTr("LEGION will automatically check for updates and prompt to download when a new version is available")
-            //     active: true
-            //     onConfirmed: active = false
-            //     onDismissed: active = false
-            // }
             // SnackbarSpec {
             //     title: qsTr("Download the latest version of LEGION")
             //     description: qsTr("A new version of LEGION is available. Do you want to download the new version now?")

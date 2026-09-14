@@ -38,6 +38,13 @@ Page {
             onCheckedChanged: Settings.closeToTray = checked
         }
 
+        SettingsSwitchRow {
+            name: qsTr("Automatically check for updates")
+            description: qsTr("LEGION will check for updates periodically about once per day.")
+            checked: Settings.checkForUpdates
+            onCheckedChanged: Settings.checkForUpdates = checked
+        }
+
         Item {
             Layout.fillHeight: true
         }

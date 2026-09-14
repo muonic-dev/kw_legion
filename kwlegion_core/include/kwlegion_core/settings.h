@@ -27,12 +27,16 @@ class Settings : public QObject {
     // This is implicitly true if shouldAutostart is already true
     // Additionally, this is implicitly set to true if the shouldAutostart value
     // is ever written to.
-    Q_PROPERTY(bool hasDismissedAutostart READ hasDismissedAutostart WRITE
-                   setHasDismissedAutostart NOTIFY hasDismissedAutostartChanged)
+    Q_PROPERTY(bool hasDismissedAutostart READ hasDismissedAutostart NOTIFY
+                   hasDismissedAutostartChanged)
     Q_PROPERTY(bool startMinimized READ startMinimized WRITE setStartMinimized
                    NOTIFY startMinimizedChanged)
     Q_PROPERTY(bool closeToTray READ closeToTray WRITE setCloseToTray NOTIFY
                    closeToTrayChanged)
+    Q_PROPERTY(bool checkForUpdates READ checkForUpdates WRITE
+                   setCheckForUpdates NOTIFY checkForUpdatesChanged)
+    Q_PROPERTY(bool hasDismissedCheckForUpdates READ hasDismissedCheckForUpdates
+                   NOTIFY hasDismissedCheckForUpdatesChanged)
 
    public:
     Settings(QObject* parent = nullptr);
@@ -41,13 +45,17 @@ class Settings : public QObject {
     void setAutostart(bool);
 
     [[nodiscard]] bool hasDismissedAutostart() const;
-    void setHasDismissedAutostart(bool dismissed);
 
     [[nodiscard]] bool startMinimized() const;
     void setStartMinimized(bool startMinimized);
 
     [[nodiscard]] bool closeToTray() const;
     void setCloseToTray(bool closeToTray);
+
+    [[nodiscard]] bool checkForUpdates() const;
+    void setCheckForUpdates(bool checkForUpdates);
+
+    [[nodiscard]] bool hasDismissedCheckForUpdates() const;
 
     void setAutostartMechanism(std::unique_ptr<AutostartMechanism> autostarter);
 
@@ -58,6 +66,8 @@ class Settings : public QObject {
     void startMinimizedChanged();
     void closeToTrayChanged();
     void hasDismissedAutostartChanged();
+    void checkForUpdatesChanged();
+    void hasDismissedCheckForUpdatesChanged();
 
    private:
     QSettings m_settings;
