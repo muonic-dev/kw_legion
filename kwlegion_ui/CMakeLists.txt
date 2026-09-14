@@ -34,13 +34,20 @@ qt_add_qml_module(kw_legion
         qml/Main.qml
         qml/Theme.qml
         qml/ShortAnimation.qml
+        qml/ShortYAnimator.qml
+        qml/ShortOpacityAnimator.qml
         qml/MediumAnimation.qml
+        qml/MediumYAnimator.qml
+        qml/MediumOpacityAnimator.qml
         qml/NavRail.qml
         qml/SettingsSwitchRow.qml
         qml/SettingDescription.qml
         qml/PatchPill.qml
         qml/TintedIcon.qml
         qml/TextFieldEdit.qml
+        qml/Snackbar.qml
+        qml/SnackbarSpec.qml
+        qml/SnackbarManager.qml
         qml/pages/StatisticsPage.qml
         qml/pages/SettingsPage.qml
         qml/pages/ReplaysPage.qml

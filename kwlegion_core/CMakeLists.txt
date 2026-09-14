@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Core Qml Sql)
+find_package(Qt6 REQUIRED COMPONENTS Core Qml Sql Network)
 
 # Bakes KW_LEGION_VERSION_SEMVER/KW_LEGION_GIT_HASH (set in the root
 # CMakeLists.txt) into a header consumed only by appinfo.cpp.
@@ -101,5 +101,6 @@ target_link_libraries(kwlegion_core
         Qt6::Core
         Qt6::Qml
         Qt6::Sql
+        Qt6::Network
         legionparser::legionparser
 )
