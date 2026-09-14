@@ -170,6 +170,12 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     ensureDirectories();
     ensureDb();
 
+    try {
+        performReplayRechecksum();
+    } catch (StorageException& ex) {
+        qCritical(logStore) << "Failed to re-checksum replays " << ex.what();
+    }
+
     // We did some kind of migration that needs additional bookkeeping
     try {
         performReplayReanalysis();
@@ -255,6 +261,105 @@ void ReplayStore::performReplayReanalysis() {
                                << QString(checksum.toHex());
             continue;
         }
+    }
+}
+
+void ReplayStore::performReplayRechecksum() {
+    Queries queries{QSqlQuery(m_db)};
+    const QList<QByteArray> needRechecksum =
+        queries.selectReplaysNeedingRechecksum();
+
+    for (const auto& checksum : needRechecksum) {
+        const QString internalPath = computeIngestionPath(checksum);
+        qDebug(logStore) << "Re-checksumming replay at: " << internalPath;
+
+        QFile replayFile(internalPath);
+        if (!replayFile.open(QIODevice::ReadOnly)) {
+            qCritical(logStore) << "Failed to open " << internalPath << " "
+                                << replayFile.errorString();
+            continue;
+        }
+
+        try {
+            const auto synopsis =
+                LegionParser::SynopsisParser::parse(replayFile);
+            if (synopsis.checksum != checksum) {
+                qWarning(logStore) << "Checksum drift detected for replay at: "
+                                   << internalPath;
+                // Now that we have found a replay where the checksum doesn't
+                // match we need to repair it. We will do this by the following
+                SqlTransactionGuard transaction(m_db);
+
+                const std::optional<Replay> existing =
+                    queries.selectReplay(synopsis.checksum);
+                // The replay was also imported under its correct checksum, we
+                // can delete the replay
+                if (existing.has_value()) {
+                    qInfo(logStore) << "Drift file exists under a different "
+                                       "checksum, deletting: "
+                                    << internalPath;
+                    deleteDuplicateReplayChecksum(transaction, queries,
+                                                  checksum);
+                } else {
+                    qInfo(logStore)
+                        << "Drift file exists will be migrated to its new "
+                           "checksum: "
+                        << internalPath << " -> " << synopsis.checksum.toHex();
+                    migrateReplayChecksum(transaction, queries, checksum,
+                                          synopsis);
+                    queries.markReplayForRechecksum(synopsis.checksum, false);
+                }
+
+                transaction.commit();
+            } else {
+                queries.markReplayForRechecksum(checksum, false);
+            }
+        } catch (LegionParser::ReplayParseException& ex) {
+            qCritical(logStore)
+                << "Failed to parse replay for re-checksum: " << internalPath;
+        } catch (StorageException& ex) {
+            qCritical(logStore)
+                << "Failed to commit re-checksum of replay: " << internalPath;
+        }
+    }
+}
+
+void ReplayStore::deleteDuplicateReplayChecksum(
+    const SqlTransactionGuard& /*tx*/, Queries& queries,
+    const QByteArray& checksum) {
+    // This leaves the replay file orphaned under its name in the State
+    // directory That's probably ok since it means we will have a chance to
+    // recover it if we need to
+    queries.deleteReplay(checksum);
+    queries.deleteReplayAnalysis(checksum);
+    queries.deleteReplayOverrides(checksum);
+    queries.deleteReplayPlayers(checksum);
+    queries.deleteReplayExternalPaths(checksum);
+}
+
+void ReplayStore::migrateReplayChecksum(
+    const SqlTransactionGuard& /*tx*/, Queries& queries,
+    const QByteArray& originalChecksum,
+    const LegionParser::ReplaySynopsis& newSynopsis) {
+    // Move the original checksum file to the new path
+    const QString originalPath = computeIngestionPath(originalChecksum);
+    const QString newPath = computeIngestionPath(newSynopsis.checksum);
+
+    // Do this first, and once the db ops are successful then clear
+    if (!QFile::copy(originalPath, newPath)) {
+        throw StorageException("Failed to rename replay file from " +
+                               originalPath + " to " + newPath);
+    }
+    // Implementation of migrating a replay to its correct checksum
+    queries.migrateReplayChecksum(originalChecksum, newSynopsis.checksum);
+    queries.migrateReplayAnalysis(originalChecksum, newSynopsis.checksum);
+    queries.migrateReplayOverrides(originalChecksum, newSynopsis.checksum);
+    queries.migrateReplayPlayers(originalChecksum, newSynopsis.checksum);
+    queries.migrateReplayExternalPaths(originalChecksum, newSynopsis.checksum);
+
+    if (!QFile::remove(originalPath)) {
+        qWarning(logStore) << "Failed to remove original replay file: "
+                           << originalPath;
     }
 }
 

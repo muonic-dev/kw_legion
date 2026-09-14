@@ -158,6 +158,21 @@ constexpr std::array MIGRATIONS{
     "    , is_replay_saver INT NOT NULL"
     "    , PRIMARY KEY (replay_checksum, player_index)"
     "    ) STRICT, WITHOUT ROWID;",
+
+    // There was an unexpected bug in the introduction of TeeDevice as used by
+    // checksumming
+    // The checksum was supposed to calculate off everything following the
+    // header so that
+    // replays are stable. However, this was not the case and our check for
+    // checksum stability
+    // missed.
+    // Mark a heal flag with the next 2 migrations which add an explicit
+    // rechecksum column to be queried during application startup
+    "ALTER TABLE replays ADD COLUMN rechecksum INT DEFAULT 0;",
+
+    // All replays should be re-checksummed
+    "UPDATE replays SET rechecksum = 1;"
+
 };
 
 void Queries::migrate() {
@@ -529,6 +544,110 @@ QList<QString> Queries::selectExternalPaths(const QByteArray& checksum) {
     }
     throwLastIfFailed();
     return paths;
+}
+
+QList<QByteArray> Queries::selectReplaysNeedingRechecksum() {
+    prepare("SELECT checksum FROM replays WHERE rechecksum = 1");
+
+    exec();
+
+    QList<QByteArray> replays;
+    while (m_query.next()) {
+        replays.append(m_query.value(0).toByteArray());
+    }
+    throwLastIfFailed();
+    return replays;
+}
+
+void Queries::deleteReplay(const QByteArray& checksum) {
+    prepare("DELETE FROM replays WHERE checksum = :checksum");
+    m_query.bindValue(":checksum", checksum);
+    exec();
+}
+
+void Queries::deleteReplayAnalysis(const QByteArray& checksum) {
+    prepare("DELETE FROM replay_analysis WHERE replay_checksum = :checksum");
+    m_query.bindValue(":checksum", checksum);
+    exec();
+}
+
+void Queries::deleteReplayOverrides(const QByteArray& checksum) {
+    prepare("DELETE FROM replay_overrides WHERE replay_checksum = :checksum");
+    m_query.bindValue(":checksum", checksum);
+    exec();
+}
+
+void Queries::deleteReplayPlayers(const QByteArray& checksum) {
+    prepare("DELETE FROM replay_players WHERE replay_checksum = :checksum");
+    m_query.bindValue(":checksum", checksum);
+    exec();
+}
+
+void Queries::deleteReplayExternalPaths(const QByteArray& checksum) {
+    prepare(
+        "DELETE FROM replay_external_paths WHERE replay_checksum = :checksum");
+    m_query.bindValue(":checksum", checksum);
+    exec();
+}
+
+void Queries::migrateReplayChecksum(const QByteArray& oldChecksum,
+                                    const QByteArray& newChecksum) {
+    prepare(
+        "UPDATE replays SET checksum = :newChecksum WHERE checksum = "
+        ":oldChecksum");
+    m_query.bindValue(":oldChecksum", oldChecksum);
+    m_query.bindValue(":newChecksum", newChecksum);
+    exec();
+}
+
+void Queries::migrateReplayAnalysis(const QByteArray& oldChecksum,
+                                    const QByteArray& newChecksum) {
+    prepare(
+        "UPDATE replay_analysis SET replay_checksum = :newChecksum WHERE "
+        "replay_checksum = :oldChecksum");
+    m_query.bindValue(":oldChecksum", oldChecksum);
+    m_query.bindValue(":newChecksum", newChecksum);
+    exec();
+}
+
+void Queries::migrateReplayOverrides(const QByteArray& oldChecksum,
+                                     const QByteArray& newChecksum) {
+    prepare(
+        "UPDATE replay_overrides SET replay_checksum = :newChecksum WHERE "
+        "replay_checksum = :oldChecksum");
+    m_query.bindValue(":oldChecksum", oldChecksum);
+    m_query.bindValue(":newChecksum", newChecksum);
+    exec();
+}
+
+void Queries::migrateReplayPlayers(const QByteArray& oldChecksum,
+                                   const QByteArray& newChecksum) {
+    prepare(
+        "UPDATE replay_players SET replay_checksum = :newChecksum WHERE "
+        "replay_checksum = :oldChecksum");
+    m_query.bindValue(":oldChecksum", oldChecksum);
+    m_query.bindValue(":newChecksum", newChecksum);
+    exec();
+}
+
+void Queries::migrateReplayExternalPaths(const QByteArray& oldChecksum,
+                                         const QByteArray& newChecksum) {
+    prepare(
+        "UPDATE replay_external_paths SET replay_checksum = :newChecksum WHERE "
+        "replay_checksum = :oldChecksum");
+    m_query.bindValue(":oldChecksum", oldChecksum);
+    m_query.bindValue(":newChecksum", newChecksum);
+    exec();
+}
+
+void Queries::markReplayForRechecksum(const QByteArray& checksum,
+                                      bool rechecksum) {
+    prepare(
+        "UPDATE replays SET rechecksum = :rechecksum WHERE checksum = "
+        ":checksum");
+    m_query.bindValue(":checksum", checksum);
+    m_query.bindValue(":rechecksum", rechecksum ? 1 : 0);
+    exec();
 }
 
 Replay Queries::readReplay() const {

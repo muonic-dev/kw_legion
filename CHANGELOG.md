@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## Unreleased
+
+### Fixed
+
+- Automatically fix broken data that can occur with replays loaded under the wrong checksum
+- The debug log will not grow without limit if the application does not restart
+- Debug logs will be preserved from a previous launch if the application crashes and you restart it
+
 ## 0.3.1
 
 ### Changed

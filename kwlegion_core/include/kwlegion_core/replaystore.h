@@ -36,6 +36,8 @@ struct Watermark;
 class InboxItem;
 class StorageException;
 
+class SqlTransactionGuard;
+
 /**
  * Identify where a replay is located for analysis
  */
@@ -146,6 +148,10 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
 
     void stop();
 
+    // Implement helper for the analysis provider
+    [[nodiscard]] std::optional<ReplayAnalysisTarget> lookupReplay(
+        const QByteArray& checksum) const override;
+
    signals:
     void replaysLoaded(const QList<Replay>&);
     // A replay was was discovered or updated
@@ -177,6 +183,26 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
     void performReplaySynopsis(const QString& path);
 
     void performReplayReanalysis();
+
+    // Due to a previous bug where the checksum implementation wasn't stable
+    // its possible that checksums have drifted. This method re-checksums
+    // all replays and adapts accordingly
+    void performReplayRechecksum();
+
+    // During re-analysis we determined we already have this replay under its
+    // correct checksum
+    // Takes the tx guard as proof of being in transaction
+    static void deleteDuplicateReplayChecksum(const SqlTransactionGuard& /*tx*/,
+                                              Queries& queries,
+                                              const QByteArray& checksum);
+
+    // During re-analysis we determined that this replay doesn't exist under its
+    // canonical path
+    // Takes the tx guard as proof of being in transaction
+    void migrateReplayChecksum(const SqlTransactionGuard& /*tx*/,
+                               Queries& queries,
+                               const QByteArray& originalChecksum,
+                               const LegionParser::ReplaySynopsis& newSynopsis);
 
     // observed is the state of the file sampled before the parse attempt
     // that came back torn - the path goes back into the deferred set to be
@@ -237,10 +263,6 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
     void exposeReplay(const QByteArray& checksum);
 
     static void hideReplay(Queries& queries, const QByteArray& checksum);
-
-    // Implement helper for the analysis provider
-    [[nodiscard]] std::optional<ReplayAnalysisTarget> lookupReplay(
-        const QByteArray& checksum) const override;
 
     // We want to wait until the full synopsis pass is done on all replays
     // before we emit the first event instead of trickling them in

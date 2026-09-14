@@ -93,9 +93,31 @@ class Queries final {
 
     QList<QString> selectExternalPaths(const QByteArray& checksum);
 
-    void bootstrapMutationTable(const QList<QString>& values);
+    QList<QByteArray> selectReplaysNeedingRechecksum();
+
+    void deleteReplay(const QByteArray& checksum);
+    void deleteReplayAnalysis(const QByteArray& checksum);
+    void deleteReplayOverrides(const QByteArray& checksum);
+    void deleteReplayPlayers(const QByteArray& checksum);
+    void deleteReplayExternalPaths(const QByteArray& checksum);
+
+    // Assumes that there is no existing replay with the new checksum
+    void migrateReplayChecksum(const QByteArray& oldChecksum,
+                               const QByteArray& newChecksum);
+    void migrateReplayAnalysis(const QByteArray& oldChecksum,
+                               const QByteArray& newChecksum);
+    void migrateReplayOverrides(const QByteArray& oldChecksum,
+                                const QByteArray& newChecksum);
+    void migrateReplayPlayers(const QByteArray& oldChecksum,
+                              const QByteArray& newChecksum);
+    void migrateReplayExternalPaths(const QByteArray& oldChecksum,
+                                    const QByteArray& newChecksum);
+
+    void markReplayForRechecksum(const QByteArray& checksum, bool rechecksum);
 
    private:
+    void bootstrapMutationTable(const QList<QString>& values);
+
     void prepare(const QString& sql);
 
     // Create a temporary table of text to work around max bound parameters
