@@ -345,6 +345,11 @@ void ReplayStore::migrateReplayChecksum(
     const QString originalPath = computeIngestionPath(originalChecksum);
     const QString newPath = computeIngestionPath(newSynopsis.checksum);
 
+    // If the file already exists assume we failed a previous migration attempt
+    // and remove it
+    if (QFile::exists(newPath)) {
+        QFile::remove(newPath);
+    }
     // Do this first, and once the db ops are successful then clear
     if (!QFile::copy(originalPath, newPath)) {
         throw StorageException("Failed to rename replay file from " +
