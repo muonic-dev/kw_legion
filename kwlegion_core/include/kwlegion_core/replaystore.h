@@ -29,7 +29,7 @@ class TornDataException;
 }  // namespace LegionParser
 
 namespace KWLegionCore {
-class Queries;
+class Persistence;
 class Deferred;
 struct Watermark;
 class InboxItem;
@@ -84,7 +84,7 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
      */
 
    public:
-    ReplayStore(Queries& queries, QString replayDir,
+    ReplayStore(Persistence& persistence, QString replayDir,
                 const QString& statePath = QStandardPaths::writableLocation(
                     QStandardPaths::StateLocation),
                 QObject* parent = nullptr);
@@ -191,14 +191,14 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
     // correct checksum
     // Takes the tx guard as proof of being in transaction
     static void deleteDuplicateReplayChecksum(const SqlTransactionGuard& /*tx*/,
-                                              Queries& queries,
+                                              Persistence& persistence,
                                               const QByteArray& checksum);
 
     // During re-analysis we determined that this replay doesn't exist under its
     // canonical path
     // Takes the tx guard as proof of being in transaction
     void migrateReplayChecksum(const SqlTransactionGuard& /*tx*/,
-                               Queries& queries,
+                               Persistence& persistence,
                                const QByteArray& originalChecksum,
                                const LegionParser::ReplaySynopsis& newSynopsis);
 
@@ -232,11 +232,11 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
     // This may insert aot replay analysis such as the body offset if it hasn't
     // been done yet
     QList<QByteArray> ingestKnownReplay(
-        Queries& queries, QFile& file,
+        Persistence& persistence, QFile& file,
         const LegionParser::ReplaySynopsis& synopsis);
 
     QList<QByteArray> ingestUnknownReplay(
-        Queries& queries, QFile& file,
+        Persistence& persistence, QFile& file,
         const LegionParser::ReplaySynopsis& synopsis);
 
     // The replay file at the path is gone or otherwise corrupt so we should
@@ -247,7 +247,7 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
     // occur on multiple branches in ingestReplay)
     // The replay at path was ingested previously but has been overwritten by
     // something new
-    static void handleExistingReplayAtPath(Queries& queries,
+    static void handleExistingReplayAtPath(Persistence& persistence,
                                            const QString& path,
                                            QList<QByteArray>& checksums);
 
@@ -260,7 +260,8 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
 
     void exposeReplay(const QByteArray& checksum);
 
-    static void hideReplay(Queries& queries, const QByteArray& checksum);
+    static void hideReplay(Persistence& persistence,
+                           const QByteArray& checksum);
 
     // We want to wait until the full synopsis pass is done on all replays
     // before we emit the first event instead of trickling them in
@@ -268,7 +269,7 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
     ActionScope m_initialSweep;
 
     // Owns the sqlite connection; not owned by ReplayStore.
-    Queries& m_queries;
+    Persistence& m_persistence;
     // Path of the internal replay storage
     QString m_storageDir;
     // Path to the Documents\Command &...\Replays dir

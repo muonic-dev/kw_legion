@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Muonic
 
-#include <kwlegion_core/queries.h>
+#include <kwlegion_core/persistence.h>
 #include <kwlegion_core/replaystore.h>
 
 #include <QDir>
@@ -37,9 +37,10 @@ TEST_CASE(
     QTemporaryDir tempDir;
     REQUIRE(tempDir.isValid());
 
-    Queries queries(tempDir.filePath("replays.db"), "replaystore_bootstrap");
-    queries.init();
-    ReplayStore store(queries, tempDir.path(), tempDir.path());
+    Persistence persistence(tempDir.filePath("replays.db"),
+                            "replaystore_bootstrap");
+    persistence.init();
+    ReplayStore store(persistence, tempDir.path(), tempDir.path());
     QSignalSpy loadedSpy(&store, &ReplayStore::replaysLoaded);
 
     // Nothing is on disk yet
@@ -63,10 +64,10 @@ TEST_CASE(
     const QString replayPath =
         copyFixtureReplay(root, "Source/replay.KWReplay");
 
-    Queries queries(tempDir.filePath("replays.db"),
-                    "replaystore_ingest_startup");
-    queries.init();
-    ReplayStore store(queries, tempDir.path(), tempDir.path());
+    Persistence persistence(tempDir.filePath("replays.db"),
+                            "replaystore_ingest_startup");
+    persistence.init();
+    ReplayStore store(persistence, tempDir.path(), tempDir.path());
     QSignalSpy loadedSpy(&store, &ReplayStore::replaysLoaded);
 
     // replayPath truthfully exists on disk at this point, so it belongs in
@@ -99,10 +100,10 @@ TEST_CASE(
 
     QByteArray checksum;
     {
-        Queries queries(tempDir.filePath("replays.db"),
-                        "replaystore_reopen_first");
-        queries.init();
-        ReplayStore store(queries, tempDir.path(), tempDir.path());
+        Persistence persistence(tempDir.filePath("replays.db"),
+                                "replaystore_reopen_first");
+        persistence.init();
+        ReplayStore store(persistence, tempDir.path(), tempDir.path());
         QSignalSpy loadedSpy(&store, &ReplayStore::replaysLoaded);
         store.receiveInitialReplayPaths({replayPath});
 
@@ -111,17 +112,17 @@ TEST_CASE(
             loadedSpy.at(0).at(0).value<QList<Replay>>();
         REQUIRE(replays.size() == 1);
         checksum = replays.at(0).checksum;
-        queries.close();
+        persistence.close();
     }
 
     // A second store opened at the same state path, as if the app had
     // restarted with the replay file still present on disk - the same
     // "currently on disk" listing must be reported, since that's the source
     // of truth receiveInitialReplayPaths uses to prune anything gone.
-    Queries queries(tempDir.filePath("replays.db"),
-                    "replaystore_reopen_second");
-    queries.init();
-    ReplayStore store(queries, tempDir.path(), tempDir.path());
+    Persistence persistence(tempDir.filePath("replays.db"),
+                            "replaystore_reopen_second");
+    persistence.init();
+    ReplayStore store(persistence, tempDir.path(), tempDir.path());
     QSignalSpy loadedSpy(&store, &ReplayStore::replaysLoaded);
     store.receiveInitialReplayPaths({replayPath});
 
@@ -138,9 +139,10 @@ TEST_CASE("ReplayStore ingests a replay reported live via synopsizeReplayFile",
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
 
-    Queries queries(tempDir.filePath("replays.db"), "replaystore_live_ingest");
-    queries.init();
-    ReplayStore store(queries, tempDir.path(), tempDir.path());
+    Persistence persistence(tempDir.filePath("replays.db"),
+                            "replaystore_live_ingest");
+    persistence.init();
+    ReplayStore store(persistence, tempDir.path(), tempDir.path());
     // Nothing is on disk yet at startup - the replay "arrives" afterward.
     store.receiveInitialReplayPaths({});
 
@@ -166,9 +168,10 @@ TEST_CASE("ReplayStore ignores a corrupt file that was never tracked",
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
 
-    Queries queries(tempDir.filePath("replays.db"), "replaystore_corrupt_file");
-    queries.init();
-    ReplayStore store(queries, tempDir.path(), tempDir.path());
+    Persistence persistence(tempDir.filePath("replays.db"),
+                            "replaystore_corrupt_file");
+    persistence.init();
+    ReplayStore store(persistence, tempDir.path(), tempDir.path());
     store.receiveInitialReplayPaths({});
 
     const QString corruptPath = root.filePath("garbage.KWReplay");
@@ -191,10 +194,10 @@ TEST_CASE(
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
 
-    Queries queries(tempDir.filePath("replays.db"),
-                    "replaystore_remove_link_known");
-    queries.init();
-    ReplayStore store(queries, tempDir.path(), tempDir.path());
+    Persistence persistence(tempDir.filePath("replays.db"),
+                            "replaystore_remove_link_known");
+    persistence.init();
+    ReplayStore store(persistence, tempDir.path(), tempDir.path());
     store.receiveInitialReplayPaths({});
 
     const QString replayPath =
@@ -218,10 +221,10 @@ TEST_CASE(
     REQUIRE(tempDir.isValid());
     const QDir root(tempDir.path());
 
-    Queries queries(tempDir.filePath("replays.db"),
-                    "replaystore_remove_link_untracked");
-    queries.init();
-    ReplayStore store(queries, tempDir.path(), tempDir.path());
+    Persistence persistence(tempDir.filePath("replays.db"),
+                            "replaystore_remove_link_untracked");
+    persistence.init();
+    ReplayStore store(persistence, tempDir.path(), tempDir.path());
     store.receiveInitialReplayPaths({});
 
     QSignalSpy changedSpy(&store, &ReplayStore::replaysChanged);

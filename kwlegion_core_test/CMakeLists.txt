@@ -4,7 +4,7 @@ add_executable(kwlegion_core_tests
     main.cpp
     deferred_tests.cpp
     prospector_tests.cpp
-    queries_tests.cpp
+    persistence_tests.cpp
     replayfilterquery_tests.cpp
     replayfilterqueryparser_tests.cpp
     replaystore_tests.cpp
@@ -24,8 +24,9 @@ target_compile_definitions(kwlegion_core_tests
 )
 
 # exception.h/transaction.h are private headers that live alongside
-# queries.cpp rather than under kwlegion_core's public include/ directory, so
-# the test target needs this path explicitly to exercise them directly.
+# persistence.cpp rather than under kwlegion_core's public include/
+# directory, so the test target needs this path explicitly to exercise them
+# directly.
 #
 # include/kwlegion_core mirrors kwlegion_core's own PRIVATE include dir of
 # the same name (see kwlegion_core/CMakeLists.txt) -- src/ headers like

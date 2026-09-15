@@ -20,27 +20,27 @@
 
 namespace KWLegionCore {
 
-Q_DECLARE_LOGGING_CATEGORY(logQueries);
+Q_DECLARE_LOGGING_CATEGORY(logPersistence);
 
 class SqlTransactionGuard;
 
 // Owns the sqlite connection and dispatches queries against it. Kept
 // alongside MIGRATIONS so the DDL and the statements that reference it stay
 // adjacent.
-class Queries final : public QObject {
+class Persistence final : public QObject {
     Q_OBJECT
 
    public:
-    explicit Queries(QString dbPath, QString connectionName,
-                     QObject* parent = nullptr);
+    explicit Persistence(QString dbPath, QString connectionName,
+                         QObject* parent = nullptr);
 
-    ~Queries() override = default;
+    ~Persistence() override = default;
 
-    Queries(const Queries&) = delete;
-    Queries(Queries&&) = delete;
+    Persistence(const Persistence&) = delete;
+    Persistence(Persistence&&) = delete;
 
-    Queries& operator=(const Queries&) = delete;
-    Queries& operator=(Queries&&) = delete;
+    Persistence& operator=(const Persistence&) = delete;
+    Persistence& operator=(Persistence&&) = delete;
 
     // Opens the database connection and runs any pending migrations. Wire
     // this to the owning thread's QThread::started (connected ahead of

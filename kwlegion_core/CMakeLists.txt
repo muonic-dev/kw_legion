@@ -19,7 +19,7 @@ add_library(kwlegion_core STATIC
     # Public interface (and also MOC)
     include/kwlegion_core/appinfo.h
     include/kwlegion_core/prospector.h
-    include/kwlegion_core/queries.h
+    include/kwlegion_core/persistence.h
     include/kwlegion_core/replaystore.h
     include/kwlegion_core/replaystoremodel.h
     include/kwlegion_core/settings.h
@@ -35,7 +35,7 @@ add_library(kwlegion_core STATIC
     src/prospector.cpp
     src/replaystore.cpp
     src/transaction.cpp
-    src/queries.cpp
+    src/persistence.cpp
     src/replay.cpp
     src/replaystoremodel.cpp
     src/teammodel.cpp

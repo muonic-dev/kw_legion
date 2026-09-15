@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Muonic
 
-#include <kwlegion_core/queries.h>
+#include <kwlegion_core/persistence.h>
 
 #include <QHashFunctions>
 #include <QList>
@@ -22,14 +22,15 @@
 
 namespace KWLegionCore {
 
-Q_LOGGING_CATEGORY(logQueries, "kwlegion.queries");
+Q_LOGGING_CATEGORY(logPersistence, "kwlegion.persistence");
 
-Queries::Queries(QString dbPath, QString connectionName, QObject* parent)
+Persistence::Persistence(QString dbPath, QString connectionName,
+                         QObject* parent)
     : QObject(parent),
       m_dbPath(std::move(dbPath)),
       m_connectionName(std::move(connectionName)) {}
 
-void Queries::init() {
+void Persistence::init() {
     if (m_db.isOpen()) {
         return;
     }
@@ -38,7 +39,7 @@ void Queries::init() {
     m_db.setDatabaseName(m_dbPath);
     m_db.setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000"));
     if (!m_db.open()) {
-        qCCritical(logQueries)
+        qCCritical(logPersistence)
             << "Failed to open database: " << m_db.lastError().text();
         return;
     }
@@ -49,15 +50,16 @@ void Queries::init() {
         // ship a broken migration this means there is less to do.
         migrate();
     } catch (const StorageException& ex) {
-        qCritical(logQueries) << "Failed to migrate database: " << ex.what();
+        qCritical(logPersistence)
+            << "Failed to migrate database: " << ex.what();
     }
 }
 
-SqlTransactionGuard Queries::beginTransact() {
+SqlTransactionGuard Persistence::beginTransact() {
     return SqlTransactionGuard(m_db);
 }
 
-void Queries::close() {
+void Persistence::close() {
     m_query = QSqlQuery();
     m_db.close();
     m_db = QSqlDatabase();
@@ -145,7 +147,7 @@ constexpr std::array MIGRATIONS{
     // their own table, mirroring the eventual split with a body-derived
     // analysis table below. A missing row means "no override", the same
     // meaning the empty-string default on the old column used to carry, so
-    // there is no default here - see Queries::updateOverrideTitle.
+    // there is no default here - see Persistence::updateOverrideTitle.
     "CREATE TABLE replay_overrides"
     "    ( replay_checksum BLOB PRIMARY KEY"
     "    , override_match_title TEXT NOT NULL"
@@ -168,7 +170,7 @@ constexpr std::array MIGRATIONS{
     "    , body_offset INT NOT NULL"
     "    ) STRICT, WITHOUT ROWID;",
 
-    // replay_external_paths checksum is queries so optimize here
+    // replay_external_paths checksum is queried so optimize here
     "CREATE INDEX idx_replay_external_paths_checksum"
     "    ON replay_external_paths(replay_checksum);",
 
@@ -216,7 +218,7 @@ constexpr std::array MIGRATIONS{
 
 };
 
-void Queries::migrate() {
+void Persistence::migrate() {
     m_query.exec("PRAGMA user_version");
     m_query.next();
     const size_t currentVersion = m_query.value(0).toULongLong();
@@ -225,7 +227,7 @@ void Queries::migrate() {
     // when there are no pending migrations to run.
     m_query.finish();
 
-    qDebug(logQueries) << "Current schema version is: " << currentVersion;
+    qDebug(logPersistence) << "Current schema version is: " << currentVersion;
 
     // The behavior of PRAGMA user_version starts at 0 so this is always the
     // next thing to execute
@@ -245,7 +247,7 @@ void Queries::migrate() {
     }
 }
 
-bool Queries::isReplayKnown(const QByteArray& checksum) {
+bool Persistence::isReplayKnown(const QByteArray& checksum) {
     prepare("SELECT count(*) FROM replays WHERE checksum = :checksum");
     m_query.bindValue(":checksum", checksum);
     exec();
@@ -267,7 +269,7 @@ constexpr const char* BASE_REPLAY_NEEDING_ANALYSIS =
     "   WHERE replay_checksum = r.checksum"
     ")";
 
-bool Queries::doesReplayNeedAnalysis(const QByteArray& checksum) {
+bool Persistence::doesReplayNeedAnalysis(const QByteArray& checksum) {
     prepare(QString(BASE_REPLAY_NEEDING_ANALYSIS) +
             " AND r.checksum = :checksum"
             " LIMIT 1");
@@ -277,7 +279,7 @@ bool Queries::doesReplayNeedAnalysis(const QByteArray& checksum) {
     return m_query.next();
 }
 
-QList<QByteArray> Queries::selectReplaysNeedingAnalysis() {
+QList<QByteArray> Persistence::selectReplaysNeedingAnalysis() {
     prepare(BASE_REPLAY_NEEDING_ANALYSIS);
     exec();
     QList<QByteArray> result;
@@ -288,7 +290,7 @@ QList<QByteArray> Queries::selectReplaysNeedingAnalysis() {
     return result;
 }
 
-void Queries::insertReplay(const LegionParser::ReplaySynopsis& synopsis) {
+void Persistence::insertReplay(const LegionParser::ReplaySynopsis& synopsis) {
     prepare(
         "INSERT INTO replays"
         "    ( checksum"
@@ -337,7 +339,7 @@ void Queries::insertReplay(const LegionParser::ReplaySynopsis& synopsis) {
     exec();
 }
 
-void Queries::insertReplayAnalysis(
+void Persistence::insertReplayAnalysis(
     const LegionParser::ReplaySynopsis& synopsis) {
     prepare(
         "INSERT INTO replay_analysis"
@@ -352,8 +354,8 @@ void Queries::insertReplayAnalysis(
     exec();
 }
 
-void Queries::updateOverrideTitle(const QByteArray& checksum,
-                                  const QString& overrideTitle) {
+void Persistence::updateOverrideTitle(const QByteArray& checksum,
+                                      const QString& overrideTitle) {
     if (overrideTitle.isEmpty()) {
         // No override is represented as an absent row rather than a stored
         // empty string, so a missing row is the only "no override" case the
@@ -379,8 +381,8 @@ void Queries::updateOverrideTitle(const QByteArray& checksum,
     exec();
 }
 
-void Queries::insertReplayPlayers(const QByteArray& checksum,
-                                  const QList<LegionParser::Player>& players) {
+void Persistence::insertReplayPlayers(
+    const QByteArray& checksum, const QList<LegionParser::Player>& players) {
     prepare(
         "INSERT INTO replay_players"
         "    ( replay_checksum"
@@ -415,7 +417,7 @@ void Queries::insertReplayPlayers(const QByteArray& checksum,
     }
 }
 
-std::optional<QByteArray> Queries::checksumForExternalPath(
+std::optional<QByteArray> Persistence::checksumForExternalPath(
     const QString& path) {
     prepare(
         "SELECT replay_checksum FROM replay_external_paths "
@@ -431,8 +433,8 @@ std::optional<QByteArray> Queries::checksumForExternalPath(
     return result;
 }
 
-bool Queries::insertExternalFilename(const QByteArray& checksum,
-                                     const QString& path) {
+bool Persistence::insertExternalFilename(const QByteArray& checksum,
+                                         const QString& path) {
     // external_path is the sole key, so a conflict means either this exact
     // (checksum, path) pair is already tracked (the WHERE guard makes that
     // a no-op) or the path is re-appearing under a new checksum (e.g. the
@@ -455,7 +457,8 @@ bool Queries::insertExternalFilename(const QByteArray& checksum,
     return m_query.numRowsAffected() > 0;
 }
 
-std::optional<QByteArray> Queries::removeExternalFilename(const QString& path) {
+std::optional<QByteArray> Persistence::removeExternalFilename(
+    const QString& path) {
     // external_path is unique, so this affects at most one row.
     prepare(
         "DELETE FROM replay_external_paths "
@@ -473,7 +476,7 @@ std::optional<QByteArray> Queries::removeExternalFilename(const QString& path) {
     return result;
 }
 
-void Queries::forgetMissingReplays(const QList<QString>& knownPaths) {
+void Persistence::forgetMissingReplays(const QList<QString>& knownPaths) {
     bootstrapMutationTable(knownPaths);
 
     // An empty knownPaths leaves known_replay_paths empty too, so the
@@ -503,7 +506,7 @@ constexpr const char* const BASE_SELECT_QUERY =
     " LEFT JOIN replay_overrides o ON o.replay_checksum = r.checksum"
     " LEFT JOIN replay_analysis a ON a.replay_checksum = r.checksum";
 
-QList<Replay> Queries::selectReplays() {
+QList<Replay> Persistence::selectReplays() {
     prepare(BASE_SELECT_QUERY);
     exec();
 
@@ -517,7 +520,7 @@ QList<Replay> Queries::selectReplays() {
     return replays;
 }
 
-std::optional<Replay> Queries::selectReplay(const QByteArray& checksum) {
+std::optional<Replay> Persistence::selectReplay(const QByteArray& checksum) {
     prepare(QString(BASE_SELECT_QUERY) + " WHERE r.checksum = :checksum");
     m_query.bindValue(":checksum", checksum);
 
@@ -538,7 +541,7 @@ std::optional<Replay> Queries::selectReplay(const QByteArray& checksum) {
     return std::nullopt;
 }
 
-QList<Player> Queries::selectReplayPlayers(const QByteArray& checksum) {
+QList<Player> Persistence::selectReplayPlayers(const QByteArray& checksum) {
     prepare(
         "SELECT player_id"
         "    , player_name"
@@ -570,7 +573,7 @@ QList<Player> Queries::selectReplayPlayers(const QByteArray& checksum) {
     return players;
 }
 
-QList<QString> Queries::selectExternalPaths(const QByteArray& checksum) {
+QList<QString> Persistence::selectExternalPaths(const QByteArray& checksum) {
     prepare(
         "SELECT external_path FROM replay_external_paths WHERE "
         "replay_checksum "
@@ -587,7 +590,7 @@ QList<QString> Queries::selectExternalPaths(const QByteArray& checksum) {
     return paths;
 }
 
-QList<QByteArray> Queries::selectReplaysNeedingRechecksum() {
+QList<QByteArray> Persistence::selectReplaysNeedingRechecksum() {
     prepare("SELECT checksum FROM replays WHERE rechecksum = 1");
 
     exec();
@@ -600,39 +603,39 @@ QList<QByteArray> Queries::selectReplaysNeedingRechecksum() {
     return replays;
 }
 
-void Queries::deleteReplay(const QByteArray& checksum) {
+void Persistence::deleteReplay(const QByteArray& checksum) {
     prepare("DELETE FROM replays WHERE checksum = :checksum");
     m_query.bindValue(":checksum", checksum);
     exec();
 }
 
-void Queries::deleteReplayAnalysis(const QByteArray& checksum) {
+void Persistence::deleteReplayAnalysis(const QByteArray& checksum) {
     prepare("DELETE FROM replay_analysis WHERE replay_checksum = :checksum");
     m_query.bindValue(":checksum", checksum);
     exec();
 }
 
-void Queries::deleteReplayOverrides(const QByteArray& checksum) {
+void Persistence::deleteReplayOverrides(const QByteArray& checksum) {
     prepare("DELETE FROM replay_overrides WHERE replay_checksum = :checksum");
     m_query.bindValue(":checksum", checksum);
     exec();
 }
 
-void Queries::deleteReplayPlayers(const QByteArray& checksum) {
+void Persistence::deleteReplayPlayers(const QByteArray& checksum) {
     prepare("DELETE FROM replay_players WHERE replay_checksum = :checksum");
     m_query.bindValue(":checksum", checksum);
     exec();
 }
 
-void Queries::deleteReplayExternalPaths(const QByteArray& checksum) {
+void Persistence::deleteReplayExternalPaths(const QByteArray& checksum) {
     prepare(
         "DELETE FROM replay_external_paths WHERE replay_checksum = :checksum");
     m_query.bindValue(":checksum", checksum);
     exec();
 }
 
-void Queries::migrateReplayChecksum(const QByteArray& oldChecksum,
-                                    const QByteArray& newChecksum) {
+void Persistence::migrateReplayChecksum(const QByteArray& oldChecksum,
+                                        const QByteArray& newChecksum) {
     prepare(
         "UPDATE replays SET checksum = :newChecksum WHERE checksum = "
         ":oldChecksum");
@@ -641,8 +644,8 @@ void Queries::migrateReplayChecksum(const QByteArray& oldChecksum,
     exec();
 }
 
-void Queries::migrateReplayAnalysis(const QByteArray& oldChecksum,
-                                    const QByteArray& newChecksum) {
+void Persistence::migrateReplayAnalysis(const QByteArray& oldChecksum,
+                                        const QByteArray& newChecksum) {
     prepare(
         "UPDATE replay_analysis SET replay_checksum = :newChecksum WHERE "
         "replay_checksum = :oldChecksum");
@@ -651,8 +654,8 @@ void Queries::migrateReplayAnalysis(const QByteArray& oldChecksum,
     exec();
 }
 
-void Queries::migrateReplayOverrides(const QByteArray& oldChecksum,
-                                     const QByteArray& newChecksum) {
+void Persistence::migrateReplayOverrides(const QByteArray& oldChecksum,
+                                         const QByteArray& newChecksum) {
     prepare(
         "UPDATE replay_overrides SET replay_checksum = :newChecksum WHERE "
         "replay_checksum = :oldChecksum");
@@ -661,8 +664,8 @@ void Queries::migrateReplayOverrides(const QByteArray& oldChecksum,
     exec();
 }
 
-void Queries::migrateReplayPlayers(const QByteArray& oldChecksum,
-                                   const QByteArray& newChecksum) {
+void Persistence::migrateReplayPlayers(const QByteArray& oldChecksum,
+                                       const QByteArray& newChecksum) {
     prepare(
         "UPDATE replay_players SET replay_checksum = :newChecksum WHERE "
         "replay_checksum = :oldChecksum");
@@ -671,8 +674,8 @@ void Queries::migrateReplayPlayers(const QByteArray& oldChecksum,
     exec();
 }
 
-void Queries::migrateReplayExternalPaths(const QByteArray& oldChecksum,
-                                         const QByteArray& newChecksum) {
+void Persistence::migrateReplayExternalPaths(const QByteArray& oldChecksum,
+                                             const QByteArray& newChecksum) {
     prepare(
         "UPDATE replay_external_paths SET replay_checksum = :newChecksum WHERE "
         "replay_checksum = :oldChecksum");
@@ -681,8 +684,8 @@ void Queries::migrateReplayExternalPaths(const QByteArray& oldChecksum,
     exec();
 }
 
-void Queries::markReplayForRechecksum(const QByteArray& checksum,
-                                      bool rechecksum) {
+void Persistence::markReplayForRechecksum(const QByteArray& checksum,
+                                          bool rechecksum) {
     prepare(
         "UPDATE replays SET rechecksum = :rechecksum WHERE checksum = "
         ":checksum");
@@ -691,7 +694,7 @@ void Queries::markReplayForRechecksum(const QByteArray& checksum,
     exec();
 }
 
-Replay Queries::readReplay() const {
+Replay Persistence::readReplay() const {
     return Replay{
         .checksum = m_query.value(0).toByteArray(),
         .timestamp = QDateTime::fromSecsSinceEpoch(
@@ -707,7 +710,7 @@ Replay Queries::readReplay() const {
     };
 }
 
-void Queries::bootstrapMutationTable(const QList<QString>& values) {
+void Persistence::bootstrapMutationTable(const QList<QString>& values) {
     prepare(
         "CREATE TEMP TABLE IF NOT EXISTS bulk_mutation_tmp "
         "(value TEXT NOT NULL)");
@@ -725,35 +728,35 @@ void Queries::bootstrapMutationTable(const QList<QString>& values) {
     }
 }
 
-void Queries::prepare(const QString& sql) {
+void Persistence::prepare(const QString& sql) {
     if (!m_query.prepare(sql)) {
         throwLast();
     }
 }
 
-void Queries::exec() {
+void Persistence::exec() {
     if (!m_query.exec()) {
         throwLast();
     }
 }
 
-void Queries::execBatch() {
+void Persistence::execBatch() {
     if (!m_query.execBatch()) {
         throwLast();
     }
 }
 
-void Queries::throwLast() const {
+void Persistence::throwLast() const {
     throw StorageException(m_query.lastError().text());
 }
 
-void Queries::throwLastIfFailed() const {
+void Persistence::throwLastIfFailed() const {
     if (m_query.lastError().isValid()) {
         throw StorageException(m_query.lastError().text());
     }
 }
 
-void Queries::nextOrThrow() {
+void Persistence::nextOrThrow() {
     if (!m_query.next()) {
         throw StorageException("expected result row");
     }
