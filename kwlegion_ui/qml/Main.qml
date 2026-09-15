@@ -147,15 +147,6 @@ ApplicationWindow {
                 onConfirmed: Settings.checkForUpdates = true
                 onDismissed: Settings.checkForUpdates = false
             }
-            // SnackbarSpec {
-            //     title: qsTr("Download the latest version of LEGION")
-            //     description: qsTr("A new version of LEGION is available. Do you want to download the new version now?")
-            //     active: true
-            //     onConfirmed: active = false
-            //     onDismissed: active = false
-            // }
-
-
         ]
     }
 }

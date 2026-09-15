@@ -228,7 +228,7 @@ Page {
                 enabled: ReplayStoreModel.selectionCount > 0
                 opacity: enabled ? 1 : 0.4
                 Behavior on opacity {
-                    ShortAnimation {}
+                    ShortOpacityAnimator {}
                 }
 
                 contentItem: TintedIcon {
@@ -250,7 +250,7 @@ Page {
                 enabled: ReplayStoreModel.selectionCount > 0
                 opacity: enabled ? 1 : 0.4
                 Behavior on opacity {
-                    ShortAnimation {}
+                    ShortOpacityAnimator {}
                 }
 
                 contentItem: TintedIcon {
@@ -272,7 +272,7 @@ Page {
                 enabled: ReplayStoreModel.selectionCount > 0
                 opacity: enabled ? 1 : 0.4
                 Behavior on opacity {
-                    ShortAnimation {}
+                    ShortOpacityAnimator {}
                 }
 
                 contentItem: TintedIcon {
@@ -327,16 +327,14 @@ Page {
 
         // Using scale isntead of height because height is a bound property
         add: Transition {
-            ShortAnimation {
-                properties: "opacity"
+            ShortOpacityAnimator {
                 from: 0
                 to: 1
             }
         }
 
         displaced: Transition {
-            ShortAnimation {
-                properties: "y"
+            ShortYAnimator {
                 easing.type: Easing.OutQuad
             }
         }
