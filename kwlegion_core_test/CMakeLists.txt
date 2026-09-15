@@ -23,9 +23,9 @@ target_compile_definitions(kwlegion_core_tests
         REPLAY_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/replays"
 )
 
-# queries.h/exception.h are private headers that live alongside queries.cpp
-# rather than under kwlegion_core's public include/ directory, so the test
-# target needs this path explicitly to exercise Queries directly.
+# exception.h/transaction.h are private headers that live alongside
+# queries.cpp rather than under kwlegion_core's public include/ directory, so
+# the test target needs this path explicitly to exercise them directly.
 #
 # include/kwlegion_core mirrors kwlegion_core's own PRIVATE include dir of
 # the same name (see kwlegion_core/CMakeLists.txt) -- src/ headers like

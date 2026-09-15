@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Muonic
 
 #include <kwlegion_core/inboxitem.h>
+#include <kwlegion_core/queries.h>
 #include <kwlegion_core/replaystore.h>
 #include <legionparser/synopsisparser.h>
 
@@ -13,8 +14,6 @@
 #include <QList>
 #include <QLoggingCategory>
 #include <QObject>
-#include <QSqlError>
-#include <QSqlQuery>
 #include <QStandardPaths>
 #include <QUrl>
 #include <QVariant>
@@ -27,7 +26,6 @@
 #include "exception.h"
 #include "legionparser/exception.h"
 #include "legionparser/replay.h"
-#include "queries.h"
 #include "transaction.h"
 
 Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
@@ -75,10 +73,10 @@ Watermark unmatchableWatermark() {
 }
 }  // namespace
 
-ReplayStore::ReplayStore(QString replayDir, const QString& statePath,
-                         QObject* parent)
+ReplayStore::ReplayStore(Queries& queries, QString replayDir,
+                         const QString& statePath, QObject* parent)
     : QObject(parent),
-      m_dbPath(statePath + "/replays.db"),
+      m_queries(queries),
       m_storageDir(statePath + "/replays"),
       m_replayDir(std::move(replayDir)),
       m_deferred(new Deferred(this)) {
@@ -97,8 +95,7 @@ void ReplayStore::stop() {
 void ReplayStore::saveReplayAs(const QByteArray& checksum, const QUrl& path) {
     // TODO: There is no i/o failure diagnostic here. We need some way of
     // propogating the result back to the ui thread...
-    Queries queries{QSqlQuery(m_db)};
-    if (!queries.selectReplay(checksum)) {
+    if (!m_queries.selectReplay(checksum)) {
         qWarning(logStore) << "Replay " << QLatin1String(checksum.toHex())
                            << " doesn't exist";
     }
@@ -115,9 +112,8 @@ void ReplayStore::saveReplayAs(const QByteArray& checksum, const QUrl& path) {
 
 void ReplayStore::exportReplaysAs(const QList<QByteArray>& checksums,
                                   const QUrl& folderPath) {
-    Queries queries{QSqlQuery(m_db)};
     for (const auto& checksum : checksums) {
-        const auto replay = queries.selectReplay(checksum);
+        const auto replay = m_queries.selectReplay(checksum);
         if (!replay.has_value()) {
             qWarning(logStore) << "Replay " << QLatin1String(checksum.toHex())
                                << " doesn't exist";
@@ -151,10 +147,9 @@ void ReplayStore::setOverrideTitle(const QByteArray& checksum,
                                    const QString& title) {
     try {
         std::optional<Replay> replay;
-        SqlTransactionGuard guard(m_db);
-        Queries queries{QSqlQuery(m_db)};
-        queries.updateOverrideTitle(checksum, title);
-        replay = queries.selectReplay(checksum);
+        auto guard = m_queries.beginTransact();
+        m_queries.updateOverrideTitle(checksum, title);
+        replay = m_queries.selectReplay(checksum);
         guard.commit();
         if (replay.has_value()) {
             emit replaysChanged(QList{replay.value()});
@@ -168,7 +163,6 @@ void ReplayStore::setOverrideTitle(const QByteArray& checksum,
 void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     // Perform initial setup operation on the startup signal
     ensureDirectories();
-    ensureDb();
 
     try {
         performReplayRechecksum();
@@ -202,12 +196,11 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     // Now that we've done all the initial processing we will emit the query
     try {
         // What replays did we know about but seem to no longer exist.
-        Queries queries{QSqlQuery(m_db)};
-        queries.forgetMissingReplays(paths);
-        QList<Replay> replays = queries.selectReplays();
+        m_queries.forgetMissingReplays(paths);
+        QList<Replay> replays = m_queries.selectReplays();
 
         for (Replay& replay : replays) {
-            replay.players = queries.selectReplayPlayers(replay.checksum);
+            replay.players = m_queries.selectReplayPlayers(replay.checksum);
         }
 
         emit replaysLoaded(replays);
@@ -221,13 +214,12 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
 }
 
 void ReplayStore::performReplayReanalysis() {
-    Queries queries{QSqlQuery(m_db)};
-    const auto needsAnalysis = queries.selectReplaysNeedingAnalysis();
+    const auto needsAnalysis = m_queries.selectReplaysNeedingAnalysis();
 
     for (const auto& checksum : needsAnalysis) {
         const QString internalPath = computeIngestionPath(checksum);
         qDebug(logStore) << "Reanalyzing replay at: " << internalPath;
-        SqlTransactionGuard guard(m_db);
+        auto guard = m_queries.beginTransact();
 
         QFile replayFile(internalPath);
         if (!replayFile.open(QIODevice::ReadOnly)) {
@@ -240,8 +232,8 @@ void ReplayStore::performReplayReanalysis() {
         try {
             const auto synopsis =
                 LegionParser::SynopsisParser::parse(replayFile);
-            queries.insertReplayPlayers(synopsis.checksum, synopsis.players);
-            queries.insertReplayAnalysis(synopsis);
+            m_queries.insertReplayPlayers(synopsis.checksum, synopsis.players);
+            m_queries.insertReplayAnalysis(synopsis);
             qDebug(logStore)
                 << "Completed re-analysis of: " << synopsis.checksum.toHex();
             guard.commit();
@@ -255,7 +247,7 @@ void ReplayStore::performReplayReanalysis() {
                 << internalPath;
         }
 
-        const std::optional<Replay> replay = queries.selectReplay(checksum);
+        const std::optional<Replay> replay = m_queries.selectReplay(checksum);
         if (!replay.has_value()) {
             qWarning(logStore) << "Replay disappeared during reanalysis path: "
                                << QString(checksum.toHex());
@@ -265,9 +257,8 @@ void ReplayStore::performReplayReanalysis() {
 }
 
 void ReplayStore::performReplayRechecksum() {
-    Queries queries{QSqlQuery(m_db)};
     const QList<QByteArray> needRechecksum =
-        queries.selectReplaysNeedingRechecksum();
+        m_queries.selectReplaysNeedingRechecksum();
 
     for (const auto& checksum : needRechecksum) {
         const QString internalPath = computeIngestionPath(checksum);
@@ -288,31 +279,31 @@ void ReplayStore::performReplayRechecksum() {
                                    << internalPath;
                 // Now that we have found a replay where the checksum doesn't
                 // match we need to repair it. We will do this by the following
-                SqlTransactionGuard transaction(m_db);
+                auto transaction = m_queries.beginTransact();
 
                 const std::optional<Replay> existing =
-                    queries.selectReplay(synopsis.checksum);
+                    m_queries.selectReplay(synopsis.checksum);
                 // The replay was also imported under its correct checksum, we
                 // can delete the replay
                 if (existing.has_value()) {
                     qInfo(logStore) << "Drift file exists under a different "
                                        "checksum, deletting: "
                                     << internalPath;
-                    deleteDuplicateReplayChecksum(transaction, queries,
+                    deleteDuplicateReplayChecksum(transaction, m_queries,
                                                   checksum);
                 } else {
                     qInfo(logStore)
                         << "Drift file exists will be migrated to its new "
                            "checksum: "
                         << internalPath << " -> " << synopsis.checksum.toHex();
-                    migrateReplayChecksum(transaction, queries, checksum,
+                    migrateReplayChecksum(transaction, m_queries, checksum,
                                           synopsis);
-                    queries.markReplayForRechecksum(synopsis.checksum, false);
+                    m_queries.markReplayForRechecksum(synopsis.checksum, false);
                 }
 
                 transaction.commit();
             } else {
-                queries.markReplayForRechecksum(checksum, false);
+                m_queries.markReplayForRechecksum(checksum, false);
             }
         } catch (LegionParser::ReplayParseException& ex) {
             qCritical(logStore)
@@ -508,17 +499,16 @@ void ReplayStore::toggleReplayExposed(const QByteArray& checksum) {
     // external paths We are going to do this whole thing in a transaction so
     // nothing else changes underneath us
     try {
-        SqlTransactionGuard tx(m_db);
-        Queries queries{QSqlQuery(m_db)};
+        auto tx = m_queries.beginTransact();
 
-        const std::optional<Replay> replay = queries.selectReplay(checksum);
+        const std::optional<Replay> replay = m_queries.selectReplay(checksum);
         if (!replay.has_value()) {
             qWarning(logStore) << "cannot toggle exposed for unknown replay "
                                << QLatin1String(checksum.toHex());
             return;
         }
         if (replay->hasExternalPath) {
-            hideReplay(queries, checksum);
+            hideReplay(m_queries, checksum);
         } else {
             exposeReplay(checksum);
         }
@@ -545,8 +535,7 @@ void ReplayStore::ensureReplayExposed(const QByteArray& checksum) {
 void ReplayStore::ensureReplayHidden(const QByteArray& checksum) {
     qInfo(logStore) << "ensureReplayHidden " << QLatin1String(checksum.toHex());
     try {
-        Queries queries{QSqlQuery(m_db)};
-        hideReplay(queries, checksum);
+        hideReplay(m_queries, checksum);
     } catch (std::runtime_error& ex) {
         qCritical(logStore) << "failed to hide: " << ex.what();
     }
@@ -556,8 +545,7 @@ void ReplayStore::exposeReplay(const QByteArray& checksum) {
     if (!QDir(m_replayDir).mkpath("managed")) {
         throw StorageException("failed to create managed/ replay folder");
     }
-    Queries queries{QSqlQuery(m_db)};
-    const auto replay = queries.selectReplay(checksum);
+    const auto replay = m_queries.selectReplay(checksum);
     if (!replay) {
         qWarning(logStore) << "Replay " << QLatin1String(checksum.toHex())
                            << " doesn't exist";
@@ -595,11 +583,10 @@ void ReplayStore::hideReplay(Queries& queries, const QByteArray& checksum) {
 
 std::optional<ReplayAnalysisTarget> ReplayStore::lookupReplay(
     const QByteArray& checksum) const {
-    Queries queries{QSqlQuery{m_db}};
     try {
-        std::optional<Replay> replay = queries.selectReplay(checksum);
+        std::optional<Replay> replay = m_queries.selectReplay(checksum);
         if (replay) {
-            replay->players = queries.selectReplayPlayers(checksum);
+            replay->players = m_queries.selectReplayPlayers(checksum);
             QString path = computeIngestionPath(checksum);
             return ReplayAnalysisTarget{.path = std::move(path),
                                         .replay = std::move(*replay)};
@@ -651,14 +638,13 @@ void ReplayStore::performReplaySynopsis(const QString& path) {
 
 QList<QByteArray> ReplayStore::ingestReplay(
     QFile& file, const LegionParser::ReplaySynopsis& metadata) {
-    SqlTransactionGuard tx(m_db);
-    Queries queries{QSqlQuery(m_db)};
+    auto tx = m_queries.beginTransact();
 
     QList<QByteArray> checksums;
-    if (queries.isReplayKnown(metadata.checksum)) {
-        checksums = ingestKnownReplay(queries, file, metadata);
+    if (m_queries.isReplayKnown(metadata.checksum)) {
+        checksums = ingestKnownReplay(m_queries, file, metadata);
     } else {
-        checksums = ingestUnknownReplay(queries, file, metadata);
+        checksums = ingestUnknownReplay(m_queries, file, metadata);
     }
 
     tx.commit();
@@ -729,19 +715,18 @@ void ReplayStore::forwardChangedReplays(const QList<QByteArray>& checksums) {
     if (m_initialSweep.isActive()) {
         return;
     }
-    Queries queries{QSqlQuery(m_db)};
 
     QList<Replay> replays;
     replays.reserve(checksums.size());
     for (const auto& checksum : checksums) {
-        std::optional<Replay> replay = queries.selectReplay(checksum);
+        std::optional<Replay> replay = m_queries.selectReplay(checksum);
         if (!replay.has_value()) {
             qWarning(logStore)
                 << "Replay with checksum: " << checksum.toHex()
                 << " disappeared before it could be emitted as updated";
         } else {
             Replay r = replay.value();
-            r.players = queries.selectReplayPlayers(r.checksum);
+            r.players = m_queries.selectReplayPlayers(r.checksum);
             replays.append(r);
         }
     }
@@ -762,38 +747,12 @@ QString ReplayStore::computeIngestionPath(const QByteArray& checksum) const {
 }
 
 std::optional<QByteArray> ReplayStore::removeReplayAtPath(const QString& path) {
-    SqlTransactionGuard tx(m_db);
-    Queries queries{QSqlQuery(m_db)};
+    auto tx = m_queries.beginTransact();
 
-    std::optional result = queries.removeExternalFilename(path);
+    std::optional result = m_queries.removeExternalFilename(path);
 
     tx.commit();
     return result;
-}
-
-void ReplayStore::ensureDb() {
-    if (m_db.isOpen()) {
-        return;
-    }
-
-    m_db = QSqlDatabase::addDatabase("QSQLITE", "kwlegion_store");
-    m_db.setDatabaseName(m_dbPath);
-    m_db.setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000"));
-    if (!m_db.open()) {
-        qCCritical(logStore)
-            << "Failed to open database: " << m_db.lastError().text();
-        return;
-    }
-
-    // TODO: Do we need some kind of internally broken structure?
-    try {
-        // Outside a transaction so that we do as much as we can
-        // if we ever ship a broken migration this means there is less to do
-        Queries queries{QSqlQuery(m_db)};
-        queries.migrate();
-    } catch (const StorageException& ex) {
-        qCritical(logStore) << "Failed to migrate database: " << ex.what();
-    }
 }
 
 void ReplayStore::ensureDirectories() {

@@ -5,6 +5,7 @@
 #include <kwlegion_core/ingestionmodel.h>
 #include <kwlegion_core/metatypes.h>
 #include <kwlegion_core/prospector.h>
+#include <kwlegion_core/queries.h>
 #include <kwlegion_core/replaystore.h>
 #include <kwlegion_core/replaystoremodel.h>
 #include <kwlegion_core/settings.h>
@@ -22,6 +23,7 @@
 #include <QObject>
 #include <QQmlApplicationEngine>
 #include <QQmlError>
+#include <QStandardPaths>
 #include <QTextStream>
 #include <QThread>
 #include <QUrl>
@@ -126,9 +128,15 @@ int main(int argc, char* argv[]) {
     // replays discovered as fast as possible so just one thread here
     QThread ioThread;
 
+    const QString statePath =
+        QStandardPaths::writableLocation(QStandardPaths::StateLocation);
+    Queries queries(statePath + "/replays.db", "kwlegion_store");
+    queries.moveToThread(&ioThread);
+
     ReplayProspector replayProspector;
     replayProspector.moveToThread(&ioThread);
-    ReplayStore replayStore(ReplayProspector::defaultReplayDirectory());
+    ReplayStore replayStore(queries, ReplayProspector::defaultReplayDirectory(),
+                            statePath);
     replayStore.moveToThread(&ioThread);
     ReplayAnalyzer replayAnalyzer(replayStore);
     replayAnalyzer.moveToThread(&ioThread);
@@ -136,6 +144,10 @@ int main(int argc, char* argv[]) {
     QObject::connect(&ioThread, &QThread::finished, &replayStore,
                      &ReplayStore::stop);
 
+    // Connected ahead of initialSweep: QThread::started's direct connections
+    // run synchronously in connection order, so this guarantees the schema
+    // exists before the prospector's results ever reach ReplayStore.
+    QObject::connect(&ioThread, &QThread::started, &queries, &Queries::init);
     QObject::connect(&ioThread, &QThread::started, &replayProspector,
                      &ReplayProspector::initialSweep);
     QObject::connect(&replayProspector,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Muonic
 
-#include "queries.h"
+#include <kwlegion_core/queries.h>
 
 #include <QHashFunctions>
 #include <QList>
@@ -13,14 +13,55 @@
 #include <array>
 #include <cstddef>
 #include <optional>
+#include <utility>
 
 #include "exception.h"
 #include "legionparser/replay.h"
 #include "replay.h"
+#include "transaction.h"
 
 namespace KWLegionCore {
 
 Q_LOGGING_CATEGORY(logQueries, "kwlegion.queries");
+
+Queries::Queries(QString dbPath, QString connectionName, QObject* parent)
+    : QObject(parent),
+      m_dbPath(std::move(dbPath)),
+      m_connectionName(std::move(connectionName)) {}
+
+void Queries::init() {
+    if (m_db.isOpen()) {
+        return;
+    }
+
+    m_db = QSqlDatabase::addDatabase("QSQLITE", m_connectionName);
+    m_db.setDatabaseName(m_dbPath);
+    m_db.setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=5000"));
+    if (!m_db.open()) {
+        qCCritical(logQueries)
+            << "Failed to open database: " << m_db.lastError().text();
+        return;
+    }
+    m_query = QSqlQuery(m_db);
+
+    try {
+        // Outside a transaction so that we do as much as we can - if we ever
+        // ship a broken migration this means there is less to do.
+        migrate();
+    } catch (const StorageException& ex) {
+        qCritical(logQueries) << "Failed to migrate database: " << ex.what();
+    }
+}
+
+SqlTransactionGuard Queries::beginTransact() {
+    return SqlTransactionGuard(m_db);
+}
+
+void Queries::close() {
+    m_query = QSqlQuery();
+    m_db.close();
+    m_db = QSqlDatabase();
+}
 
 // NOTE: It is a pattern that we handle forcing re-analysis of a replay by
 // deleting the relevant information

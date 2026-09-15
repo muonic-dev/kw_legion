@@ -12,22 +12,29 @@
 #include <QDateTime>
 #include <QList>
 #include <QLoggingCategory>
+#include <QObject>
+#include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QString>
 #include <optional>
-#include <utility>
 
 namespace KWLegionCore {
 
 Q_DECLARE_LOGGING_CATEGORY(logQueries);
 
-// Helper utility class for dispatching queries. Kept alongside MIGRATIONS so
-// the DDL and the statements that reference it stay adjacent.
-class Queries final {
-   public:
-    explicit Queries(QSqlQuery&& query) : m_query(std::move(query)) {}
+class SqlTransactionGuard;
 
-    ~Queries() = default;
+// Owns the sqlite connection and dispatches queries against it. Kept
+// alongside MIGRATIONS so the DDL and the statements that reference it stay
+// adjacent.
+class Queries final : public QObject {
+    Q_OBJECT
+
+   public:
+    explicit Queries(QString dbPath, QString connectionName,
+                     QObject* parent = nullptr);
+
+    ~Queries() override = default;
 
     Queries(const Queries&) = delete;
     Queries(Queries&&) = delete;
@@ -35,8 +42,23 @@ class Queries final {
     Queries& operator=(const Queries&) = delete;
     Queries& operator=(Queries&&) = delete;
 
+    // Opens the database connection and runs any pending migrations. Wire
+    // this to the owning thread's QThread::started (connected ahead of
+    // anything that depends on the schema existing, since started's direct
+    // connections run synchronously in connection order).
+    void init();
+
     // Runs any pending migrations. Throws StorageException on failure.
     void migrate();
+
+    // Releases the query and closes the underlying connection. Callers that
+    // need to remove the connection (e.g. QSqlDatabase::removeDatabase() in
+    // tests) must call this first - otherwise this object's own handle keeps
+    // it open and removeDatabase() just warns instead of doing anything.
+    void close();
+
+    // Begin a transaction against this connection.
+    [[nodiscard]] SqlTransactionGuard beginTransact();
 
     bool isReplayKnown(const QByteArray& checksum);
 
@@ -136,6 +158,9 @@ class Queries final {
 
     [[nodiscard]] Replay readReplay() const;
 
+    QString m_dbPath;
+    QString m_connectionName;
+    QSqlDatabase m_db;
     QSqlQuery m_query;
 };
 

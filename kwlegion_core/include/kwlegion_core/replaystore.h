@@ -13,7 +13,6 @@
 #include <QLoggingCategory>
 #include <QObject>
 #include <QSet>
-#include <QSqlDatabase>
 #include <QStandardPaths>
 #include <QString>
 #include <QTimer>
@@ -85,7 +84,7 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
      */
 
    public:
-    ReplayStore(QString replayDir,
+    ReplayStore(Queries& queries, QString replayDir,
                 const QString& statePath = QStandardPaths::writableLocation(
                     QStandardPaths::StateLocation),
                 QObject* parent = nullptr);
@@ -170,7 +169,6 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
     void inboxItemRemoved(const QString& path);
 
    private:
-    void ensureDb();
     void ensureDirectories();
 
     // Perform the actual replay synopsis
@@ -269,9 +267,8 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
     // Allow suppressing the emission on the initial sweeep
     ActionScope m_initialSweep;
 
-    QSqlDatabase m_db;
-    // Path of the sqlite database
-    QString m_dbPath;
+    // Owns the sqlite connection; not owned by ReplayStore.
+    Queries& m_queries;
     // Path of the internal replay storage
     QString m_storageDir;
     // Path to the Documents\Command &...\Replays dir
