@@ -89,6 +89,9 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
                     QStandardPaths::StateLocation),
                 QObject* parent = nullptr);
 
+    // Perform startup activities
+    void init();
+
     /**
      * The initial paths that exist in the replay folder
      *

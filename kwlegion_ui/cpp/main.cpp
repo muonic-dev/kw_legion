@@ -154,6 +154,9 @@ int main(int argc, char* argv[]) {
     // exists before the prospector's results ever reach ReplayStore.
     QObject::connect(&ioThread, &QThread::started, &persistence,
                      &Persistence::init);
+    // Must fire before initialSweep to make sure directories are initialized
+    QObject::connect(&ioThread, &QThread::started, &replayStore,
+                     &ReplayStore::init);
     QObject::connect(&ioThread, &QThread::started, &replayProspector,
                      &ReplayProspector::initialSweep);
     QObject::connect(&replayProspector,

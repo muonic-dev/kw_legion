@@ -86,6 +86,11 @@ ReplayStore::ReplayStore(Persistence& persistence, QString replayDir,
                      &ReplayStore::synopsizeReplayFile);
 }
 
+void ReplayStore::init() {
+    // Perform initial setup operation on the startup signal
+    ensureDirectories();
+}
+
 void ReplayStore::stop() {
     // Silence a warning about stopping the time
     // Trigger from stopping on the thread
@@ -161,9 +166,6 @@ void ReplayStore::setOverrideTitle(const QByteArray& checksum,
 }
 
 void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
-    // Perform initial setup operation on the startup signal
-    ensureDirectories();
-
     try {
         performReplayRechecksum();
     } catch (StorageException& ex) {
