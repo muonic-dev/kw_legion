@@ -2,10 +2,12 @@
 // Copyright (C) 2026 Muonic
 
 #include <kwlegion_core/appinfo.h>
+#include <kwlegion_core/autostart.h>
 #include <kwlegion_core/ingestionmodel.h>
 #include <kwlegion_core/metatypes.h>
-#include <kwlegion_core/prospector.h>
 #include <kwlegion_core/persistence.h>
+#include <kwlegion_core/prospector.h>
+#include <kwlegion_core/replayanalyzer.h>
 #include <kwlegion_core/replaystore.h>
 #include <kwlegion_core/replaystoremodel.h>
 #include <kwlegion_core/settings.h>
@@ -31,18 +33,21 @@
 #include <QWindow>
 #include <Qt>
 #include <QtLogging>
-#include <cstdio>
+#include <functional>
+#include <optional>
 
-#include "kwlegion_core/autostart.h"
 #include "logrotator.h"
 #include "singleinstanceguard.h"
 
 namespace {
 
+using QtMessageTrampoline =
+    std::function<void(QtMsgType, const QMessageLogContext&, const QString&)>;
+
 // Adapt to the Qt log handler
-std::optional<
-    std::function<void(QtMsgType, const QMessageLogContext&, const QString&)>>
-    messageTrampoline;
+// This needs to be non-const since we are interacting with qts specific api
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+std::optional<QtMessageTrampoline> messageTrampoline;
 
 void logMessageHandler(QtMsgType type, const QMessageLogContext& context,
                        const QString& msg) {
