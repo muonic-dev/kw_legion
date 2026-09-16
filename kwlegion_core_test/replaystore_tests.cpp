@@ -44,6 +44,7 @@ TEST_CASE(
     QSignalSpy loadedSpy(&store, &ReplayStore::replaysLoaded);
 
     // Nothing is on disk yet
+    store.init();
     store.receiveInitialReplayPaths({});
 
     REQUIRE(loadedSpy.count() == 1);
@@ -72,6 +73,7 @@ TEST_CASE(
 
     // replayPath truthfully exists on disk at this point, so it belongs in
     // the startup listing.
+    store.init();
     store.receiveInitialReplayPaths({replayPath});
 
     REQUIRE(loadedSpy.count() == 1);
@@ -104,6 +106,7 @@ TEST_CASE(
                                 "replaystore_reopen_first");
         persistence.init();
         ReplayStore store(persistence, tempDir.path(), tempDir.path());
+        store.init();
         QSignalSpy loadedSpy(&store, &ReplayStore::replaysLoaded);
         store.receiveInitialReplayPaths({replayPath});
 
@@ -123,6 +126,7 @@ TEST_CASE(
                             "replaystore_reopen_second");
     persistence.init();
     ReplayStore store(persistence, tempDir.path(), tempDir.path());
+    store.init();
     QSignalSpy loadedSpy(&store, &ReplayStore::replaysLoaded);
     store.receiveInitialReplayPaths({replayPath});
 
@@ -143,6 +147,7 @@ TEST_CASE("ReplayStore ingests a replay reported live via synopsizeReplayFile",
                             "replaystore_live_ingest");
     persistence.init();
     ReplayStore store(persistence, tempDir.path(), tempDir.path());
+    store.init();
     // Nothing is on disk yet at startup - the replay "arrives" afterward.
     store.receiveInitialReplayPaths({});
 
@@ -172,6 +177,7 @@ TEST_CASE("ReplayStore ignores a corrupt file that was never tracked",
                             "replaystore_corrupt_file");
     persistence.init();
     ReplayStore store(persistence, tempDir.path(), tempDir.path());
+    store.init();
     store.receiveInitialReplayPaths({});
 
     const QString corruptPath = root.filePath("garbage.KWReplay");
@@ -198,6 +204,7 @@ TEST_CASE(
                             "replaystore_remove_link_known");
     persistence.init();
     ReplayStore store(persistence, tempDir.path(), tempDir.path());
+    store.init();
     store.receiveInitialReplayPaths({});
 
     const QString replayPath =
@@ -225,6 +232,7 @@ TEST_CASE(
                             "replaystore_remove_link_untracked");
     persistence.init();
     ReplayStore store(persistence, tempDir.path(), tempDir.path());
+    store.init();
     store.receiveInitialReplayPaths({});
 
     QSignalSpy changedSpy(&store, &ReplayStore::replaysChanged);
