@@ -10,6 +10,7 @@
 #include <QObject>
 #include <QString>
 #include <QTimer>
+#include <QtTypes>
 
 namespace KWLegionCore {
 

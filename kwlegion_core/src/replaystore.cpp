@@ -4,6 +4,8 @@
 #include <kwlegion_core/inboxitem.h>
 #include <kwlegion_core/persistence.h>
 #include <kwlegion_core/replaystore.h>
+#include <legionparser/exception.h>
+#include <legionparser/replay.h>
 #include <legionparser/synopsisparser.h>
 
 #include <QDateTime>
@@ -21,13 +23,13 @@
 #include <QtLogging>
 #include <algorithm>
 #include <optional>
+#include <ranges>
 #include <stdexcept>
 #include <utility>
 
 #include "deferred.h"
 #include "exception.h"
-#include "legionparser/exception.h"
-#include "legionparser/replay.h"
+#include "externalreplayfile.h"
 #include "queries.h"
 #include "transaction.h"
 

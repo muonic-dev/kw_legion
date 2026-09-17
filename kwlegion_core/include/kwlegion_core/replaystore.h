@@ -238,7 +238,7 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
     // Ingest a known replay
     // This may insert aot replay analysis such as the body offset if it hasn't
     // been done yet
-    QList<QByteArray> ingestKnownReplay(
+    static QList<QByteArray> ingestKnownReplay(
         Persistence& persistence, QFile& file, const QFileInfo& pathInfo,
         const LegionParser::ReplaySynopsis& synopsis);
 

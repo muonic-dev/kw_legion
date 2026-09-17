@@ -4,23 +4,26 @@
 #include "queries.h"
 
 #include <kwlegion_core/persistence.h>
+#include <legionparser/replay.h>
+#include <qassert.h>
 
+#include <QDateTime>
 #include <QHashFunctions>
 #include <QList>
 #include <QLoggingCategory>
+#include <QSqlDatabase>
 #include <QSqlError>
 #include <QTimeZone>
 #include <QVariantList>
 #include <QtLogging>
+#include <QtTypes>
 #include <array>
 #include <cstddef>
 #include <optional>
-#include <utility>
 
 #include "exception.h"
-#include "legionparser/replay.h"
+#include "externalreplayfile.h"
 #include "replay.h"
-#include "transaction.h"
 
 namespace KWLegionCore {
 
