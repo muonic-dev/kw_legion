@@ -5,6 +5,7 @@ add_executable(kwlegion_core_tests
     deferred_tests.cpp
     prospector_tests.cpp
     persistence_tests.cpp
+    queries_tests.cpp
     replayfilterquery_tests.cpp
     replayfilterqueryparser_tests.cpp
     replaystore_tests.cpp

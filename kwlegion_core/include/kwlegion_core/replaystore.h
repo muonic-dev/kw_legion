@@ -8,6 +8,7 @@
 #include <legionparser/replay.h>
 
 #include <QDir>
+#include <QFileInfo>
 #include <QHash>
 #include <QList>
 #include <QLoggingCategory>
@@ -181,7 +182,9 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
     // from the prospector (synopsizeReplayFile)
     // But we also want an entrypoint for the deferred retry logic
     // that will share the logic
-    void performReplaySynopsis(const QString& path);
+    // Reuse one cached metadata snapshot throughout an ingestion attempt.
+    void synopsizeReplayFileInfo(const QFileInfo& pathInfo);
+    void performReplaySynopsis(const QFileInfo& pathInfo);
 
     void performReplayReanalysis();
 
@@ -229,17 +232,18 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
     // Returns the checksums that were impacted by the ingestion
     // This is guaranteed to contain metadata.checksum
     QList<QByteArray> ingestReplay(
-        QFile& file, const LegionParser::ReplaySynopsis& synopsis);
+        QFile& file, const QFileInfo& pathInfo,
+        const LegionParser::ReplaySynopsis& synopsis);
 
     // Ingest a known replay
     // This may insert aot replay analysis such as the body offset if it hasn't
     // been done yet
     QList<QByteArray> ingestKnownReplay(
-        Persistence& persistence, QFile& file,
+        Persistence& persistence, QFile& file, const QFileInfo& pathInfo,
         const LegionParser::ReplaySynopsis& synopsis);
 
     QList<QByteArray> ingestUnknownReplay(
-        Persistence& persistence, QFile& file,
+        Persistence& persistence, QFile& file, const QFileInfo& pathInfo,
         const LegionParser::ReplaySynopsis& synopsis);
 
     // The replay file at the path is gone or otherwise corrupt so we should

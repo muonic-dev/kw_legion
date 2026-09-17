@@ -9,6 +9,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QDir>
+#include <QFileInfo>
 #include <QHashFunctions>
 #include <QLatin1StringView>
 #include <QList>
@@ -18,6 +19,7 @@
 #include <QUrl>
 #include <QVariant>
 #include <QtLogging>
+#include <algorithm>
 #include <optional>
 #include <stdexcept>
 #include <utility>
@@ -26,6 +28,7 @@
 #include "exception.h"
 #include "legionparser/exception.h"
 #include "legionparser/replay.h"
+#include "queries.h"
 #include "transaction.h"
 
 Q_LOGGING_CATEGORY(logStore, "kwlegion.store");
@@ -100,7 +103,7 @@ void ReplayStore::stop() {
 void ReplayStore::saveReplayAs(const QByteArray& checksum, const QUrl& path) {
     // TODO: There is no i/o failure diagnostic here. We need some way of
     // propogating the result back to the ui thread...
-    if (!m_persistence.selectReplay(checksum)) {
+    if (!Queries::get(m_persistence).selectReplay(checksum)) {
         qWarning(logStore) << "Replay " << QLatin1String(checksum.toHex())
                            << " doesn't exist";
     }
@@ -118,7 +121,7 @@ void ReplayStore::saveReplayAs(const QByteArray& checksum, const QUrl& path) {
 void ReplayStore::exportReplaysAs(const QList<QByteArray>& checksums,
                                   const QUrl& folderPath) {
     for (const auto& checksum : checksums) {
-        const auto replay = m_persistence.selectReplay(checksum);
+        const auto replay = Queries::get(m_persistence).selectReplay(checksum);
         if (!replay.has_value()) {
             qWarning(logStore) << "Replay " << QLatin1String(checksum.toHex())
                                << " doesn't exist";
@@ -148,13 +151,14 @@ void ReplayStore::exportReplaysAs(const QList<QByteArray>& checksums,
 void ReplayStore::clearOverrideTitle(const QByteArray& checksum) {
     setOverrideTitle(checksum, QStringLiteral(""));
 }
+
 void ReplayStore::setOverrideTitle(const QByteArray& checksum,
                                    const QString& title) {
     try {
         std::optional<Replay> replay;
         auto guard = m_persistence.beginTransact();
-        m_persistence.updateOverrideTitle(checksum, title);
-        replay = m_persistence.selectReplay(checksum);
+        Queries::get(m_persistence).updateOverrideTitle(checksum, title);
+        replay = Queries::get(m_persistence).selectReplay(checksum);
         guard.commit();
         if (replay.has_value()) {
             emit replaysChanged(QList{replay.value()});
@@ -184,25 +188,45 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     // it from the paths we actually find.
     emit inboxReset();
 
-    // Bracket synopsizeReplayFile so that we don't constantly emit the
-    // individual load action
-    const auto guard = m_initialSweep.enter();
-    // Ingest every path that we have
-    for (const auto& path : paths) {
-        // TODO: Maybe we can avoid making this a ton of transactions
-        // We ignore the return value here because its the initial startup.
-        // We're emitting everythign at the end
-        synopsizeReplayFile(path);
-    }
-
-    // Now that we've done all the initial processing we will emit the query
     try {
+        // Lets start be selecting all known external replays
+        QList<ExternalReplayFile> knownExternalReplays =
+            Queries::get(m_persistence).selectKnownExternalReplayFiles();
+
+        // Bracket synopsizeReplayFile so that we don't constantly emit the
+        // individual load action
+        const auto guard = m_initialSweep.enter();
+        // Ingest every path that we have
+        for (const auto& path : paths) {
+            QFileInfo pathInfo{path};
+
+            const auto match = std::ranges::find_if(
+                knownExternalReplays,
+                [&path, &pathInfo](const ExternalReplayFile& erf) {
+                    return erf.externalPath == path &&
+                           erf.mtime == pathInfo.lastModified(QTimeZone::UTC) &&
+                           erf.fileSize == pathInfo.size();
+                });
+            // Fast path optimization, we already have seen this with same mtime
+            // and size so skip it
+            if (match != std::ranges::end(knownExternalReplays)) {
+                continue;
+            }
+
+            // TODO: Maybe we can avoid making this a ton of transactions
+            // We ignore the return value here because its the initial startup.
+            // We're emitting everythign at the end
+            synopsizeReplayFileInfo(pathInfo);
+        }
+
+        // Now that we've done all the initial processing we will emit the query
         // What replays did we know about but seem to no longer exist.
-        m_persistence.forgetMissingReplays(paths);
-        QList<Replay> replays = m_persistence.selectReplays();
+        Queries::get(m_persistence).forgetMissingReplays(paths);
+        QList<Replay> replays = Queries::get(m_persistence).selectReplays();
 
         for (Replay& replay : replays) {
-            replay.players = m_persistence.selectReplayPlayers(replay.checksum);
+            replay.players = Queries::get(m_persistence)
+                                 .selectReplayPlayers(replay.checksum);
         }
 
         emit replaysLoaded(replays);
@@ -216,7 +240,8 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
 }
 
 void ReplayStore::performReplayReanalysis() {
-    const auto needsAnalysis = m_persistence.selectReplaysNeedingAnalysis();
+    const auto needsAnalysis =
+        Queries::get(m_persistence).selectReplaysNeedingAnalysis();
 
     for (const auto& checksum : needsAnalysis) {
         const QString internalPath = computeIngestionPath(checksum);
@@ -234,9 +259,9 @@ void ReplayStore::performReplayReanalysis() {
         try {
             const auto synopsis =
                 LegionParser::SynopsisParser::parse(replayFile);
-            m_persistence.insertReplayPlayers(synopsis.checksum,
-                                              synopsis.players);
-            m_persistence.insertReplayAnalysis(synopsis);
+            Queries::get(m_persistence)
+                .insertReplayPlayers(synopsis.checksum, synopsis.players);
+            Queries::get(m_persistence).insertReplayAnalysis(synopsis);
             qDebug(logStore)
                 << "Completed re-analysis of: " << synopsis.checksum.toHex();
             guard.commit();
@@ -251,7 +276,7 @@ void ReplayStore::performReplayReanalysis() {
         }
 
         const std::optional<Replay> replay =
-            m_persistence.selectReplay(checksum);
+            Queries::get(m_persistence).selectReplay(checksum);
         if (!replay.has_value()) {
             qWarning(logStore) << "Replay disappeared during reanalysis path: "
                                << QString(checksum.toHex());
@@ -262,7 +287,7 @@ void ReplayStore::performReplayReanalysis() {
 
 void ReplayStore::performReplayRechecksum() {
     const QList<QByteArray> needRechecksum =
-        m_persistence.selectReplaysNeedingRechecksum();
+        Queries::get(m_persistence).selectReplaysNeedingRechecksum();
 
     for (const auto& checksum : needRechecksum) {
         const QString internalPath = computeIngestionPath(checksum);
@@ -286,7 +311,7 @@ void ReplayStore::performReplayRechecksum() {
                 auto transaction = m_persistence.beginTransact();
 
                 const std::optional<Replay> existing =
-                    m_persistence.selectReplay(synopsis.checksum);
+                    Queries::get(m_persistence).selectReplay(synopsis.checksum);
                 // The replay was also imported under its correct checksum, we
                 // can delete the replay
                 if (existing.has_value()) {
@@ -302,13 +327,14 @@ void ReplayStore::performReplayRechecksum() {
                         << internalPath << " -> " << synopsis.checksum.toHex();
                     migrateReplayChecksum(transaction, m_persistence, checksum,
                                           synopsis);
-                    m_persistence.markReplayForRechecksum(synopsis.checksum,
-                                                          false);
+                    Queries::get(m_persistence)
+                        .markReplayForRechecksum(synopsis.checksum, false);
                 }
 
                 transaction.commit();
             } else {
-                m_persistence.markReplayForRechecksum(checksum, false);
+                Queries::get(m_persistence)
+                    .markReplayForRechecksum(checksum, false);
             }
         } catch (LegionParser::ReplayParseException& ex) {
             qCritical(logStore)
@@ -326,11 +352,11 @@ void ReplayStore::deleteDuplicateReplayChecksum(
     // This leaves the replay file orphaned under its name in the State
     // directory That's probably ok since it means we will have a chance to
     // recover it if we need to
-    persistence.deleteReplay(checksum);
-    persistence.deleteReplayAnalysis(checksum);
-    persistence.deleteReplayOverrides(checksum);
-    persistence.deleteReplayPlayers(checksum);
-    persistence.deleteReplayExternalPaths(checksum);
+    Queries::get(persistence).deleteReplay(checksum);
+    Queries::get(persistence).deleteReplayAnalysis(checksum);
+    Queries::get(persistence).deleteReplayOverrides(checksum);
+    Queries::get(persistence).deleteReplayPlayers(checksum);
+    Queries::get(persistence).deleteReplayExternalPaths(checksum);
 }
 
 void ReplayStore::migrateReplayChecksum(
@@ -353,12 +379,16 @@ void ReplayStore::migrateReplayChecksum(
         }
     }
     // Implementation of migrating a replay to its correct checksum
-    persistence.migrateReplayChecksum(originalChecksum, newSynopsis.checksum);
-    persistence.migrateReplayAnalysis(originalChecksum, newSynopsis.checksum);
-    persistence.migrateReplayOverrides(originalChecksum, newSynopsis.checksum);
-    persistence.migrateReplayPlayers(originalChecksum, newSynopsis.checksum);
-    persistence.migrateReplayExternalPaths(originalChecksum,
-                                           newSynopsis.checksum);
+    Queries::get(persistence)
+        .migrateReplayChecksum(originalChecksum, newSynopsis.checksum);
+    Queries::get(persistence)
+        .migrateReplayAnalysis(originalChecksum, newSynopsis.checksum);
+    Queries::get(persistence)
+        .migrateReplayOverrides(originalChecksum, newSynopsis.checksum);
+    Queries::get(persistence)
+        .migrateReplayPlayers(originalChecksum, newSynopsis.checksum);
+    Queries::get(persistence)
+        .migrateReplayExternalPaths(originalChecksum, newSynopsis.checksum);
 
     if (!QFile::remove(originalPath)) {
         qWarning(logStore) << "Failed to remove original replay file: "
@@ -376,13 +406,23 @@ void ReplayStore::removeReplayFile(const QString& path) {
 }
 
 void ReplayStore::synopsizeReplayFile(const QString& path) {
+    const QFileInfo pathInfo(path);
+    synopsizeReplayFileInfo(pathInfo);
+}
+
+void ReplayStore::synopsizeReplayFileInfo(const QFileInfo& pathInfo) {
+    const QString path = pathInfo.filePath();
     // We were waiting but also a file notification happened
     m_deferred->removeWaitForChange(path);
 
     // Sampled before the parse attempt deliberately: if the file grows while
     // we are reading it, a sample taken afterwards would record bytes we
     // never parsed and we would then wait for a change that already happened.
-    const Watermark observed = Deferred::sample(path);
+    const Watermark observed{
+        .size = pathInfo.size(),
+        .modifiedAt = pathInfo.lastModified(QTimeZone::UTC),
+        .sampledAt = QDateTime::currentDateTimeUtc(),
+    };
 
     if (observed.size == 0) {
         // Nothing to hand the parser yet. Wait for the file to grow rather
@@ -395,7 +435,7 @@ void ReplayStore::synopsizeReplayFile(const QString& path) {
     }
 
     try {
-        performReplaySynopsis(path);
+        performReplaySynopsis(pathInfo);
         // Success = not pending
         m_storageRetries.remove(path);
         emit inboxItemRemoved(path);
@@ -508,7 +548,7 @@ void ReplayStore::toggleReplayExposed(const QByteArray& checksum) {
         auto tx = m_persistence.beginTransact();
 
         const std::optional<Replay> replay =
-            m_persistence.selectReplay(checksum);
+            Queries::get(m_persistence).selectReplay(checksum);
         if (!replay.has_value()) {
             qWarning(logStore) << "cannot toggle exposed for unknown replay "
                                << QLatin1String(checksum.toHex());
@@ -552,7 +592,7 @@ void ReplayStore::exposeReplay(const QByteArray& checksum) {
     if (!QDir(m_replayDir).mkpath("managed")) {
         throw StorageException("failed to create managed/ replay folder");
     }
-    const auto replay = m_persistence.selectReplay(checksum);
+    const auto replay = Queries::get(m_persistence).selectReplay(checksum);
     if (!replay) {
         qWarning(logStore) << "Replay " << QLatin1String(checksum.toHex())
                            << " doesn't exist";
@@ -579,7 +619,7 @@ void ReplayStore::exposeReplay(const QByteArray& checksum) {
 void ReplayStore::hideReplay(Persistence& persistence,
                              const QByteArray& checksum) {
     // Delete everything that we load as external
-    auto paths = persistence.selectExternalPaths(checksum);
+    auto paths = Queries::get(persistence).selectExternalPaths(checksum);
     for (const auto& path : paths) {
         QFile file(path);
         if (!file.remove()) {
@@ -592,9 +632,11 @@ void ReplayStore::hideReplay(Persistence& persistence,
 std::optional<ReplayAnalysisTarget> ReplayStore::lookupReplay(
     const QByteArray& checksum) const {
     try {
-        std::optional<Replay> replay = m_persistence.selectReplay(checksum);
+        std::optional<Replay> replay =
+            Queries::get(m_persistence).selectReplay(checksum);
         if (replay) {
-            replay->players = m_persistence.selectReplayPlayers(checksum);
+            replay->players =
+                Queries::get(m_persistence).selectReplayPlayers(checksum);
             QString path = computeIngestionPath(checksum);
             return ReplayAnalysisTarget{.path = std::move(path),
                                         .replay = std::move(*replay)};
@@ -614,7 +656,8 @@ void ReplayStore::acknowledgeItem(const QString& path) {
     emit inboxItemRemoved(path);
 }
 
-void ReplayStore::performReplaySynopsis(const QString& path) {
+void ReplayStore::performReplaySynopsis(const QFileInfo& pathInfo) {
+    const QString path = pathInfo.filePath();
     qDebug(logStore) << "Synopsizing replay: " << path;
     QFile replayFile(path);
     if (!replayFile.open(QIODevice::ReadOnly)) {
@@ -640,19 +683,22 @@ void ReplayStore::performReplaySynopsis(const QString& path) {
         LegionParser::SynopsisParser::parse(replayFile);
 
     // Ingest the replay and determine all the checksums that changed
-    const QList<QByteArray> impacted = ingestReplay(replayFile, metadata);
+    const QList<QByteArray> impacted =
+        ingestReplay(replayFile, pathInfo, metadata);
     forwardChangedReplays(impacted);
 }
 
 QList<QByteArray> ReplayStore::ingestReplay(
-    QFile& file, const LegionParser::ReplaySynopsis& metadata) {
+    QFile& file, const QFileInfo& pathInfo,
+    const LegionParser::ReplaySynopsis& metadata) {
     auto tx = m_persistence.beginTransact();
 
     QList<QByteArray> checksums;
-    if (m_persistence.isReplayKnown(metadata.checksum)) {
-        checksums = ingestKnownReplay(m_persistence, file, metadata);
+    if (Queries::get(m_persistence).isReplayKnown(metadata.checksum)) {
+        checksums = ingestKnownReplay(m_persistence, file, pathInfo, metadata);
     } else {
-        checksums = ingestUnknownReplay(m_persistence, file, metadata);
+        checksums =
+            ingestUnknownReplay(m_persistence, file, pathInfo, metadata);
     }
 
     tx.commit();
@@ -661,21 +707,24 @@ QList<QByteArray> ReplayStore::ingestReplay(
 }
 
 QList<QByteArray> ReplayStore::ingestKnownReplay(
-    Persistence& persistence, QFile& file,
+    Persistence& persistence, QFile& file, const QFileInfo& pathInfo,
     const LegionParser::ReplaySynopsis& metadata) {
     QList<QByteArray> impactedChecksums{{metadata.checksum}};
 
-    if (persistence.doesReplayNeedAnalysis(metadata.checksum)) {
-        persistence.insertReplayAnalysis(metadata);
-        persistence.insertReplayPlayers(metadata.checksum, metadata.players);
+    if (Queries::get(persistence).doesReplayNeedAnalysis(metadata.checksum)) {
+        Queries::get(persistence).insertReplayAnalysis(metadata);
+        Queries::get(persistence)
+            .insertReplayPlayers(metadata.checksum, metadata.players);
     }
     // If the replay has been seen before then we need to add a path to it
     qDebug(logStore) << "Existing replay being ingested: " << file.fileName();
 
     handleExistingReplayAtPath(persistence, file.fileName(), impactedChecksums);
 
-    if (!persistence.insertExternalFilename(metadata.checksum,
-                                            file.fileName())) {
+    if (!Queries::get(persistence)
+             .insertExternalFilename(metadata.checksum, file.fileName(),
+                                     pathInfo.lastModified(QTimeZone::UTC),
+                                     pathInfo.size())) {
         qDebug(logStore) << "Existing replay was already tracked"
                          << file.fileName();
     }
@@ -684,19 +733,23 @@ QList<QByteArray> ReplayStore::ingestKnownReplay(
 }
 
 QList<QByteArray> ReplayStore::ingestUnknownReplay(
-    Persistence& persistence, QFile& file,
+    Persistence& persistence, QFile& file, const QFileInfo& pathInfo,
     const LegionParser::ReplaySynopsis& metadata) {
     QList<QByteArray> impactedChecksums{{metadata.checksum}};
     qInfo(logStore) << "New replay being ingested: " << file.fileName();
     // This is the first time the replay has been seen so
     // we need to perform to insert everything
-    persistence.insertReplay(metadata);
-    persistence.insertReplayAnalysis(metadata);
-    persistence.insertReplayPlayers(metadata.checksum, metadata.players);
+    Queries::get(persistence).insertReplay(metadata);
+    Queries::get(persistence).insertReplayAnalysis(metadata);
+    Queries::get(persistence)
+        .insertReplayPlayers(metadata.checksum, metadata.players);
 
     handleExistingReplayAtPath(persistence, file.fileName(), impactedChecksums);
 
-    persistence.insertExternalFilename(metadata.checksum, file.fileName());
+    Queries::get(persistence)
+        .insertExternalFilename(metadata.checksum, file.fileName(),
+                                pathInfo.lastModified(QTimeZone::UTC),
+                                pathInfo.size());
 
     // Before committing we should copy to the canonical path
     if (!file.copy(computeIngestionPath(metadata.checksum))) {
@@ -710,7 +763,7 @@ void ReplayStore::handleExistingReplayAtPath(Persistence& persistence,
                                              const QString& path,
                                              QList<QByteArray>& checksums) {
     const std::optional<QByteArray> checksum =
-        persistence.checksumForExternalPath(path);
+        Queries::get(persistence).checksumForExternalPath(path);
     if (checksum.has_value() && !checksums.contains(checksum.value())) {
         qDebug(logStore) << "Existing replay at path with different checksum: "
                          << path;
@@ -728,14 +781,16 @@ void ReplayStore::forwardChangedReplays(const QList<QByteArray>& checksums) {
     QList<Replay> replays;
     replays.reserve(checksums.size());
     for (const auto& checksum : checksums) {
-        std::optional<Replay> replay = m_persistence.selectReplay(checksum);
+        std::optional<Replay> replay =
+            Queries::get(m_persistence).selectReplay(checksum);
         if (!replay.has_value()) {
             qWarning(logStore)
                 << "Replay with checksum: " << checksum.toHex()
                 << " disappeared before it could be emitted as updated";
         } else {
             Replay r = replay.value();
-            r.players = m_persistence.selectReplayPlayers(r.checksum);
+            r.players =
+                Queries::get(m_persistence).selectReplayPlayers(r.checksum);
             replays.append(r);
         }
     }
@@ -758,7 +813,8 @@ QString ReplayStore::computeIngestionPath(const QByteArray& checksum) const {
 std::optional<QByteArray> ReplayStore::removeReplayAtPath(const QString& path) {
     auto tx = m_persistence.beginTransact();
 
-    std::optional result = m_persistence.removeExternalFilename(path);
+    std::optional result =
+        Queries::get(m_persistence).removeExternalFilename(path);
 
     tx.commit();
     return result;

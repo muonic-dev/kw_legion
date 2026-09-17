@@ -14,6 +14,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "exception.h"
+#include "queries.h"
 
 using namespace KWLegionCore;
 
@@ -77,7 +78,7 @@ TEST_CASE("Persistence migrate creates the schema and is idempotent",
 
     // Calling migrate() again once the schema is already current should be
     // a harmless no-op rather than trying to re-run already-applied DDL.
-    CHECK_NOTHROW(persistence.migrate());
+    CHECK_NOTHROW(Queries::get(persistence).migrate());
 
     QSqlQuery check(db);
     REQUIRE(check.exec(
@@ -101,12 +102,12 @@ TEST_CASE("Persistence isReplayKnown reflects insertReplay",
     QSqlDatabase db = QSqlDatabase::database("persistence_is_known");
 
     const QByteArray checksum = "checksum-known";
-    CHECK_FALSE(persistence.isReplayKnown(checksum));
+    CHECK_FALSE(Queries::get(persistence).isReplayKnown(checksum));
 
-    persistence.insertReplay(makeMetadata(checksum));
+    Queries::get(persistence).insertReplay(makeMetadata(checksum));
 
-    CHECK(persistence.isReplayKnown(checksum));
-    CHECK_FALSE(persistence.isReplayKnown("checksum-different"));
+    CHECK(Queries::get(persistence).isReplayKnown(checksum));
+    CHECK_FALSE(Queries::get(persistence).isReplayKnown("checksum-different"));
 
     persistence.close();
     db = QSqlDatabase();
@@ -128,9 +129,10 @@ TEST_CASE("Persistence selectReplay returns the stored fields",
     metadata.matchTitle = "Stored Match Title";
     metadata.matchDescription = "Stored match description";
     metadata.mapReference = "data/maps/stored-reference";
-    persistence.insertReplay(metadata);
+    Queries::get(persistence).insertReplay(metadata);
 
-    const std::optional<Replay> replay = persistence.selectReplay(checksum);
+    const std::optional<Replay> replay =
+        Queries::get(persistence).selectReplay(checksum);
     REQUIRE(replay.has_value());
     CHECK(replay->checksum == checksum);
     CHECK(replay->matchTitle == "Stored Match Title");
@@ -156,7 +158,8 @@ TEST_CASE("Persistence selectReplay returns nullopt for an unknown checksum",
     QSqlDatabase db =
         QSqlDatabase::database("persistence_select_replay_missing");
 
-    CHECK_FALSE(persistence.selectReplay("does-not-exist").has_value());
+    CHECK_FALSE(
+        Queries::get(persistence).selectReplay("does-not-exist").has_value());
 
     persistence.close();
     db = QSqlDatabase();
@@ -170,10 +173,11 @@ TEST_CASE("Persistence insertReplay throws on a duplicate checksum",
     QSqlDatabase db = QSqlDatabase::database("persistence_insert_duplicate");
 
     const QByteArray checksum = "checksum-dup";
-    persistence.insertReplay(makeMetadata(checksum));
+    Queries::get(persistence).insertReplay(makeMetadata(checksum));
 
-    CHECK_THROWS_AS(persistence.insertReplay(makeMetadata(checksum)),
-                    StorageException);
+    CHECK_THROWS_AS(
+        Queries::get(persistence).insertReplay(makeMetadata(checksum)),
+        StorageException);
 
     persistence.close();
     db = QSqlDatabase();
@@ -196,19 +200,19 @@ TEST_CASE("Persistence doesReplayNeedAnalysis reflects insertReplayAnalysis",
                              .faction = LegionParser::Faction::GDI,
                              .isComputer = false,
                              .isReplaySaver = true}};
-    persistence.insertReplay(metadata);
+    Queries::get(persistence).insertReplay(metadata);
 
     // insertReplay alone no longer writes replay_analysis - that's now a
     // separate step - so a freshly-inserted replay still needs analysis.
-    CHECK(persistence.doesReplayNeedAnalysis(checksum));
+    CHECK(Queries::get(persistence).doesReplayNeedAnalysis(checksum));
 
     // Needing analysis also requires replay_players to be populated -
     // without this, insertReplayAnalysis alone would still leave the
     // replay needing (player) analysis, see the dedicated test below.
-    persistence.insertReplayPlayers(checksum, metadata.players);
-    persistence.insertReplayAnalysis(metadata);
+    Queries::get(persistence).insertReplayPlayers(checksum, metadata.players);
+    Queries::get(persistence).insertReplayAnalysis(metadata);
 
-    CHECK_FALSE(persistence.doesReplayNeedAnalysis(checksum));
+    CHECK_FALSE(Queries::get(persistence).doesReplayNeedAnalysis(checksum));
 
     persistence.close();
     db = QSqlDatabase();
@@ -227,11 +231,11 @@ TEST_CASE(
 
     const QByteArray checksum = "checksum-analysis-no-players";
     LegionParser::ReplaySynopsis metadata = makeMetadata(checksum);
-    persistence.insertReplay(metadata);
-    persistence.insertReplayAnalysis(metadata);
+    Queries::get(persistence).insertReplay(metadata);
+    Queries::get(persistence).insertReplayAnalysis(metadata);
     // Deliberately never call insertReplayPlayers for this checksum.
 
-    CHECK(persistence.doesReplayNeedAnalysis(checksum));
+    CHECK(Queries::get(persistence).doesReplayNeedAnalysis(checksum));
 
     persistence.close();
     db = QSqlDatabase();
@@ -247,8 +251,8 @@ TEST_CASE("Persistence insertReplayAnalysis stores the body offset",
     const QByteArray checksum = "checksum-insert-analysis";
     LegionParser::ReplaySynopsis metadata = makeMetadata(checksum);
     metadata.bodyOffset = 4096;
-    persistence.insertReplay(metadata);
-    persistence.insertReplayAnalysis(metadata);
+    Queries::get(persistence).insertReplay(metadata);
+    Queries::get(persistence).insertReplayAnalysis(metadata);
 
     QSqlQuery check(db);
     REQUIRE(check.prepare(
@@ -274,8 +278,8 @@ TEST_CASE("Persistence insertReplayAnalysis stores the engine ticks",
     const QByteArray checksum = "checksum-insert-analysis-ticks";
     LegionParser::ReplaySynopsis metadata = makeMetadata(checksum);
     metadata.engineTicks = 12345;
-    persistence.insertReplay(metadata);
-    persistence.insertReplayAnalysis(metadata);
+    Queries::get(persistence).insertReplay(metadata);
+    Queries::get(persistence).insertReplayAnalysis(metadata);
 
     QSqlQuery check(db);
     REQUIRE(check.prepare(
@@ -305,19 +309,20 @@ TEST_CASE(
     auto analyzedMeta = makeMetadata(analyzed);
     analyzedMeta.players = {
         LegionParser::Player{.id = 1, .name = "P1", .teamNumber = 0}};
-    persistence.insertReplay(analyzedMeta);
-    persistence.insertReplayPlayers(analyzedMeta.checksum,
-                                    analyzedMeta.players);
-    persistence.insertReplayAnalysis(analyzedMeta);
+    Queries::get(persistence).insertReplay(analyzedMeta);
+    Queries::get(persistence)
+        .insertReplayPlayers(analyzedMeta.checksum, analyzedMeta.players);
+    Queries::get(persistence).insertReplayAnalysis(analyzedMeta);
 
     auto pendingMeta = makeMetadata(pending);
     pendingMeta.players = {
         LegionParser::Player{.id = 1, .name = "P1", .teamNumber = 0}};
-    persistence.insertReplay(pendingMeta);
-    persistence.insertReplayPlayers(pendingMeta.checksum, pendingMeta.players);
+    Queries::get(persistence).insertReplay(pendingMeta);
+    Queries::get(persistence)
+        .insertReplayPlayers(pendingMeta.checksum, pendingMeta.players);
 
     const QList<QByteArray> needsAnalysis =
-        persistence.selectReplaysNeedingAnalysis();
+        Queries::get(persistence).selectReplaysNeedingAnalysis();
 
     CHECK(needsAnalysis.size() == 1);
     CHECK(needsAnalysis.contains(pending));
@@ -340,11 +345,11 @@ TEST_CASE(
     auto metadata = makeMetadata(checksum);
     metadata.players = {
         LegionParser::Player{.id = 1, .name = "P1", .teamNumber = 0}};
-    persistence.insertReplay(metadata);
-    persistence.insertReplayPlayers(checksum, metadata.players);
-    persistence.insertReplayAnalysis(metadata);
+    Queries::get(persistence).insertReplay(metadata);
+    Queries::get(persistence).insertReplayPlayers(checksum, metadata.players);
+    Queries::get(persistence).insertReplayAnalysis(metadata);
 
-    CHECK(persistence.selectReplaysNeedingAnalysis().isEmpty());
+    CHECK(Queries::get(persistence).selectReplaysNeedingAnalysis().isEmpty());
 
     persistence.close();
     db = QSqlDatabase();
@@ -358,7 +363,7 @@ TEST_CASE("Persistence insertReplayPlayers stores every player for a replay",
     QSqlDatabase db = QSqlDatabase::database("persistence_insert_players");
 
     const QByteArray checksum = "checksum-players";
-    persistence.insertReplay(makeMetadata(checksum));
+    Queries::get(persistence).insertReplay(makeMetadata(checksum));
 
     const QList<LegionParser::Player> players{
         LegionParser::Player{.id = 1,
@@ -375,7 +380,7 @@ TEST_CASE("Persistence insertReplayPlayers stores every player for a replay",
                              .isReplaySaver = false},
     };
 
-    persistence.insertReplayPlayers(checksum, players);
+    Queries::get(persistence).insertReplayPlayers(checksum, players);
 
     CHECK(countPlayers(db, checksum) == 2);
 
@@ -405,9 +410,9 @@ TEST_CASE("Persistence insertReplayPlayers with an empty list inserts nothing",
         QSqlDatabase::database("persistence_insert_players_empty");
 
     const QByteArray checksum = "checksum-no-players";
-    persistence.insertReplay(makeMetadata(checksum));
+    Queries::get(persistence).insertReplay(makeMetadata(checksum));
 
-    persistence.insertReplayPlayers(checksum, {});
+    Queries::get(persistence).insertReplayPlayers(checksum, {});
 
     CHECK(countPlayers(db, checksum) == 0);
 
@@ -423,14 +428,20 @@ TEST_CASE("Persistence insertExternalFilename reports whether the path is new",
     QSqlDatabase db = QSqlDatabase::database("persistence_insert_external");
 
     const QByteArray checksum = "checksum-external";
-    persistence.insertReplay(makeMetadata(checksum));
+    Queries::get(persistence).insertReplay(makeMetadata(checksum));
 
-    CHECK(
-        persistence.insertExternalFilename(checksum, "C:/replays/a.KWReplay"));
-    CHECK_FALSE(
-        persistence.insertExternalFilename(checksum, "C:/replays/a.KWReplay"));
-    CHECK(
-        persistence.insertExternalFilename(checksum, "C:/replays/b.KWReplay"));
+    CHECK(Queries::get(persistence)
+              .insertExternalFilename(checksum, "C:/replays/a.KWReplay",
+                                      QDateTime::fromSecsSinceEpoch(1700000000),
+                                      123));
+    CHECK_FALSE(Queries::get(persistence)
+                    .insertExternalFilename(
+                        checksum, "C:/replays/a.KWReplay",
+                        QDateTime::fromSecsSinceEpoch(1700000000), 123));
+    CHECK(Queries::get(persistence)
+              .insertExternalFilename(checksum, "C:/replays/b.KWReplay",
+                                      QDateTime::fromSecsSinceEpoch(1700000000),
+                                      123));
 
     CHECK(countExternalPaths(db, checksum) == 2);
 
@@ -452,20 +463,28 @@ TEST_CASE(
     const QByteArray newChecksum = "checksum-new";
     const QString path = "C:/replays/Last Replay.KWReplay";
 
-    persistence.insertReplay(makeMetadata(oldChecksum));
-    persistence.insertReplay(makeMetadata(newChecksum));
-    persistence.insertExternalFilename(oldChecksum, path);
+    Queries::get(persistence).insertReplay(makeMetadata(oldChecksum));
+    Queries::get(persistence).insertReplay(makeMetadata(newChecksum));
+    Queries::get(persistence)
+        .insertExternalFilename(oldChecksum, path,
+                                QDateTime::fromSecsSinceEpoch(1700000000), 123);
 
     // external_path is the sole key - a path can only ever point at one
     // checksum, so re-inserting it under a new checksum (e.g. the game's
     // rolling "Last Replay.KWReplay" being overwritten by a new match) must
     // atomically move the row rather than erroring or leaving a duplicate.
-    CHECK(persistence.insertExternalFilename(newChecksum, path));
+    CHECK(Queries::get(persistence)
+              .insertExternalFilename(newChecksum, path,
+                                      QDateTime::fromSecsSinceEpoch(1700000000),
+                                      123));
     CHECK(countExternalPaths(db, oldChecksum) == 0);
     CHECK(countExternalPaths(db, newChecksum) == 1);
 
     // Re-inserting the same (checksum, path) pair again is a true no-op.
-    CHECK_FALSE(persistence.insertExternalFilename(newChecksum, path));
+    CHECK_FALSE(Queries::get(persistence)
+                    .insertExternalFilename(
+                        newChecksum, path,
+                        QDateTime::fromSecsSinceEpoch(1700000000), 123));
     CHECK(countExternalPaths(db, newChecksum) == 1);
 
     persistence.close();
@@ -483,13 +502,16 @@ TEST_CASE(
     const QByteArray checksum = "checksum-lookup";
     const QString path = "C:/replays/Last Replay.KWReplay";
 
-    CHECK_FALSE(persistence.checksumForExternalPath(path).has_value());
+    CHECK_FALSE(
+        Queries::get(persistence).checksumForExternalPath(path).has_value());
 
-    persistence.insertReplay(makeMetadata(checksum));
-    persistence.insertExternalFilename(checksum, path);
+    Queries::get(persistence).insertReplay(makeMetadata(checksum));
+    Queries::get(persistence)
+        .insertExternalFilename(checksum, path,
+                                QDateTime::fromSecsSinceEpoch(1700000000), 123);
 
     const std::optional<QByteArray> found =
-        persistence.checksumForExternalPath(path);
+        Queries::get(persistence).checksumForExternalPath(path);
     REQUIRE(found.has_value());
     CHECK(found.value() == checksum);
 
@@ -505,12 +527,17 @@ TEST_CASE("Persistence removeExternalFilename drops only the given path",
     QSqlDatabase db = QSqlDatabase::database("persistence_remove_external");
 
     const QByteArray checksum = "checksum-remove-external";
-    persistence.insertReplay(makeMetadata(checksum));
-    persistence.insertExternalFilename(checksum, "C:/replays/a.KWReplay");
-    persistence.insertExternalFilename(checksum, "C:/replays/b.KWReplay");
+    Queries::get(persistence).insertReplay(makeMetadata(checksum));
+    Queries::get(persistence)
+        .insertExternalFilename(checksum, "C:/replays/a.KWReplay",
+                                QDateTime::fromSecsSinceEpoch(1700000000), 123);
+    Queries::get(persistence)
+        .insertExternalFilename(checksum, "C:/replays/b.KWReplay",
+                                QDateTime::fromSecsSinceEpoch(1700000000), 123);
 
     const std::optional<QByteArray> dropped =
-        persistence.removeExternalFilename("C:/replays/a.KWReplay");
+        Queries::get(persistence)
+            .removeExternalFilename("C:/replays/a.KWReplay");
     REQUIRE(dropped.has_value());
     CHECK(dropped.value() == checksum);
 
@@ -540,11 +567,14 @@ TEST_CASE(
         QSqlDatabase::database("persistence_remove_external_missing");
 
     const QByteArray checksum = "checksum-remove-external-missing";
-    persistence.insertReplay(makeMetadata(checksum));
-    persistence.insertExternalFilename(checksum, "C:/replays/a.KWReplay");
+    Queries::get(persistence).insertReplay(makeMetadata(checksum));
+    Queries::get(persistence)
+        .insertExternalFilename(checksum, "C:/replays/a.KWReplay",
+                                QDateTime::fromSecsSinceEpoch(1700000000), 123);
 
     CHECK_FALSE(
-        persistence.removeExternalFilename("C:/replays/does-not-exist.KWReplay")
+        Queries::get(persistence)
+            .removeExternalFilename("C:/replays/does-not-exist.KWReplay")
             .has_value());
 
     CHECK(countExternalPaths(db, checksum) == 1);
@@ -563,22 +593,27 @@ TEST_CASE(
     QSqlDatabase db = QSqlDatabase::database("persistence_forget_missing");
 
     const QByteArray checksum = "checksum-forget";
-    persistence.insertReplay(makeMetadata(checksum));
-    persistence.insertExternalFilename(checksum, "C:/replays/a.KWReplay");
-    persistence.insertExternalFilename(checksum, "C:/replays/b.KWReplay");
+    Queries::get(persistence).insertReplay(makeMetadata(checksum));
+    Queries::get(persistence)
+        .insertExternalFilename(checksum, "C:/replays/a.KWReplay",
+                                QDateTime::fromSecsSinceEpoch(1700000000), 123);
+    Queries::get(persistence)
+        .insertExternalFilename(checksum, "C:/replays/b.KWReplay",
+                                QDateTime::fromSecsSinceEpoch(1700000000), 123);
 
-    persistence.forgetMissingReplays({"C:/replays/a.KWReplay"});
+    Queries::get(persistence).forgetMissingReplays({"C:/replays/a.KWReplay"});
 
     CHECK(countExternalPaths(db, checksum) == 1);
 
     // An empty "currently known" list means nothing on disk is known any
     // more, so every remaining path should be dropped too - the replay row
     // itself is untouched, only its external-path registrations are.
-    persistence.forgetMissingReplays({});
+    Queries::get(persistence).forgetMissingReplays({});
 
     CHECK(countExternalPaths(db, checksum) == 0);
 
-    const std::optional<Replay> replay = persistence.selectReplay(checksum);
+    const std::optional<Replay> replay =
+        Queries::get(persistence).selectReplay(checksum);
     REQUIRE(replay.has_value());
     CHECK_FALSE(replay->hasExternalPath);
 
@@ -596,7 +631,7 @@ TEST_CASE(
     QSqlDatabase db = QSqlDatabase::database("persistence_forget_missing_many");
 
     const QByteArray checksum = "checksum-many-paths";
-    persistence.insertReplay(makeMetadata(checksum));
+    Queries::get(persistence).insertReplay(makeMetadata(checksum));
 
     // A large replay folder may accumulate m any files
     constexpr int totalPaths = 35000;
@@ -606,14 +641,16 @@ TEST_CASE(
     for (int i = 0; i < totalPaths; i++) {
         const QString path =
             QStringLiteral("C:/replays/replay-%1.KWReplay").arg(i);
-        persistence.insertExternalFilename(checksum, path);
+        Queries::get(persistence)
+            .insertExternalFilename(
+                checksum, path, QDateTime::fromSecsSinceEpoch(1700000000), 123);
         if (i < keptPaths) {
             knownPaths.append(path);
         }
     }
     REQUIRE(countExternalPaths(db, checksum) == totalPaths);
 
-    persistence.forgetMissingReplays(knownPaths);
+    Queries::get(persistence).forgetMissingReplays(knownPaths);
 
     CHECK(countExternalPaths(db, checksum) == keptPaths);
 
@@ -635,17 +672,19 @@ TEST_CASE("Persistence selectReplays reports hasExternalPath per replay",
     withPathMetadata.matchTitle = "Match A";
     withPathMetadata.matchDescription = "Description A";
     withPathMetadata.mapReference = "Reference A";
-    persistence.insertReplay(withPathMetadata);
+    Queries::get(persistence).insertReplay(withPathMetadata);
 
     LegionParser::ReplaySynopsis withoutPathMetadata =
         makeMetadata(withoutPath, "Map B");
     withoutPathMetadata.matchTitle = "Match B";
     withoutPathMetadata.matchDescription = "Description B";
     withoutPathMetadata.mapReference = "Reference B";
-    persistence.insertReplay(withoutPathMetadata);
-    persistence.insertExternalFilename(withPath, "C:/replays/a.KWReplay");
+    Queries::get(persistence).insertReplay(withoutPathMetadata);
+    Queries::get(persistence)
+        .insertExternalFilename(withPath, "C:/replays/a.KWReplay",
+                                QDateTime::fromSecsSinceEpoch(1700000000), 123);
 
-    const QList<Replay> replays = persistence.selectReplays();
+    const QList<Replay> replays = Queries::get(persistence).selectReplays();
     REQUIRE(replays.size() == 2);
 
     QHash<QByteArray, Replay> byChecksum;
@@ -679,9 +718,10 @@ TEST_CASE("Persistence selectReplay defaults overrideMatchTitle to empty",
         QSqlDatabase::database("persistence_override_title_default");
 
     const QByteArray checksum = "checksum-override-default";
-    persistence.insertReplay(makeMetadata(checksum));
+    Queries::get(persistence).insertReplay(makeMetadata(checksum));
 
-    const std::optional<Replay> replay = persistence.selectReplay(checksum);
+    const std::optional<Replay> replay =
+        Queries::get(persistence).selectReplay(checksum);
     REQUIRE(replay.has_value());
     CHECK(replay->overrideMatchTitle.isEmpty());
 
@@ -700,15 +740,16 @@ TEST_CASE(
         QSqlDatabase::database("persistence_override_title_update");
 
     const QByteArray checksum = "checksum-override-update";
-    persistence.insertReplay(makeMetadata(checksum));
+    Queries::get(persistence).insertReplay(makeMetadata(checksum));
 
-    persistence.updateOverrideTitle(checksum, "Custom Title");
+    Queries::get(persistence).updateOverrideTitle(checksum, "Custom Title");
 
-    const std::optional<Replay> replay = persistence.selectReplay(checksum);
+    const std::optional<Replay> replay =
+        Queries::get(persistence).selectReplay(checksum);
     REQUIRE(replay.has_value());
     CHECK(replay->overrideMatchTitle == "Custom Title");
 
-    const QList<Replay> replays = persistence.selectReplays();
+    const QList<Replay> replays = Queries::get(persistence).selectReplays();
     REQUIRE(replays.size() == 1);
     CHECK(replays.first().overrideMatchTitle == "Custom Title");
 
@@ -725,12 +766,13 @@ TEST_CASE("Persistence updateOverrideTitle overwrites a previous override",
         QSqlDatabase::database("persistence_override_title_overwrite");
 
     const QByteArray checksum = "checksum-override-overwrite";
-    persistence.insertReplay(makeMetadata(checksum));
+    Queries::get(persistence).insertReplay(makeMetadata(checksum));
 
-    persistence.updateOverrideTitle(checksum, "First Title");
-    persistence.updateOverrideTitle(checksum, "Second Title");
+    Queries::get(persistence).updateOverrideTitle(checksum, "First Title");
+    Queries::get(persistence).updateOverrideTitle(checksum, "Second Title");
 
-    const std::optional<Replay> replay = persistence.selectReplay(checksum);
+    const std::optional<Replay> replay =
+        Queries::get(persistence).selectReplay(checksum);
     REQUIRE(replay.has_value());
     CHECK(replay->overrideMatchTitle == "Second Title");
 
@@ -748,12 +790,13 @@ TEST_CASE(
         QSqlDatabase::database("persistence_override_title_clear");
 
     const QByteArray checksum = "checksum-override-clear";
-    persistence.insertReplay(makeMetadata(checksum));
-    persistence.updateOverrideTitle(checksum, "Custom Title");
+    Queries::get(persistence).insertReplay(makeMetadata(checksum));
+    Queries::get(persistence).updateOverrideTitle(checksum, "Custom Title");
 
-    persistence.updateOverrideTitle(checksum, "");
+    Queries::get(persistence).updateOverrideTitle(checksum, "");
 
-    const std::optional<Replay> replay = persistence.selectReplay(checksum);
+    const std::optional<Replay> replay =
+        Queries::get(persistence).selectReplay(checksum);
     REQUIRE(replay.has_value());
     CHECK(replay->overrideMatchTitle.isEmpty());
 

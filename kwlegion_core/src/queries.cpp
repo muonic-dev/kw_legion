@@ -1,0 +1,787 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Muonic
+
+#include "queries.h"
+
+#include <kwlegion_core/persistence.h>
+
+#include <QHashFunctions>
+#include <QList>
+#include <QLoggingCategory>
+#include <QSqlError>
+#include <QTimeZone>
+#include <QVariantList>
+#include <QtLogging>
+#include <array>
+#include <cstddef>
+#include <optional>
+#include <utility>
+
+#include "exception.h"
+#include "legionparser/replay.h"
+#include "replay.h"
+#include "transaction.h"
+
+namespace KWLegionCore {
+
+Queries& Queries::get(Persistence& persistence) {
+    Q_ASSERT(persistence.m_queries);
+    return *persistence.m_queries;
+}
+
+Queries::Queries(const QSqlDatabase& db) : m_query(db) {}
+
+// NOTE: It is a pattern that we handle forcing re-analysis of a replay by
+// deleting the relevant information
+constexpr std::array MIGRATIONS{
+    // Store the replay here
+    // Note: we use the checksum to compute a stored local state path
+    "CREATE TABLE replays"
+    "    ( checksum BLOB PRIMARY KEY"
+    "    , match_title TEXT NOT NULL"
+    "    , match_description TEXT NOT NULL"
+    "    , map_name TEXT NOT NULL"
+    "    , map_id TEXT NOT NULL"
+    "    , game_type INT NOT NULL"
+    "    , timestamp INT NOT NULL"
+    "    , has_commentary INT NOT NULL"
+    "    , filename TEXT NOT NULL"
+    "    , map_reference TEXT NOT NULL"
+    "    , version_major INT"
+    "    , version_minor INT"
+    "    , build_major INT"
+    "    , build_minor INT"
+    "    , canonical_name TEXT"
+    "    ) STRICT, WITHOUT ROWID;",
+
+    // Replays might occur more than once in the replay folder for whatever
+    // reason so a single storage is not good enough
+    // external_path is a full canonical path. A path can only ever point at
+    // one file on disk, so it can only ever belong to one checksum at a
+    // time
+    "CREATE TABLE replay_external_paths"
+    "    ( replay_checksum BLOB NOT NULL"
+    "    , external_path TEXT NOT NULL"
+    "    , PRIMARY KEY(external_path)"
+    "    ) STRICT, WITHOUT ROWID;",
+
+    // player_id isn't reliably unique per replay - e.g. the trailing
+    // commentator player's id is consistently 0, and skirmish replays leave
+    // every player's id at 0 - so rows are identified by rowid instead.
+    // NOT AUTHORITATIVE, recreated
+    "CREATE TABLE replay_players"
+    "    ( replay_checksum BLOB NOT NULL"
+    "    , player_id INT NOT NULL"
+    "    , player_name TEXT NOT NULL"
+    "    , team_number INT"
+    "    , faction INT NOT NULL"
+    "    , is_computer INT NOT NULL"
+    "    , is_replay_saver INT NOT NULL"
+    "    ) STRICT;",
+
+    "CREATE INDEX idx_replay_players_checksum"
+    "    ON replay_players(replay_checksum);",
+
+    // Dropped again further down - kept here because migrations are
+    // append-only and replayed in order on an older database.
+    "CREATE TABLE broken_replays"
+    "   ( replay_path TEXT NOT NULL PRIMARY KEY"
+    "   , problem INT NOT NULL"
+    "   , noticed_at INT NOT NULL"
+    "   ) STRICT, WITHOUT ROWID;",
+
+    // Tombstone marker for the UI's dismiss action. NULL means the row is
+    // still active; a timestamp means it was acknowledged and should be
+    // hidden. Nullable so existing rows migrate in as "not acknowledged"
+    // with no backfill needed.
+    "ALTER TABLE broken_replays ADD COLUMN acknowledged_at INT;",
+
+    // The match title override. Default of '' to correspond to QString()
+    // defaulting semantics
+    "ALTER TABLE replays ADD COLUMN override_match_title TEXT  "
+    "NOT NULL DEFAULT ''",
+
+    // Problem state is now derived rather than stored. The startup sweep
+    // re-parses every path in the replay folder anyway, so the table was a
+    // cache of state we rebuild regardless - and one that could (and did)
+    // desync from what was actually on disk. Dismissal becomes
+    // session-scoped as a result, which is what we want given the game's
+    // rolling "Last Replay.KWReplay" path.
+    "DROP TABLE broken_replays;",
+
+    // Split the user-editable override columns out of replays and into
+    // their own table, mirroring the eventual split with a body-derived
+    // analysis table below. A missing row means "no override", the same
+    // meaning the empty-string default on the old column used to carry, so
+    // there is no default here - see Queries::updateOverrideTitle.
+    "CREATE TABLE replay_overrides"
+    "    ( replay_checksum BLOB PRIMARY KEY"
+    "    , override_match_title TEXT NOT NULL"
+    "    ) STRICT, WITHOUT ROWID;",
+
+    // Only carry forward replays that actually have an override - an empty
+    // string on the old column means the same thing as no row at all here,
+    // so there is nothing worth preserving for the rest.
+    "INSERT INTO replay_overrides (replay_checksum, override_match_title) "
+    "SELECT checksum, override_match_title FROM replays "
+    "WHERE override_match_title != '';",
+
+    "ALTER TABLE replays DROP COLUMN override_match_title;",
+
+    // Holds facts derived from walking the replay's action stream and/or
+    // synposis. Currently, body_offset is recorded from the header and
+    // marks a place that can be seeked to to start the body stream
+    "CREATE TABLE replay_analysis"
+    "    ( replay_checksum BLOB PRIMARY KEY"
+    "    , body_offset INT NOT NULL"
+    "    ) STRICT, WITHOUT ROWID;",
+
+    // replay_external_paths checksum is queried so optimize here
+    "CREATE INDEX idx_replay_external_paths_checksum"
+    "    ON replay_external_paths(replay_checksum);",
+
+    // Trigger re-analysis for engine_ticks
+    "DELETE FROM replay_analysis",
+
+    // Add the number of engine simulation ticks to the replay_analysis
+    "ALTER TABLE replay_analysis ADD COLUMN engine_ticks INT NOT NULL",
+
+    // Trigger player re-analysis by dropping the entire replay_players
+    // We are going to recreate it from scratch without rowid since we have a
+    // new primary key
+    "DROP INDEX idx_replay_players_checksum",
+
+    "DROP TABLE replay_players",
+
+    // Recreate the replay_players with player_index as a field
+    // This is an implicit index of the player that command structures link
+    // to. It is also unique per table so we have the primar key
+    "CREATE TABLE replay_players"
+    "    ( replay_checksum BLOB NOT NULL"
+    "    , player_index INT NOT NULL"
+    "    , player_id INT NOT NULL"
+    "    , player_name TEXT NOT NULL"
+    "    , team_number INT"
+    "    , faction INT NOT NULL"
+    "    , is_computer INT NOT NULL"
+    "    , is_replay_saver INT NOT NULL"
+    "    , PRIMARY KEY (replay_checksum, player_index)"
+    "    ) STRICT, WITHOUT ROWID;",
+
+    // There was an unexpected bug in the introduction of TeeDevice as used by
+    // checksumming
+    // The checksum was supposed to calculate off everything following the
+    // header so that
+    // replays are stable. However, this was not the case and our check for
+    // checksum stability
+    // missed.
+    // Mark a heal flag with the next 2 migrations which add an explicit
+    // rechecksum column to be queried during application startup
+    "ALTER TABLE replays ADD COLUMN rechecksum INT DEFAULT 0;",
+
+    // All replays should be re-checksummed
+    "UPDATE replays SET rechecksum = 1;",
+
+    // We are adding an mtime and a size to the replay_external_paths for a fast
+    // path ingestion
+    // during startup. We would ideally avoid checksumming every replay in the
+    // replays folder
+    // to accelerate startup
+    // First things first, we delete all existing rows to force re-analysis
+
+    "DELETE FROM replay_external_paths;",
+
+    // mtime is stored as milliseconds since epoch in UTC
+    "ALTER TABLE replay_external_paths ADD COLUMN mtime INT NOT NULL",
+
+    "ALTER TABLE replay_external_paths ADD COLUMN size INT NOT NULL",
+
+};
+
+void Queries::migrate() {
+    m_query.exec("PRAGMA user_version");
+    m_query.next();
+    const size_t currentVersion = m_query.value(0).toULongLong();
+    // We aren't draining so call finish explicitly - otherwise the
+    // statement stays active and blocks the caller's transaction commit
+    // when there are no pending migrations to run.
+    m_query.finish();
+
+    qDebug(logPersistence) << "Current schema version is: " << currentVersion;
+
+    // The behavior of PRAGMA user_version starts at 0 so this is always the
+    // next thing to execute
+    for (size_t nextExec = currentVersion; nextExec < MIGRATIONS.size();
+         nextExec++) {
+        if (!m_query.exec(MIGRATIONS.at(nextExec))) {
+            throwLast();
+        }
+        if (!m_query.exec(QStringLiteral("PRAGMA user_version = %1;")
+                              .arg(nextExec + 1))) {
+            // The migration itself already ran (SQLite DDL isn't wrapped in
+            // our own transaction here), so this is a real inconsistent
+            // state, not just a no-op to bail out of - throw either way,
+            // since there is nothing else useful to fall back to.
+            throwLast();
+        }
+    }
+}
+
+QList<ExternalReplayFile> Queries::selectKnownExternalReplayFiles() {
+    prepare(
+        "SELECT replay_checksum, external_path, mtime, size FROM "
+        "replay_external_paths");
+    exec();
+    QList<ExternalReplayFile> result;
+    while (m_query.next()) {
+        result.push_back(ExternalReplayFile{
+            .replayChecksum = m_query.value(0).toByteArray(),
+            .externalPath = m_query.value(1).toString(),
+            .mtime =
+                QDateTime::fromMSecsSinceEpoch(m_query.value(2).toLongLong()),
+            .fileSize = m_query.value(3).toLongLong(),
+        });
+    }
+    throwLastIfFailed();
+    return result;
+}
+
+bool Queries::isReplayKnown(const QString& externalPath, const QDateTime& mtime,
+                            const qsizetype size) {
+    prepare(
+        "SELECT count(*)"
+        " FROM replay_external_paths "
+        " WHERE external_path = :path "
+        "   AND mtime = :mtime "
+        "   AND size = :size "
+        " LIMIT 1");
+    m_query.bindValue(":path", externalPath);
+    m_query.bindValue(":mtime", mtime.toMSecsSinceEpoch());
+    m_query.bindValue(":size", size);
+    exec();
+    nextOrThrow();
+    return m_query.value(0).toInt() != 0;
+}
+
+bool Queries::isReplayKnown(const QByteArray& checksum) {
+    prepare("SELECT count(*) FROM replays WHERE checksum = :checksum LIMIT 1");
+    m_query.bindValue(":checksum", checksum);
+    exec();
+    nextOrThrow();
+    return m_query.value(0).toInt() != 0;
+}
+
+constexpr const char* BASE_REPLAY_NEEDING_ANALYSIS =
+    " SELECT checksum"
+    " FROM replays r"
+    " WHERE NOT EXISTS ( "
+    "   SELECT replay_checksum"
+    "   FROM replay_analysis "
+    "   WHERE replay_checksum = r.checksum"
+    " ) "
+    " OR NOT EXISTS ( "
+    "   SELECT 1"
+    "   FROM replay_players "
+    "   WHERE replay_checksum = r.checksum"
+    ")";
+
+bool Queries::doesReplayNeedAnalysis(const QByteArray& checksum) {
+    prepare(QString(BASE_REPLAY_NEEDING_ANALYSIS) +
+            " AND r.checksum = :checksum"
+            " LIMIT 1");
+    m_query.bindValue(":checksum", checksum);
+    exec();
+    // If there is a row, then re-analysis needed
+    return m_query.next();
+}
+
+QList<QByteArray> Queries::selectReplaysNeedingAnalysis() {
+    prepare(BASE_REPLAY_NEEDING_ANALYSIS);
+    exec();
+    QList<QByteArray> result;
+    while (m_query.next()) {
+        result.append(m_query.value(0).toByteArray());
+    }
+    throwLastIfFailed();
+    return result;
+}
+
+void Queries::insertReplay(const LegionParser::ReplaySynopsis& synopsis) {
+    prepare(
+        "INSERT INTO replays"
+        "    ( checksum"
+        "    , match_title"
+        "    , match_description"
+        "    , map_name"
+        "    , map_id"
+        "    , game_type"
+        "    , timestamp"
+        "    , has_commentary"
+        "    , filename"
+        "    , map_reference"
+        "    , version_major"
+        "    , version_minor"
+        "    , build_major"
+        "    , build_minor )"
+        " VALUES"
+        "    ( :checksum"
+        "    , :match_title"
+        "    , :match_description"
+        "    , :map_name"
+        "    , :map_id"
+        "    , :game_type"
+        "    , :timestamp"
+        "    , :has_commentary"
+        "    , :filename"
+        "    , :map_reference"
+        "    , :version_major"
+        "    , :version_minor"
+        "    , :build_major"
+        "    , :build_minor);");
+    m_query.bindValue(":checksum", synopsis.checksum);
+    m_query.bindValue(":match_title", synopsis.matchTitle);
+    m_query.bindValue(":match_description", synopsis.matchDescription);
+    m_query.bindValue(":map_name", synopsis.mapName);
+    m_query.bindValue(":map_id", synopsis.mapId);
+    m_query.bindValue(":game_type", LegionParser::toUInt8(synopsis.gameType));
+    m_query.bindValue(":timestamp", synopsis.timestamp.toSecsSinceEpoch());
+    m_query.bindValue(":has_commentary", synopsis.hasCommentary);
+    m_query.bindValue(":filename", synopsis.filename);
+    m_query.bindValue(":map_reference", synopsis.mapReference);
+    m_query.bindValue(":version_major", synopsis.versionMajor);
+    m_query.bindValue(":version_minor", synopsis.versionMinor);
+    m_query.bindValue(":build_major", synopsis.buildMajor);
+    m_query.bindValue(":build_minor", synopsis.buildMinor);
+    exec();
+}
+
+void Queries::insertReplayAnalysis(
+    const LegionParser::ReplaySynopsis& synopsis) {
+    prepare(
+        "INSERT INTO replay_analysis"
+        " (replay_checksum, body_offset, engine_ticks)"
+        " VALUES (:checksum, :offset, :ticks)"
+        " ON CONFLICT (replay_checksum) "
+        " DO UPDATE SET body_offset = excluded.body_offset"
+        "   , engine_ticks = excluded.engine_ticks");
+    m_query.bindValue(":checksum", synopsis.checksum);
+    m_query.bindValue(":offset", synopsis.bodyOffset);
+    m_query.bindValue(":ticks", synopsis.engineTicks);
+    exec();
+}
+
+void Queries::updateOverrideTitle(const QByteArray& checksum,
+                                  const QString& overrideTitle) {
+    if (overrideTitle.isEmpty()) {
+        // No override is represented as an absent row rather than a stored
+        // empty string, so a missing row is the only "no override" case the
+        // read side has to handle.
+        prepare(
+            "DELETE FROM replay_overrides WHERE replay_checksum = "
+            ":checksum");
+        m_query.bindValue(":checksum", checksum);
+        exec();
+        return;
+    }
+    prepare(
+        "INSERT INTO replay_overrides"
+        "    ( replay_checksum"
+        "    , override_match_title )"
+        " VALUES"
+        "    ( :checksum"
+        "    , :override )"
+        " ON CONFLICT(replay_checksum) DO UPDATE"
+        "    SET override_match_title = excluded.override_match_title;");
+    m_query.bindValue(":checksum", checksum);
+    m_query.bindValue(":override", overrideTitle);
+    exec();
+}
+
+void Queries::insertReplayPlayers(const QByteArray& checksum,
+                                  const QList<LegionParser::Player>& players) {
+    prepare(
+        "INSERT INTO replay_players"
+        "    ( replay_checksum"
+        "    , player_index"
+        "    , player_id"
+        "    , player_name"
+        "    , team_number"
+        "    , faction"
+        "    , is_computer"
+        "    , is_replay_saver )"
+        " VALUES"
+        "    ( :replay_checksum"
+        "    , :player_index"
+        "    , :player_id"
+        "    , :player_name"
+        "    , :team_number"
+        "    , :faction"
+        "    , :is_computer"
+        "    , :is_replay_saver)"
+        " ON CONFLICT(replay_checksum, player_index) DO NOTHING;");
+    // We explicitly insert the player index here
+    for (auto it = players.cbegin(); it != players.cend(); ++it) {
+        m_query.bindValue(":replay_checksum", checksum);
+        m_query.bindValue(":player_index", it - players.cbegin());
+        m_query.bindValue(":player_id", it->id);
+        m_query.bindValue(":player_name", it->name);
+        m_query.bindValue(":team_number", it->teamNumber);
+        m_query.bindValue(":faction", LegionParser::toUInt8(it->faction));
+        m_query.bindValue(":is_computer", it->isComputer ? 1 : 0);
+        m_query.bindValue(":is_replay_saver", it->isReplaySaver ? 1 : 0);
+        exec();
+    }
+}
+
+std::optional<QByteArray> Queries::checksumForExternalPath(
+    const QString& path) {
+    prepare(
+        "SELECT replay_checksum FROM replay_external_paths "
+        "WHERE external_path = :external_path");
+    m_query.bindValue(":external_path", path);
+    exec();
+    std::optional<QByteArray> result;
+    if (m_query.next()) {
+        result = m_query.value(0).toByteArray();
+    }
+    // We aren't draining so call finish explicitly
+    m_query.finish();
+    return result;
+}
+
+bool Queries::insertExternalFilename(const QByteArray& checksum,
+                                     const QString& path,
+                                     const QDateTime& mtime, qsizetype size) {
+    // Refresh the fingerprint even when the content checksum is unchanged.
+    // An identical checksum, timestamp and size remains a no-op.
+    prepare(
+        "INSERT INTO replay_external_paths"
+        "    ( replay_checksum"
+        "    , external_path"
+        "    , mtime"
+        "    , size)"
+        " VALUES"
+        "    ( :replay_checksum"
+        "    , :external_path"
+        "    , :mtime"
+        "    , :size)"
+        " ON CONFLICT(external_path) DO UPDATE"
+        "    SET replay_checksum = excluded.replay_checksum"
+        "      , mtime = excluded.mtime"
+        "      , size = excluded.size"
+        "    WHERE replay_checksum != excluded.replay_checksum"
+        "       OR mtime != excluded.mtime"
+        "       OR size != excluded.size;");
+    m_query.bindValue(":replay_checksum", checksum);
+    m_query.bindValue(":external_path", path);
+    m_query.bindValue(":mtime", mtime.toMSecsSinceEpoch());
+    m_query.bindValue(":size", size);
+    exec();
+    return m_query.numRowsAffected() > 0;
+}
+
+std::optional<QByteArray> Queries::removeExternalFilename(const QString& path) {
+    // external_path is unique, so this affects at most one row.
+    prepare(
+        "DELETE FROM replay_external_paths "
+        "WHERE external_path = :external_path "
+        "RETURNING replay_checksum;");
+    m_query.bindValue(":external_path", path);
+    exec();
+
+    std::optional<QByteArray> result;
+    if (m_query.next()) {
+        result = m_query.value(0).toByteArray();
+    }
+    // We aren't draining so finish explicitly
+    m_query.finish();
+    return result;
+}
+
+void Queries::forgetMissingReplays(const QList<QString>& knownPaths) {
+    bootstrapMutationTable(knownPaths);
+
+    // An empty knownPaths leaves known_replay_paths empty too, so the
+    // subquery matches nothing and every row still gets deleted - the same
+    // "nothing is known to exist" behavior as before.
+    prepare(
+        "DELETE FROM replay_external_paths "
+        "WHERE external_path NOT IN (SELECT value FROM bulk_mutation_tmp)");
+    exec();
+}
+
+constexpr const char* const BASE_SELECT_QUERY =
+    "SELECT r.checksum"
+    "    , r.timestamp"
+    "    , r.match_title"
+    "    , r.match_description"
+    "    , r.map_name"
+    "    , r.map_reference"
+    "    , EXISTS ("
+    "        SELECT 1 FROM replay_external_paths"
+    "        WHERE replay_checksum = r.checksum"
+    "      ) AS has_external_path"
+    "    , COALESCE(o.override_match_title, '') AS override_match_title"
+    "    , COALESCE(a.engine_ticks, 0) as engine_ticks"
+    "    , COALESCE(a.body_offset, 0) as body_offset"
+    " FROM replays r"
+    " LEFT JOIN replay_overrides o ON o.replay_checksum = r.checksum"
+    " LEFT JOIN replay_analysis a ON a.replay_checksum = r.checksum";
+
+QList<Replay> Queries::selectReplays() {
+    prepare(BASE_SELECT_QUERY);
+    exec();
+
+    QList<Replay> replays;
+    while (m_query.next()) {
+        replays.append(readReplay());
+    }
+
+    throwLastIfFailed();
+
+    return replays;
+}
+
+std::optional<Replay> Queries::selectReplay(const QByteArray& checksum) {
+    prepare(QString(BASE_SELECT_QUERY) + " WHERE r.checksum = :checksum");
+    m_query.bindValue(":checksum", checksum);
+
+    exec();
+
+    if (m_query.next()) {
+        Replay result = readReplay();
+        // We aren't draining so call finish explicitly - otherwise the
+        // statement stays active and blocks the caller's transaction
+        // commit.
+        m_query.finish();
+        return result;
+    }
+
+    // Check for termination due to error
+    throwLastIfFailed();
+
+    return std::nullopt;
+}
+
+QList<Player> Queries::selectReplayPlayers(const QByteArray& checksum) {
+    prepare(
+        "SELECT player_id"
+        "    , player_name"
+        "    , team_number"
+        "    , faction"
+        "    , is_computer"
+        "    , is_replay_saver"
+        " FROM replay_players"
+        " WHERE replay_checksum = :checksum"
+        " ORDER BY player_index ASC");  // explicitly order by
+    m_query.bindValue(":checksum", checksum);
+
+    exec();
+
+    QList<Player> players;
+    while (m_query.next()) {
+        Player player;
+        player.id = m_query.value(0).toInt();
+        player.name = m_query.value(1).toString();
+        player.teamNumber = m_query.value(2).toInt();
+        player.faction =
+            LegionParser::factionFromUInt8(m_query.value(3).toUInt());
+        player.isComputer = m_query.value(4).toBool();
+        players.append(player);
+    }
+
+    throwLastIfFailed();
+
+    return players;
+}
+
+QList<QString> Queries::selectExternalPaths(const QByteArray& checksum) {
+    prepare(
+        "SELECT external_path FROM replay_external_paths WHERE "
+        "replay_checksum "
+        "= :checksum");
+    m_query.bindValue(":checksum", checksum);
+
+    exec();
+
+    QList<QString> paths;
+    while (m_query.next()) {
+        paths.append(m_query.value(0).toString());
+    }
+    throwLastIfFailed();
+    return paths;
+}
+
+QList<QByteArray> Queries::selectReplaysNeedingRechecksum() {
+    prepare("SELECT checksum FROM replays WHERE rechecksum = 1");
+
+    exec();
+
+    QList<QByteArray> replays;
+    while (m_query.next()) {
+        replays.append(m_query.value(0).toByteArray());
+    }
+    throwLastIfFailed();
+    return replays;
+}
+
+void Queries::deleteReplay(const QByteArray& checksum) {
+    prepare("DELETE FROM replays WHERE checksum = :checksum");
+    m_query.bindValue(":checksum", checksum);
+    exec();
+}
+
+void Queries::deleteReplayAnalysis(const QByteArray& checksum) {
+    prepare("DELETE FROM replay_analysis WHERE replay_checksum = :checksum");
+    m_query.bindValue(":checksum", checksum);
+    exec();
+}
+
+void Queries::deleteReplayOverrides(const QByteArray& checksum) {
+    prepare("DELETE FROM replay_overrides WHERE replay_checksum = :checksum");
+    m_query.bindValue(":checksum", checksum);
+    exec();
+}
+
+void Queries::deleteReplayPlayers(const QByteArray& checksum) {
+    prepare("DELETE FROM replay_players WHERE replay_checksum = :checksum");
+    m_query.bindValue(":checksum", checksum);
+    exec();
+}
+
+void Queries::deleteReplayExternalPaths(const QByteArray& checksum) {
+    prepare(
+        "DELETE FROM replay_external_paths WHERE replay_checksum = :checksum");
+    m_query.bindValue(":checksum", checksum);
+    exec();
+}
+
+void Queries::migrateReplayChecksum(const QByteArray& oldChecksum,
+                                    const QByteArray& newChecksum) {
+    prepare(
+        "UPDATE replays SET checksum = :newChecksum WHERE checksum = "
+        ":oldChecksum");
+    m_query.bindValue(":oldChecksum", oldChecksum);
+    m_query.bindValue(":newChecksum", newChecksum);
+    exec();
+}
+
+void Queries::migrateReplayAnalysis(const QByteArray& oldChecksum,
+                                    const QByteArray& newChecksum) {
+    prepare(
+        "UPDATE replay_analysis SET replay_checksum = :newChecksum WHERE "
+        "replay_checksum = :oldChecksum");
+    m_query.bindValue(":oldChecksum", oldChecksum);
+    m_query.bindValue(":newChecksum", newChecksum);
+    exec();
+}
+
+void Queries::migrateReplayOverrides(const QByteArray& oldChecksum,
+                                     const QByteArray& newChecksum) {
+    prepare(
+        "UPDATE replay_overrides SET replay_checksum = :newChecksum WHERE "
+        "replay_checksum = :oldChecksum");
+    m_query.bindValue(":oldChecksum", oldChecksum);
+    m_query.bindValue(":newChecksum", newChecksum);
+    exec();
+}
+
+void Queries::migrateReplayPlayers(const QByteArray& oldChecksum,
+                                   const QByteArray& newChecksum) {
+    prepare(
+        "UPDATE replay_players SET replay_checksum = :newChecksum WHERE "
+        "replay_checksum = :oldChecksum");
+    m_query.bindValue(":oldChecksum", oldChecksum);
+    m_query.bindValue(":newChecksum", newChecksum);
+    exec();
+}
+
+void Queries::migrateReplayExternalPaths(const QByteArray& oldChecksum,
+                                         const QByteArray& newChecksum) {
+    prepare(
+        "UPDATE replay_external_paths SET replay_checksum = :newChecksum WHERE "
+        "replay_checksum = :oldChecksum");
+    m_query.bindValue(":oldChecksum", oldChecksum);
+    m_query.bindValue(":newChecksum", newChecksum);
+    exec();
+}
+
+void Queries::markReplayForRechecksum(const QByteArray& checksum,
+                                      bool rechecksum) {
+    prepare(
+        "UPDATE replays SET rechecksum = :rechecksum WHERE checksum = "
+        ":checksum");
+    m_query.bindValue(":checksum", checksum);
+    m_query.bindValue(":rechecksum", rechecksum ? 1 : 0);
+    exec();
+}
+
+Replay Queries::readReplay() const {
+    return Replay{
+        .checksum = m_query.value(0).toByteArray(),
+        .timestamp = QDateTime::fromSecsSinceEpoch(
+            m_query.value(1).toLongLong(), QTimeZone(QTimeZone::UTC)),
+        .matchTitle = m_query.value(2).toString(),
+        .matchDescription = m_query.value(3).toString(),
+        .mapName = m_query.value(4).toString(),
+        .mapReference = m_query.value(5).toString(),
+        .hasExternalPath = m_query.value(6).toBool(),
+        .overrideMatchTitle = m_query.value(7).toString(),
+        .engineTicks = m_query.value(8).toUInt(),
+        .bodyOffset = m_query.value(9).toUInt(),
+    };
+}
+
+void Queries::bootstrapMutationTable(const QList<QString>& values) {
+    prepare(
+        "CREATE TEMP TABLE IF NOT EXISTS bulk_mutation_tmp "
+        "(value TEXT NOT NULL)");
+    exec();
+
+    prepare("DELETE FROM bulk_mutation_tmp");
+    exec();
+
+    if (!values.isEmpty()) {
+        prepare("INSERT INTO bulk_mutation_tmp(value) VALUES (:value)");
+        for (const auto& v : values) {
+            m_query.bindValue(":value", v);
+            exec();
+        }
+    }
+}
+
+void Queries::prepare(const QString& sql) {
+    if (!m_query.prepare(sql)) {
+        throwLast();
+    }
+}
+
+void Queries::exec() {
+    if (!m_query.exec()) {
+        throwLast();
+    }
+}
+
+void Queries::execBatch() {
+    if (!m_query.execBatch()) {
+        throwLast();
+    }
+}
+
+void Queries::throwLast() const {
+    throw StorageException(m_query.lastError().text());
+}
+
+void Queries::throwLastIfFailed() const {
+    if (m_query.lastError().isValid()) {
+        throw StorageException(m_query.lastError().text());
+    }
+}
+
+void Queries::nextOrThrow() {
+    if (!m_query.next()) {
+        throw StorageException("expected result row");
+    }
+}
+
+}  // namespace KWLegionCore

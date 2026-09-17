@@ -5,6 +5,7 @@
 ### Changed
 
 - The blank statistics page has been removed until there are meaningful statistics
+- Startup should be faster and consume less CPU
 
 ### Fixed
 

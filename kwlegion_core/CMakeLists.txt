@@ -36,6 +36,7 @@ add_library(kwlegion_core STATIC
     src/replaystore.cpp
     src/transaction.cpp
     src/persistence.cpp
+    src/queries.cpp
     src/replay.cpp
     src/replaystoremodel.cpp
     src/teammodel.cpp
