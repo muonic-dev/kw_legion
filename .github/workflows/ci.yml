@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  debug-build-and-test-win32:
+    name: debug-build-and-test-win32
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    env:
+      CC: clang
+      CXX: clang++
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Qt and LLVM-MinGW
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.11.1
+          host: windows
+          target: desktop
+          arch: win64_llvm_mingw
+          modules: qtgraphs
+          tools: tools_llvm_mingw1706,qt.tools.win64_llvm_mingw1706
+          cache: true
+
+      - name: Configure debug build
+        run: cmake --preset Debug
+
+      - name: Build
+        run: cmake --build --preset Debug --parallel
+
+      - name: Run tests
+        run: ctest --preset Debug
