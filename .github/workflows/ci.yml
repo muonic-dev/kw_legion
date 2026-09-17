@@ -33,7 +33,7 @@ jobs:
           host: windows
           target: desktop
           arch: win64_llvm_mingw
-          modules: qtgraphs
+          modules: qtgraphs qtquick3d qtshadertools qtquicktimeline
           tools: tools_llvm_mingw1706,qt.tools.win64_llvm_mingw1706
           cache: true
 
