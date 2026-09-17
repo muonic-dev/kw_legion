@@ -7,11 +7,13 @@ project(kw_legion
 
 # CMake's project(VERSION) accepts only numeric components, so keep it numeric
 # and derive a SemVer pre-release label separately for packaging/display.
-set(KW_LEGION_VERSION_PRERELEASE "snapshot")
-if (KW_LEGION_VERSION_PRERELEASE STREQUAL "") 
-set(KW_LEGION_VERSION_SEMVER "${PROJECT_VERSION}")
+set(KW_LEGION_VERSION_PRERELEASE "snapshot" CACHE STRING
+    "SemVer pre-release label; leave empty for a stable release")
+if(KW_LEGION_VERSION_PRERELEASE STREQUAL "")
+    set(KW_LEGION_VERSION_SEMVER "${PROJECT_VERSION}")
 else()
-set(KW_LEGION_VERSION_SEMVER "${PROJECT_VERSION}-${KW_LEGION_VERSION_PRERELEASE}")
+    set(KW_LEGION_VERSION_SEMVER
+        "${PROJECT_VERSION}-${KW_LEGION_VERSION_PRERELEASE}")
 endif()
 
 # Short commit hash for the About page's build field, kept separate from

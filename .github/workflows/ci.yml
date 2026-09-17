@@ -2,6 +2,10 @@ name: CI
 
 on:
   push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
   pull_request:
   workflow_dispatch:
 
@@ -10,7 +14,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Do not interrupt a workflow that may be publishing a release.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
 
 jobs:
   debug-build-and-test-win32:
@@ -45,3 +50,121 @@ jobs:
 
       - name: Run tests
         run: ctest --preset Debug
+
+  package-release-win32:
+    name: package-release-win32
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: debug-build-and-test-win32
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    permissions:
+      contents: write
+
+    env:
+      CC: clang
+      CXX: clang++
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag and derive version
+        id: version
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $cmake = Get-Content CMakeLists.txt -Raw
+          $projectPattern = 'project\(kw_legion\s+VERSION\s+"(?<version>\d+\.\d+\.\d+)"'
+          $projectMatch = [regex]::Match($cmake, $projectPattern)
+          if (-not $projectMatch.Success) {
+              throw 'Could not read the project version from CMakeLists.txt'
+          }
+
+          $projectVersion = $projectMatch.Groups['version'].Value
+          $tagPattern = '^v(?<version>\d+\.\d+\.\d+)$'
+          if ($env:RELEASE_TAG -notmatch $tagPattern) {
+              throw "Release tag '$env:RELEASE_TAG' is not a final release tag of the form vX.Y.Z"
+          }
+
+          $tagVersion = $Matches.version
+          if ($tagVersion -ne $projectVersion) {
+              throw "Tag version '$tagVersion' does not match CMake project version '$projectVersion'"
+          }
+
+          "version=$tagVersion" >> $env:GITHUB_OUTPUT
+
+      - name: Install Qt and LLVM-MinGW
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.10.3
+          host: windows
+          target: desktop
+          arch: win64_llvm_mingw
+          modules: qtgraphs qtquick3d qtshadertools qtquicktimeline
+          tools: tools_llvm_mingw1706,qt.tools.win64_llvm_mingw1706
+          cache: true
+
+      - name: Configure release build
+        run: cmake --preset Release "-DKW_LEGION_VERSION_PRERELEASE="
+
+      - name: Build release
+        run: cmake --build --preset Release --parallel
+
+      - name: Package release
+        working-directory: build-release
+        run: cpack --config CPackConfig.cmake
+
+      - name: Stage release artifacts
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $packageName = "kw-legion-$env:RELEASE_VERSION"
+          $packagePaths = @(
+              "build-release/$packageName.exe",
+              "build-release/$packageName.zip"
+          )
+
+          New-Item -ItemType Directory -Path release-artifacts | Out-Null
+          foreach ($packagePath in $packagePaths) {
+              if (-not (Test-Path -LiteralPath $packagePath)) {
+                  throw "Expected package '$packagePath' was not produced"
+              }
+              Copy-Item -LiteralPath $packagePath -Destination release-artifacts
+          }
+
+          $checksums = foreach ($packagePath in $packagePaths) {
+              $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $packagePath).Hash.ToLowerInvariant()
+              "$hash  $(Split-Path -Leaf $packagePath)"
+          }
+          $checksums | Set-Content release-artifacts/SHA256SUMS.txt
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: kw-legion-${{ steps.version.outputs.version }}-win32
+          path: release-artifacts/
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $packageName = "kw-legion-$env:RELEASE_VERSION"
+          gh release create $env:RELEASE_TAG `
+              "release-artifacts/$packageName.exe" `
+              "release-artifacts/$packageName.zip" `
+              'release-artifacts/SHA256SUMS.txt' `
+              --title $env:RELEASE_TAG `
+              --generate-notes `
+              --verify-tag
+          if ($LASTEXITCODE -ne 0) {
+              throw "gh release create failed with exit code $LASTEXITCODE"
+          }
