@@ -9,6 +9,7 @@
 #include <QSet>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <catch2/catch_test_macros.hpp>
 
 using namespace KWLegionCore;
@@ -157,8 +158,9 @@ TEST_CASE("ReplayProspector detects a file modified at the root",
     sweep(prospector);
 
     QSignalSpy spy(&prospector, &ReplayProspector::replayFileChanged);
+    REQUIRE(spy.isValid());
 
-    modifyFile(targetPath);
+    QTimer::singleShot(0, [&] { modifyFile(targetPath); });
 
     REQUIRE(spy.wait(WATCH_TIMEOUT_MS));
     for (const QList<QVariant>& emission : spy) {
