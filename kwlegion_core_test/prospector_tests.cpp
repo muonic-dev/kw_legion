@@ -3,13 +3,13 @@
 
 #include <kwlegion_core/prospector.h>
 
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QSet>
 #include <QSignalSpy>
 #include <QTemporaryDir>
-#include <QTimer>
 #include <catch2/catch_test_macros.hpp>
 
 using namespace KWLegionCore;
@@ -31,12 +31,20 @@ void createFile(const QDir& root, const QString& relativePath) {
     file.write("replay");
 }
 
+// Moves the initial modification time far enough into the past that a
+// subsequent write cannot share its timestamp. Qt's Windows watcher listens
+// for size changes, but verifies them using lastModified() before emitting its
+// signal. This establishes the baseline before the watcher is installed; the
+// timestamp change itself is not expected to generate a notification.
+void ageFile(const QString& absolutePath) {
+    QFile file(absolutePath);
+    REQUIRE(file.open(QIODevice::ReadWrite));
+    REQUIRE(file.setFileTime(QDateTime::currentDateTimeUtc().addSecs(-10),
+                             QFileDevice::FileModificationTime));
+}
+
 // Appends more data to an existing file, mimicking an application (or a
-// hex editor) rewriting part of a file in place. Relies on the write itself
-// to naturally advance the OS-reported modification time - explicitly
-// stamping it via QFileDevice::setFileTime() turned out to be unreliable at
-// triggering a Windows change notification, even though the timestamp
-// itself changed on disk.
+// hex editor) rewriting part of a file in place.
 void modifyFile(const QString& absolutePath) {
     QFile file(absolutePath);
     REQUIRE(file.open(QIODevice::Append));
@@ -152,6 +160,7 @@ TEST_CASE("ReplayProspector detects a file modified at the root",
 
     createFile(root, "Last Replay.KWReplay");
     const QString targetPath = root.filePath("Last Replay.KWReplay");
+    ageFile(targetPath);
     const QString expectedPath = QFileInfo(targetPath).canonicalFilePath();
 
     ReplayProspector prospector(tempDir.path());
@@ -160,7 +169,7 @@ TEST_CASE("ReplayProspector detects a file modified at the root",
     QSignalSpy spy(&prospector, &ReplayProspector::replayFileChanged);
     REQUIRE(spy.isValid());
 
-    QTimer::singleShot(0, [&] { modifyFile(targetPath); });
+    modifyFile(targetPath);
 
     REQUIRE(spy.wait(WATCH_TIMEOUT_MS));
     for (const QList<QVariant>& emission : spy) {
@@ -176,12 +185,14 @@ TEST_CASE("ReplayProspector detects a file modified in a subdirectory",
 
     createFile(root, "Skirmish/skirmish1.KWReplay");
     const QString targetPath = root.filePath("Skirmish/skirmish1.KWReplay");
+    ageFile(targetPath);
     const QString expectedPath = QFileInfo(targetPath).canonicalFilePath();
 
     ReplayProspector prospector(tempDir.path());
     sweep(prospector);
 
     QSignalSpy spy(&prospector, &ReplayProspector::replayFileChanged);
+    REQUIRE(spy.isValid());
 
     modifyFile(targetPath);
 
