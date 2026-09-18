@@ -27,6 +27,10 @@ Licensed under GPLv3 (see [LICENSE](LICENSE))
 
 This project is licensed under the GNU General Public License v3.0 or later - see the [LICENSE](LICENSE) file for details.
 
+## Linux Support
+
+Linux is not directly supported but if a contributor wanted to step forward it is feasible. The primary limitation is the inference of where the replays directory is and the autostart implementation. The ability to override the default replay directory by configuration would be the minimum requirement along with the ability to infer where the replay directory is under the proton prefix. You may be able to get this to work by symlinking the actually protonprefix Replays dir into you xdg-documents directory at the appropriate path though.
+
 ## Development
 
 ⚠️ This project is open source because I believe in it. However, as I have limited time if you drive by PR it is very unlikely that I will review and/or merge.
@@ -38,5 +42,4 @@ It writes 4k blocks and flushes them then sleeps for 4s to simulate the way KW s
 
 ## AI Disclosure
 
-This program has been developed with the assistance of AI. The primary contribution has been implementing/debugging the build system, the UI,
-and generating tests. I believe I have a firm understanding of all the code currently in program.
+This program has been developed with the assistance of AI. The primary contribution has been implementing/debugging the build system, the UI, and generating tests. I believe I have a firm understanding of all the code currently in program.
