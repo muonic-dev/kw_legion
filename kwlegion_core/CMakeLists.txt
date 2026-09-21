@@ -27,6 +27,7 @@ add_library(kwlegion_core STATIC
     include/kwlegion_core/inboxitem.h
     include/kwlegion_core/asyncvalue.h
     include/kwlegion_core/replayanalyzer.h
+    include/kwlegion_core/autoupdate.h
     # Main src
 
     src/apmanalyzer.cpp
@@ -59,6 +60,8 @@ add_library(kwlegion_core STATIC
     src/replayanalyzerbridge.cpp
     src/sortfilterproxymodel.h #MOC
     src/sortfilterproxymodel.cpp
+    src/autoupdate_impl.h #MOC
+    src/autoupdate.cpp
     ${platform_sources}
     
 )

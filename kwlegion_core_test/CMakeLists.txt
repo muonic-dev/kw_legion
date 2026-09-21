@@ -2,6 +2,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Sql Test)
 
 add_executable(kwlegion_core_tests
     main.cpp
+    autoupdate_tests.cpp
     deferred_tests.cpp
     prospector_tests.cpp
     persistence_tests.cpp

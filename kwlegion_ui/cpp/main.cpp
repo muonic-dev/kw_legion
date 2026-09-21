@@ -21,7 +21,6 @@
 #include <QIcon>
 #include <QLatin1StringView>
 #include <QList>
-#include <QMutex>
 #include <QObject>
 #include <QQmlApplicationEngine>
 #include <QQmlError>

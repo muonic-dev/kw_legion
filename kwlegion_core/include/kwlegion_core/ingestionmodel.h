@@ -9,8 +9,11 @@
 
 #include <QAbstractListModel>
 #include <QByteArray>
-#include <QQmlEngine>
-#include <QTimer>
+#include <QHash>
+#include <QVariant>
+
+class QQmlEngine;
+class QJSEngine;
 
 namespace KWLegionCore {
 class ReplayStore;

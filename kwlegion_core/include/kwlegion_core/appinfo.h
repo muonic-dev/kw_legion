@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <qqmlintegration.h>
+
 #include <QObject>
 #include <QQmlEngine>
 #include <QString>
