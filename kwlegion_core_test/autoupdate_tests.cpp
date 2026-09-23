@@ -12,6 +12,7 @@
 #include <optional>
 #include <variant>
 
+#include "autoupdate.h"
 #include "autoupdate_impl.h"
 
 using namespace KWLegionCore;
@@ -21,9 +22,7 @@ namespace {
 const QDateTime CHECK_TIME =
     QDateTime::fromString("2026-09-21T12:00:00Z", Qt::ISODate);
 
-Checker checker() {
-    return Checker{QUrl{"http://127.0.0.1"}, nullptr};
-}
+Checker checker() { return Checker{QUrl{"http://127.0.0.1"}, nullptr}; }
 
 }  // namespace
 
@@ -106,6 +105,13 @@ TEST_CASE("Malformed GitHub JSON is reported as a general failure",
     CHECK_FALSE(std::get<GeneralFailedCheck>(result).message.isEmpty());
 }
 
+TEST_CASE("Only newer release versions are offered", "[autoupdate][version]") {
+    CHECK(Checker::isReleaseNewer("0.4.0", "v0.5.0"));
+    CHECK(Checker::isReleaseNewer("0.4.0-snapshot", "v0.4.0"));
+    CHECK_FALSE(Checker::isReleaseNewer("0.4.0", "v0.4.0"));
+    CHECK_FALSE(Checker::isReleaseNewer("0.5.0", "v0.4.0"));
+}
+
 TEST_CASE("A network error completes the check once and clears checking",
           "[autoupdate][network]") {
     // Reserve an ephemeral port and close it so the request deterministically
@@ -116,16 +122,15 @@ TEST_CASE("A network error completes the check once and clears checking",
     portReservation.close();
 
     QNetworkAccessManager nam;
-    Checker subject{
-        QUrl{QStringLiteral("http://127.0.0.1:%1").arg(unusedPort)}, &nam};
+    Checker subject{QUrl{QStringLiteral("http://127.0.0.1:%1").arg(unusedPort)},
+                    &nam};
     std::optional<CheckResult> result;
     int completionCount = 0;
-    QObject::connect(
-        &subject, &Checker::checkComplete, &subject,
-        [&result, &completionCount](CheckResult completed) {
-            result = std::move(completed);
-            ++completionCount;
-        });
+    QObject::connect(&subject, &Checker::checkComplete, &subject,
+                     [&result, &completionCount](CheckResult completed) {
+                         result = std::move(completed);
+                         ++completionCount;
+                     });
 
     subject.startCheck();
     CHECK(subject.isChecking());

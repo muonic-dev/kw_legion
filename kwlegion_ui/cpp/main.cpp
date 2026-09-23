@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Muonic
 
 #include <kwlegion_core/appinfo.h>
+#include <kwlegion_core/autoupdate.h>
 #include <kwlegion_core/autostart.h>
 #include <kwlegion_core/ingestionmodel.h>
 #include <kwlegion_core/metatypes.h>
@@ -198,6 +199,10 @@ int main(int argc, char* argv[]) {
     auto* settings = requireSingleton<Settings>(engine, "Settings");
     settings->setAutostartMechanism(
         KWLegionCore::createPlatformAutostartMechanism());
+
+    auto* autoUpdater =
+        requireSingleton<AutoUpdater>(engine, "AutoUpdater");
+    autoUpdater->finishInit(settings);
 
     auto* replayStoreModel =
         requireSingleton<ReplayStoreModel>(engine, "ReplayStoreModel");

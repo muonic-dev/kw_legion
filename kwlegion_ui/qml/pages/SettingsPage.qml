@@ -21,28 +21,28 @@ Page {
             name: qsTr("Start automatically")
             description: qsTr("Start at login. LEGION needs to be running in order to track your replays.")
             checked: Settings.shouldAutostart
-            onCheckedChanged: Settings.shouldAutostart = checked
+            onToggled: checked => Settings.shouldAutostart = checked
         }
 
         SettingsSwitchRow {
             name: qsTr("Start hidden")
             description: qsTr("Start hidden to the tray icon")
             checked: Settings.startMinimized
-            onCheckedChanged: Settings.startMinimized = checked
+            onToggled: checked => Settings.startMinimized = checked
         }
 
         SettingsSwitchRow {
             name: qsTr("Minimize to tray")
             description: qsTr("Hide the window to the tray icon instead of quitting when you close close")
             checked: Settings.closeToTray
-            onCheckedChanged: Settings.closeToTray = checked
+            onToggled: checked => Settings.closeToTray = checked
         }
 
         SettingsSwitchRow {
             name: qsTr("Automatically check for updates")
             description: qsTr("LEGION will check for updates periodically about once per day.")
             checked: Settings.checkForUpdates
-            onCheckedChanged: Settings.checkForUpdates = checked
+            onToggled: checked => Settings.checkForUpdates = checked
         }
 
         Item {

@@ -146,6 +146,16 @@ ApplicationWindow {
                 active: !Settings.hasDismissedCheckForUpdates
                 onConfirmed: Settings.checkForUpdates = true
                 onDismissed: Settings.checkForUpdates = false
+            },
+            SnackbarSpec {
+                title: qsTr("Update available")
+                description: qsTr("%1 is available. Download it now?").arg(AutoUpdater.availableReleaseName)
+                active: AutoUpdater.updateAvailable
+                onConfirmed: {
+                    Qt.openUrlExternally(AutoUpdater.availableReleaseUrl);
+                    AutoUpdater.dismissAvailableRelease();
+                }
+                onDismissed: AutoUpdater.dismissAvailableRelease()
             }
         ]
     }

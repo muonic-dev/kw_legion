@@ -139,6 +139,19 @@ add_custom_command(TARGET kw_legion POST_BUILD
         $<TARGET_FILE_DIR:kw_legion>/imageformats
 )
 
+# QNetworkAccessManager discovers TLS backends as plugins. On Windows use
+# Schannel so HTTPS update checks rely on the native OS TLS implementation and
+# do not require separately deployed OpenSSL libraries.
+if(WIN32)
+    add_custom_command(TARGET kw_legion POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            $<TARGET_FILE_DIR:kw_legion>/tls
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:Qt6::QSchannelBackendPlugin>
+            $<TARGET_FILE_DIR:kw_legion>/tls
+    )
+endif()
+
 install(TARGETS kw_legion
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -154,7 +167,7 @@ if(WIN32)
     # Trim installer payload to what this app actually needs at runtime.
     list(APPEND kw_legion_deploy_tool_options
         --skip-plugin-types qmltooling
-        --include-plugins qsqlite,qsvg
+        --include-plugins qsqlite,qsvg,qschannelbackend
         --exclude-plugins qsqlibase,qsqlmimer,qsqloci,qsqlodbc,qsqlpsql
     )
 endif()

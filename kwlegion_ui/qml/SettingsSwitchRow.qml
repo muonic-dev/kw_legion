@@ -11,6 +11,7 @@ ColumnLayout {
     property alias name: settingDesc.name
     property alias description: settingDesc.description
     property alias checked: toggle.checked
+    signal toggled(bool checked)
 
     Layout.alignment: Qt.AlignHCenter
     Layout.maximumWidth: 640
@@ -27,6 +28,7 @@ ColumnLayout {
         Switch {
             id: toggle
             Layout.alignment: Qt.AlignVCenter
+            onToggled: control.toggled(checked)
         }
     }
 }

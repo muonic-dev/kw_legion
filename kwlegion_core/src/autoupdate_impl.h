@@ -3,6 +3,8 @@
  * Copyright (C) 2026 Muonic
  */
 
+#include <kwlegion_core/autoupdate.h>
+
 #include <QByteArray>
 #include <QDateTime>
 #include <QObject>
@@ -10,27 +12,10 @@
 #include <QUrl>
 #include <variant>
 
+
 class QNetworkAccessManager;
 
 namespace KWLegionCore {
-
-struct SuccessfulCheck {
-    QString name;
-    QString tagName;
-    QUrl releaseUrl;
-};
-
-struct HttpFailedCheck {
-    int statusCode;
-    QString message;
-};
-
-struct GeneralFailedCheck {
-    QString message;
-};
-
-using CheckResult =
-    std::variant<SuccessfulCheck, HttpFailedCheck, GeneralFailedCheck>;
 
 /**
  * The policy implementation of checks
@@ -59,6 +44,8 @@ class Checker : public QObject {
     void startCheck();
 
     static CheckResult parseReleaseResponse(const QByteArray& body);
+    static bool isReleaseNewer(const QString& currentVersion,
+                               const QString& releaseTag);
 
    signals:
     void checkComplete(CheckResult result);

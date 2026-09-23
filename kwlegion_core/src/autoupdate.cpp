@@ -4,7 +4,9 @@
  */
 
 #include <kwlegion_core/autoupdate.h>
+#include <kwlegion_core/settings.h>
 
+#include <QDebug>
 #include <QDir>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -14,19 +16,164 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QSettings>
-#include <QSslError>
 #include <QStandardPaths>
 #include <QTimer>
+#include <QVersionNumber>
 #include <chrono>
 #include <memory>
 #include <optional>
 #include <utility>
 
 #include "autoupdate_impl.h"
+#include "version.h"
+
+namespace {
+template <typename... Ts>
+struct Match : Ts... {
+    using Ts::operator()...;
+};
+}  // namespace
 
 namespace KWLegionCore {
 
-AutoUpdater::AutoUpdater(QObject* parent) : QObject(parent) {}
+Q_LOGGING_CATEGORY(logAutoUpdater, "kwlegion.autoupdater");
+
+constexpr const char* const LAST_SUCCESSFUL_KEY = "lastSuccessfulCheck";
+constexpr const char* const LAST_KEY = "lastCheck";
+constexpr const char* const MOST_RECENTLY_DISMISSED_RELEASE_KEY =
+    "mostRecentlyDismissedRelease";
+
+// Autoupdater is a sub-composition root responsible for wiring together the
+// relevant pieces for update
+AutoUpdater::AutoUpdater(QObject* parent)
+    : QObject(parent),
+      m_timer(new QTimer(this)),
+      m_nam(new QNetworkAccessManager(this)),
+      m_checker(new Checker(githubApi(), m_nam, this)) {
+    m_timer->setInterval(std::chrono::minutes{15});
+    m_timer->callOnTimeout(this, &AutoUpdater::timerFired);
+    connect(m_checker, &Checker::checkComplete, this,
+            &AutoUpdater::checkComplete);
+
+    const QString cacheLocation =
+        QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    if (cacheLocation.isEmpty() || !QDir().mkpath(cacheLocation)) {
+        qCWarning(logAutoUpdater).noquote()
+            << "Automatic update checks disabled: unable to create cache "
+               "directory:"
+            << cacheLocation;
+        return;
+    }
+    const QString path = cacheLocation + "/autoupdate.ini";
+    m_cache = new QSettings(path, QSettings::Format::IniFormat, this);
+}
+
+AutoUpdater* AutoUpdater::create(QQmlEngine* /*qmlEngine*/,
+                                 QJSEngine* /*jsEngine*/) {
+    return new AutoUpdater;
+}
+
+void AutoUpdater::finishInit(Settings* settings) {
+    Q_ASSERT(settings != nullptr);
+    Q_ASSERT(m_settings == nullptr);
+    m_settings = settings;
+
+    connect(m_settings, &Settings::checkForUpdatesChanged, this,
+            &AutoUpdater::reapplyCheckPolicy);
+    connect(m_settings, &Settings::checkForUpdatesChanged, this,
+            &AutoUpdater::timerFired);
+
+    reapplyCheckPolicy();
+    timerFired();
+    m_timer->start();
+}
+
+bool AutoUpdater::updateAvailable() const {
+    return m_availableRelease.has_value();
+}
+
+QString AutoUpdater::availableVersion() const {
+    return m_availableRelease ? m_availableRelease->tagName : QString{};
+}
+
+QString AutoUpdater::availableReleaseName() const {
+    return m_availableRelease ? m_availableRelease->name : QString{};
+}
+
+QUrl AutoUpdater::availableReleaseUrl() const {
+    return m_availableRelease ? m_availableRelease->releaseUrl : QUrl{};
+}
+
+void AutoUpdater::dismissAvailableRelease() {
+    if (!m_availableRelease) {
+        return;
+    }
+    m_cache->setValue(MOST_RECENTLY_DISMISSED_RELEASE_KEY,
+                      m_availableRelease->tagName);
+    m_cache->sync();
+    if (m_cache->status() != QSettings::NoError) {
+        qCWarning(logAutoUpdater)
+            << "Unable to persist the dismissed update release";
+    }
+    m_availableRelease.reset();
+    emit availableReleaseChanged();
+}
+
+void AutoUpdater::timerFired() {
+    // Lazy init or could fail to initialize so we we must guard here
+    if (m_cache == nullptr || m_settings == nullptr) {
+        return;
+    }
+    const QDateTime now{m_clock()};
+    if (m_checker->isCheckDue(now)) {
+        m_checker->startCheck();
+        m_cache->setValue(LAST_KEY, now);
+        reapplyCheckPolicy();
+    }
+}
+
+void AutoUpdater::reapplyCheckPolicy() {
+    // Lazy init or could fail to initialize so we we must guard here
+    if (m_cache == nullptr || m_settings == nullptr) {
+        return;
+    }
+
+    m_checker->setChecksEnabled(m_settings->checkForUpdates());
+    m_checker->setLastSuccessfulUpdateCheck(
+        m_cache->value(LAST_SUCCESSFUL_KEY).toDateTime());
+    m_checker->setLastUpdateCheck(m_cache->value(LAST_KEY).toDateTime());
+}
+
+void AutoUpdater::checkComplete(CheckResult checkResult) {
+    const QDateTime now{m_clock()};
+    std::visit(Match{
+                   [this, &now](SuccessfulCheck check) {
+                       m_cache->setValue(LAST_SUCCESSFUL_KEY, now);
+                       m_checker->setLastSuccessfulUpdateCheck(now);
+
+                       const QString dismissedRelease =
+                           m_cache->value(MOST_RECENTLY_DISMISSED_RELEASE_KEY)
+                               .toString();
+                       //    if (Checker::isReleaseNewer(
+                       //            QString::fromUtf8(KW_LEGION_VERSION_SEMVER),
+                       //            check.tagName) &&
+                       //        dismissedRelease != check.tagName) {
+                       m_availableRelease = std::move(check);
+                       emit availableReleaseChanged();
+                       //    }
+                   },
+                   [](const HttpFailedCheck& failure) {
+                       qCWarning(logAutoUpdater).noquote()
+                           << "Update check failed with HTTP status"
+                           << failure.statusCode << ":" << failure.message;
+                   },
+                   [](const GeneralFailedCheck& failure) {
+                       qCWarning(logAutoUpdater).noquote()
+                           << "Update check failed:" << failure.message;
+                   },
+               },
+               std::move(checkResult));
+}
 
 constexpr const char* const LATEST_PATH =
     "/repos/muonic-dev/kw_legion/releases/latest";
@@ -181,9 +328,41 @@ CheckResult Checker::parseReleaseResponse(const QByteArray& body) {
     };
 }
 
-AutoUpdater* AutoUpdater::create(QQmlEngine* /*qmlEngine*/,
-                                 QJSEngine* /*jsEngine*/) {
-    return new AutoUpdater;
+bool Checker::isReleaseNewer(const QString& currentVersion,
+                             const QString& releaseTag) {
+    const auto normalize = [](QString version) {
+        if (version.startsWith('v', Qt::CaseInsensitive)) {
+            version.remove(0, 1);
+        }
+        return version;
+    };
+
+    const QString current = normalize(currentVersion);
+    const QString release = normalize(releaseTag);
+    if (current == release) {
+        return false;
+    }
+
+    qsizetype currentSuffix = 0;
+    qsizetype releaseSuffix = 0;
+    const QVersionNumber currentNumber =
+        QVersionNumber::fromString(current, &currentSuffix);
+    const QVersionNumber releaseNumber =
+        QVersionNumber::fromString(release, &releaseSuffix);
+    if (currentNumber.isNull() || releaseNumber.isNull()) {
+        // GitHub has already identified this as the latest release. If its tag
+        // is non-SemVer, only suppress an exact match.
+        return true;
+    }
+
+    const int comparison =
+        QVersionNumber::compare(releaseNumber, currentNumber);
+    if (comparison != 0) {
+        return comparison > 0;
+    }
+
+    // Equal numeric versions: a stable release supersedes a local prerelease.
+    return releaseSuffix == release.size() && currentSuffix != current.size();
 }
 
 }  // namespace KWLegionCore
