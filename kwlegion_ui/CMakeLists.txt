@@ -16,6 +16,8 @@ qt_add_executable(kw_legion
     cpp/main.cpp
     cpp/singleinstanceguard.h
     cpp/singleinstanceguard.cpp
+    cpp/startuptrace.h
+    cpp/startuptrace.cpp
     cpp/logrotator.h
     cpp/logrotator.cpp
     $<$<PLATFORM_ID:Windows>:${CMAKE_CURRENT_BINARY_DIR}/kw_legion.rc>

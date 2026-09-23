@@ -101,8 +101,9 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
      * what is new, and what has disappeared.
      *
      * This doubles as the startup trigger for migrations and setup and will
-     * cause the emission of the replaysLoaded(QList<Replay>) so that we
-     * don't flash stale content
+     * cause a second emission of replaysLoaded(QList<Replay>) containing the
+     * reconciled state. ReplayStore::init emits the persisted snapshot first
+     * so the UI can display cached content while this work runs.
      */
     void receiveInitialReplayPaths(const QList<QString>& paths);
 
@@ -174,6 +175,11 @@ class ReplayStore : public QObject, public ReplayAnalysisTargetProvider {
 
    private:
     void ensureDirectories();
+
+    // Query and publish a complete snapshot of the persisted replay state.
+    // Used once during initialization and again after filesystem
+    // reconciliation.
+    void emitReplaySnapshot();
 
     // Perform the actual replay synopsis
     // This is the happy path for parsing and ingestion

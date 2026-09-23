@@ -15,14 +15,12 @@ ApplicationWindow {
     height: 700
     minimumWidth: 200
     minimumHeight: 250
-    visible: false // so we can control via the on completed
+    color: Theme.lightMode ? Theme.reallyLight : Theme.reallyDark
+    // C++ exposes the window at zero opacity, then reveals it after Qt Quick
+    // submits the first complete frame.
+    visible: false
 
     title: qsTr("LEGION Replay Manager")
-
-    Component.onCompleted: {
-        const beVisible = !AppInfo.startMinimized && !Settings.startMinimized;
-        appWindow.visible = beVisible;
-    }
 
     property bool quitting: false
 

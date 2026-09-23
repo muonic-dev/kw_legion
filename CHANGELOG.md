@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.5.0
+
+### Changed
+
+- Startup should be faster yet again
+- Prevent a white flash when starting in dark mode
+
 ## 0.4.0
 
 ### Changed

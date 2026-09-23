@@ -94,6 +94,13 @@ ReplayStore::ReplayStore(Persistence& persistence, QString replayDir,
 void ReplayStore::init() {
     // Perform initial setup operation on the startup signal
     ensureDirectories();
+
+    try {
+        emitReplaySnapshot();
+    } catch (StorageException& ex) {
+        qCritical(logStore)
+            << "Unable to load the cached replays " << ex.what();
+    }
 }
 
 void ReplayStore::stop() {
@@ -224,14 +231,7 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
         // Now that we've done all the initial processing we will emit the query
         // What replays did we know about but seem to no longer exist.
         Queries::get(m_persistence).forgetMissingReplays(paths);
-        QList<Replay> replays = Queries::get(m_persistence).selectReplays();
-
-        for (Replay& replay : replays) {
-            replay.players = Queries::get(m_persistence)
-                                 .selectReplayPlayers(replay.checksum);
-        }
-
-        emit replaysLoaded(replays);
+        emitReplaySnapshot();
 
         // We've done startup, so lets do any pending analysis that we need.
         // In the future we may need to do re-emission of individual replays
@@ -239,6 +239,17 @@ void ReplayStore::receiveInitialReplayPaths(const QList<QString>& paths) {
     } catch (StorageException& ex) {
         qCritical(logStore) << "Unable to access the replays " << ex.what();
     }
+}
+
+void ReplayStore::emitReplaySnapshot() {
+    QList<Replay> replays = Queries::get(m_persistence).selectReplays();
+
+    for (Replay& replay : replays) {
+        replay.players =
+            Queries::get(m_persistence).selectReplayPlayers(replay.checksum);
+    }
+
+    emit replaysLoaded(replays);
 }
 
 void ReplayStore::performReplayReanalysis() {

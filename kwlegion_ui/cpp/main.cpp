@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Muonic
 
 #include <kwlegion_core/appinfo.h>
-#include <kwlegion_core/autoupdate.h>
 #include <kwlegion_core/autostart.h>
+#include <kwlegion_core/autoupdate.h>
 #include <kwlegion_core/ingestionmodel.h>
 #include <kwlegion_core/metatypes.h>
 #include <kwlegion_core/persistence.h>
@@ -25,9 +25,12 @@
 #include <QObject>
 #include <QQmlApplicationEngine>
 #include <QQmlError>
+#include <QQuickWindow>
 #include <QStandardPaths>
+#include <QString>
 #include <QTextStream>
 #include <QThread>
+#include <QTimer>
 #include <QUrl>
 #include <QWidgetSet>
 #include <QWindow>
@@ -38,6 +41,7 @@
 
 #include "logrotator.h"
 #include "singleinstanceguard.h"
+#include "startuptrace.h"
 
 namespace {
 
@@ -72,6 +76,9 @@ using namespace KWLegionUI;
 
 // NOLINTNEXTLINE(modernize-avoid-c-arrays, cppcoreguidelines-avoid-c-arrays)
 int main(int argc, char* argv[]) {
+    StartupTrace startupTrace;
+    startupTrace.mark(QStringLiteral("main_entered"));
+
     QCoreApplication::setOrganizationName("Muonic-Dev");
     QCoreApplication::setOrganizationDomain("muonic-dev.github.io");
 
@@ -79,6 +86,7 @@ int main(int argc, char* argv[]) {
         KWLegionCore::DEBUG_BUILD ? "kw_legion-debug" : "kw_legion");
 
     QGuiApplication app(argc, argv);
+    startupTrace.mark(QStringLiteral("qgui_application_constructed"));
 
     LogRotator logRotator(KWLegionCore::AppInfo::defaultLogFilePath());
     logRotator.start();
@@ -89,16 +97,21 @@ int main(int argc, char* argv[]) {
         logRotator.logMessage(type, context, msg);
     };
     qInstallMessageHandler(logMessageHandler);
+    startupTrace.mark(QStringLiteral("logging_installed"));
+    startupTrace.enableLogging();
 
     const SingleInstanceGuard singleInstanceGuard(
         QCoreApplication::applicationName());
+    startupTrace.mark(QStringLiteral("single_instance_checked"));
     if (!singleInstanceGuard.isPrimaryInstance()) {
         qInfo() << "Another instance of kw_legion is already running - "
                    "exiting.";
         return 0;
     }
 
-    if (QGuiApplication::arguments().contains(QStringLiteral("--minimized"))) {
+    const bool startMinimizedRequested =
+        QGuiApplication::arguments().contains(QStringLiteral("--minimized"));
+    if (startMinimizedRequested) {
         qInfo() << "Start minimized requested";
         AppInfo::setStartMinimized(true);
     }
@@ -111,6 +124,7 @@ int main(int argc, char* argv[]) {
             : QIcon(":/qt/qml/KWLegionUI/ico/CNCKW_Marked_of_Kane_Logo.png"));
 
     registerMetaTypes();
+    startupTrace.mark(QStringLiteral("application_configured"));
 
     QQmlApplicationEngine engine;
     QObject::connect(
@@ -126,6 +140,7 @@ int main(int argc, char* argv[]) {
                              qWarning() << error.toString();
                          }
                      });
+    startupTrace.mark(QStringLiteral("qml_engine_constructed"));
 
     // Background thread to run i/o jobs on
     // Currently, the only requirement is to move the I/O processing
@@ -145,6 +160,7 @@ int main(int argc, char* argv[]) {
     replayStore.moveToThread(&ioThread);
     ReplayAnalyzer replayAnalyzer(replayStore);
     replayAnalyzer.moveToThread(&ioThread);
+    startupTrace.mark(QStringLiteral("worker_objects_constructed"));
 
     QObject::connect(&ioThread, &QThread::finished, &replayStore,
                      &ReplayStore::stop);
@@ -166,8 +182,16 @@ int main(int argc, char* argv[]) {
                      &replayStore, &ReplayStore::synopsizeReplayFile);
     QObject::connect(&replayProspector, &ReplayProspector::replayFileRemoved,
                      &replayStore, &ReplayStore::removeReplayFile);
+    startupTrace.mark(QStringLiteral("startup_connections_complete"));
 
     engine.loadFromModule("KWLegionUI", "Main");
+    startupTrace.mark(QStringLiteral("qml_loaded"));
+
+    QQuickWindow* rootWindow = nullptr;
+    if (!engine.rootObjects().isEmpty()) {
+        rootWindow =
+            qobject_cast<QQuickWindow*>(engine.rootObjects().constFirst());
+    }
 
     QObject::connect(
         &singleInstanceGuard, &SingleInstanceGuard::activationRequested, &app,
@@ -199,21 +223,57 @@ int main(int argc, char* argv[]) {
     auto* settings = requireSingleton<Settings>(engine, "Settings");
     settings->setAutostartMechanism(
         KWLegionCore::createPlatformAutostartMechanism());
+    startupTrace.mark(QStringLiteral("settings_initialized"));
 
-    auto* autoUpdater =
-        requireSingleton<AutoUpdater>(engine, "AutoUpdater");
+    auto* autoUpdater = requireSingleton<AutoUpdater>(engine, "AutoUpdater");
     autoUpdater->finishInit(settings);
+    startupTrace.mark(QStringLiteral("auto_updater_initialized"));
 
     auto* replayStoreModel =
         requireSingleton<ReplayStoreModel>(engine, "ReplayStoreModel");
     replayStoreModel->finishInit(&replayStore, &replayAnalyzer);
+    startupTrace.mark(QStringLiteral("replay_store_model_initialized"));
 
     auto* ingestionModel =
         requireSingleton<IngestionModel>(engine, "IngestionModel");
     ingestionModel->finishInit(&replayStore);
+    startupTrace.mark(QStringLiteral("ingestion_model_initialized"));
 
     ioThread.start();
+    startupTrace.mark(QStringLiteral("io_thread_started"));
 
+    if (rootWindow != nullptr && !startMinimizedRequested &&
+        !settings->startMinimized()) {
+        // Expose the native window without making its unpainted client area
+        // visible. The single-shot frame callback reveals it once the scene
+        // graph has submitted complete content, then disconnects itself.
+        // This works around a flashbang paint when starting in dark-mode and
+        // we also piggyback on it for some additional startup metrics.
+        rootWindow->setOpacity(0.0);
+        const auto firstFrameConnection = static_cast<Qt::ConnectionType>(
+            Qt::DirectConnection | Qt::SingleShotConnection);
+        QObject::connect(
+            rootWindow, &QQuickWindow::frameSwapped, rootWindow,
+            [rootWindow, &startupTrace] {
+                startupTrace.mark(QStringLiteral("first_frame_swapped"));
+                QMetaObject::invokeMethod(
+                    rootWindow, [rootWindow] { rootWindow->setOpacity(1.0); },
+                    Qt::QueuedConnection);
+            },
+            firstFrameConnection);
+
+        // Queue the exposure so it happens only after the event loop can
+        // service Qt Quick's render request. Opacity stays at zero until the
+        // first frame is submitted.
+        QTimer::singleShot(0, rootWindow, [rootWindow] { rootWindow->show(); });
+    } else {
+        // A later tray activation is not part of startup, so no first-frame
+        // callback is installed for an initially hidden window.
+        qInfo() << "startup first_frame_tracking=skipped "
+                   "reason=initial_window_hidden";
+    }
+
+    startupTrace.mark(QStringLiteral("event_loop_entered"));
     const auto result = QGuiApplication::exec();
 
     ioThread.quit();

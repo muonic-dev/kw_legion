@@ -47,8 +47,9 @@ TEST_CASE(
     store.init();
     store.receiveInitialReplayPaths({});
 
-    REQUIRE(loadedSpy.count() == 1);
+    REQUIRE(loadedSpy.count() == 2);
     CHECK(loadedSpy.at(0).at(0).value<QList<Replay>>().isEmpty());
+    CHECK(loadedSpy.at(1).at(0).value<QList<Replay>>().isEmpty());
 
     CHECK(QFile::exists(tempDir.filePath("replays.db")));
     CHECK(QDir(tempDir.filePath("replays")).exists());
@@ -76,8 +77,9 @@ TEST_CASE(
     store.init();
     store.receiveInitialReplayPaths({replayPath});
 
-    REQUIRE(loadedSpy.count() == 1);
-    const QList<Replay> replays = loadedSpy.at(0).at(0).value<QList<Replay>>();
+    REQUIRE(loadedSpy.count() == 2);
+    CHECK(loadedSpy.at(0).at(0).value<QList<Replay>>().isEmpty());
+    const QList<Replay> replays = loadedSpy.at(1).at(0).value<QList<Replay>>();
     REQUIRE(replays.size() == 1);
     CHECK_FALSE(replays.at(0).checksum.isEmpty());
     CHECK(replays.at(0).hasExternalPath);
@@ -126,15 +128,16 @@ TEST_CASE(
                             "replaystore_reopen_second");
     persistence.init();
     ReplayStore store(persistence, tempDir.path(), tempDir.path());
-    store.init();
     QSignalSpy loadedSpy(&store, &ReplayStore::replaysLoaded);
+    store.init();
     store.receiveInitialReplayPaths({replayPath});
 
-    REQUIRE(loadedSpy.count() == 1);
+    REQUIRE(loadedSpy.count() == 2);
     const QList<Replay> replays = loadedSpy.at(0).at(0).value<QList<Replay>>();
     REQUIRE(replays.size() == 1);
     CHECK(replays.at(0).checksum == checksum);
     CHECK(replays.at(0).hasExternalPath);
+    CHECK(loadedSpy.at(1).at(0).value<QList<Replay>>().size() == 1);
 }
 
 TEST_CASE("ReplayStore ingests a replay reported live via synopsizeReplayFile",
