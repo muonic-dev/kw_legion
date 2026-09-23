@@ -3,6 +3,7 @@
  * Copyright (C) 2026 Muonic
  */
 
+#include <kwlegion_core/appinfo.h>
 #include <kwlegion_core/autoupdate.h>
 #include <kwlegion_core/settings.h>
 
@@ -154,13 +155,20 @@ void AutoUpdater::checkComplete(CheckResult checkResult) {
                        const QString dismissedRelease =
                            m_cache->value(MOST_RECENTLY_DISMISSED_RELEASE_KEY)
                                .toString();
-                       //    if (Checker::isReleaseNewer(
-                       //            QString::fromUtf8(KW_LEGION_VERSION_SEMVER),
-                       //            check.tagName) &&
-                       //        dismissedRelease != check.tagName) {
-                       m_availableRelease = std::move(check);
-                       emit availableReleaseChanged();
-                       //    }
+                       // Debugging aid: debug builds deliberately offer the
+                       // latest published release even when it predates the
+                       // running build, making the snackbar/browser flow easy
+                       // to exercise against the repository's prior release.
+                       const bool shouldOfferRelease =
+                           DEBUG_BUILD ||
+                           Checker::isReleaseNewer(
+                               QString::fromUtf8(KW_LEGION_VERSION_SEMVER),
+                               check.tagName);
+                       if (shouldOfferRelease &&
+                           dismissedRelease != check.tagName) {
+                           m_availableRelease = std::move(check);
+                           emit availableReleaseChanged();
+                       }
                    },
                    [](const HttpFailedCheck& failure) {
                        qCWarning(logAutoUpdater).noquote()
